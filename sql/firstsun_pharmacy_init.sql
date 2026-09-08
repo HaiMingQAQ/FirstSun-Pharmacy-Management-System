@@ -1,15 +1,13 @@
--- FirstSun Pharmacy Management System initial database
-
--- Reduced schema: 40 tables total = 31 pharmacy tables + 4 member tables + 5 pay tables
-
--- Generated from E:\github\xmlg-2\2-资料2 source SQL files on 2026-09-08
-
+-- FirstSun database baseline V1.0, MySQL >= 8.0.28
+-- 46 tables = 33 pharmacy + 4 member + 9 payment. system/infra tables are separate.
+-- EMPTY DATABASE ONLY. No DROP or sample secrets. Existing tables fail loudly.
+-- Select your intended empty database before executing. See README.md.
 SET NAMES utf8mb4;
+SET time_zone = '+08:00';
 
-SET FOREIGN_KEY_CHECKS = 0;
 
-CREATE TABLE IF NOT EXISTS ph_store (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_store (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   store_code      VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '门店编码(唯一)',
   store_name      VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '门店名称',
   address         VARCHAR(200) NOT NULL DEFAULT '' COMMENT '地址',
@@ -26,14 +24,16 @@ CREATE TABLE IF NOT EXISTS ph_store (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  dept_id BIGINT DEFAULT NULL COMMENT '关联框架system_dept.id，部署时绑定',
+  UNIQUE KEY uk_store_dept (tenant_id,dept_id),
   PRIMARY KEY (id),
   UNIQUE KEY uk_store_code (store_code),
   KEY idx_license_expire (license_expire)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='门店表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_store';
 
-CREATE TABLE IF NOT EXISTS ph_warehouse (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '所属门店(ph_store)',
+CREATE TABLE ph_warehouse (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  store_id        BIGINT NOT NULL COMMENT '所属门店(ph_store)',
   wh_code         VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '仓库编码',
   wh_name         VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '仓库名称',
   temp_zone       TINYINT      NOT NULL DEFAULT 0 COMMENT '温区:0常温/1阴凉/2冷藏/3冷冻(GSP)',
@@ -46,13 +46,13 @@ CREATE TABLE IF NOT EXISTS ph_warehouse (
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
   PRIMARY KEY (id),
-  UNIQUE KEY uk_wh_code (wh_code),
+  UNIQUE KEY uk_wh_code (tenant_id,store_id,wh_code),
   KEY idx_store_id (store_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='仓库表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_warehouse';
 
-CREATE TABLE IF NOT EXISTS ph_location (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  warehouse_id    BIGINT UNSIGNED NOT NULL COMMENT '所属仓库(ph_warehouse)',
+CREATE TABLE ph_location (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  warehouse_id    BIGINT NOT NULL COMMENT '所属仓库(ph_warehouse)',
   location_code   VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '货位码(如A-01-01)',
   location_type   TINYINT      NOT NULL DEFAULT 0 COMMENT '0常规/1处方药区/2特管柜/3拆零区/4近效期区',
   max_capacity    INT UNSIGNED DEFAULT NULL COMMENT '容量',
@@ -67,14 +67,14 @@ CREATE TABLE IF NOT EXISTS ph_location (
   PRIMARY KEY (id),
   UNIQUE KEY uk_location (warehouse_id, location_code),
   KEY idx_warehouse (warehouse_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='货位表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_location';
 
-CREATE TABLE IF NOT EXISTS ph_employee (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_employee (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   emp_no          VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '工号(唯一)',
   emp_name        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '姓名',
-  phone           VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '手机号(AES加密存储,NFR-11)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '所属门店',
+  phone VARCHAR(255) NOT NULL DEFAULT '' COMMENT '加密手机号，应用生成密文',
+  store_id        BIGINT NOT NULL COMMENT '所属门店',
   position        TINYINT      NOT NULL DEFAULT 0 COMMENT '岗位:1店长/2药师/3收银员/4库管员/5采购/6财务/9系统管理员',
   pharmacist_no   VARCHAR(32)  DEFAULT NULL COMMENT '执业药师注册证号(ADM-004)',
   license_expire  DATE         DEFAULT NULL COMMENT '药师资质到期日',
@@ -87,17 +87,19 @@ CREATE TABLE IF NOT EXISTS ph_employee (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  user_id BIGINT DEFAULT NULL COMMENT '关联框架system_users.id',
+  UNIQUE KEY uk_employee_user (tenant_id,user_id),
   PRIMARY KEY (id),
   UNIQUE KEY uk_emp_no (emp_no),
   KEY idx_store (store_id),
   KEY idx_license_expire (license_expire)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='员工表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_employee';
 
-CREATE TABLE IF NOT EXISTS ph_category (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_category (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   cat_code        VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '分类编码',
   cat_name        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '分类名',
-  parent_id       BIGINT UNSIGNED DEFAULT NULL COMMENT '上级分类(0表示顶级)',
+  parent_id       BIGINT DEFAULT NULL COMMENT '上级分类(0表示顶级)',
   cat_type        TINYINT      NOT NULL DEFAULT 0 COMMENT '0药品/1保健品/2医疗器械/3中药饮片/4日化/5其他',
   sort            INT          NOT NULL DEFAULT 0 COMMENT '排序',
   status          TINYINT      NOT NULL DEFAULT 1 COMMENT '启用',
@@ -110,12 +112,12 @@ CREATE TABLE IF NOT EXISTS ph_category (
   PRIMARY KEY (id),
   UNIQUE KEY uk_cat_code (cat_code),
   KEY idx_parent (parent_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品分类表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_category';
 
-CREATE TABLE IF NOT EXISTS ph_drug (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_drug (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   drug_code       VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '药品编码(系统内码,唯一)',
-  category_id     BIGINT UNSIGNED NOT NULL COMMENT '分类(ph_category)',
+  category_id     BIGINT NOT NULL COMMENT '分类(ph_category)',
   generic_name    VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '通用名',
   trade_name      VARCHAR(64)  DEFAULT NULL COMMENT '商品名',
   spell_code      VARCHAR(32)  DEFAULT NULL COMMENT '拼音码(如amxljn)',
@@ -123,7 +125,7 @@ CREATE TABLE IF NOT EXISTS ph_drug (
   dosage_form     VARCHAR(16)  DEFAULT NULL COMMENT '剂型(字典)',
   manufacturer    VARCHAR(128) DEFAULT NULL COMMENT '生产厂家',
   approval_no     VARCHAR(64)  DEFAULT NULL COMMENT '批准文号',
-  drug_type       TINYINT      NOT NULL DEFAULT 0 COMMENT '类型(0处方/1OTC甲/2OTC乙/3特管/4饮片/5保健/6器械/7日化/8其他)',
+  drug_type TINYINT NOT NULL DEFAULT 1 COMMENT '0处方1OTC甲2OTC乙3特管4饮片5保健6器械7日化8其他',
   is_rx           TINYINT      NOT NULL DEFAULT 0 COMMENT '是否处方药(收银强制审方POS-005)',
   is_special      TINYINT      NOT NULL DEFAULT 0 COMMENT '是否特殊管理药品(REG-002)',
   is_pseudoephedrine TINYINT   NOT NULL DEFAULT 0 COMMENT '含麻黄碱类(REG-006限购)',
@@ -140,8 +142,8 @@ CREATE TABLE IF NOT EXISTS ph_drug (
   max_stock       INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '库存上限',
   storage_cond    TINYINT      NOT NULL DEFAULT 0 COMMENT '储存条件:0常温/1阴凉/2冷藏/3冷冻',
   need_expiry     TINYINT      NOT NULL DEFAULT 1 COMMENT '是否效期管理',
-  default_location_id BIGINT UNSIGNED DEFAULT NULL COMMENT '默认货位',
-  saleable_online TINYINT      NOT NULL DEFAULT 1 COMMENT '是否线上可售(处方药/特管禁售WX-003/005)',
+  default_location_id BIGINT DEFAULT NULL COMMENT '默认货位',
+  saleable_online TINYINT NOT NULL DEFAULT 0 COMMENT '线上可售开关，仍须后端审方与特殊药品校验',
   status          TINYINT      NOT NULL DEFAULT 1 COMMENT '1启用/0停用',
   remark          VARCHAR(500) DEFAULT NULL COMMENT '备注',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
@@ -150,6 +152,17 @@ CREATE TABLE IF NOT EXISTS ph_drug (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  image_url VARCHAR(512) DEFAULT NULL COMMENT '封面图片',
+  images JSON DEFAULT NULL COMMENT '图片地址数组',
+  description TEXT COMMENT '药品说明信息',
+  instructions_url VARCHAR(512) DEFAULT NULL COMMENT '说明书文件',
+  approve_status TINYINT NOT NULL DEFAULT 0 COMMENT '品种审核0待审1通过2驳回',
+  audit_by BIGINT DEFAULT NULL COMMENT '审核员工',
+  audit_at DATETIME DEFAULT NULL COMMENT '审核时间',
+  audit_opinion VARCHAR(500) DEFAULT NULL COMMENT '意见，历史写业务审计',
+  CONSTRAINT ck_drug_price CHECK (retail_price >= 0 AND (member_price IS NULL OR member_price >= 0) AND (cost_price IS NULL OR cost_price >= 0) AND (min_sale_price IS NULL OR min_sale_price >= 0)),
+  CONSTRAINT ck_drug_stock CHECK (max_stock = 0 OR max_stock >= min_stock),
+  CONSTRAINT ck_drug_rx CHECK (drug_type <> 0 OR is_rx = 1),
   PRIMARY KEY (id),
   UNIQUE KEY uk_drug_code (drug_code),
   KEY idx_generic (generic_name),
@@ -157,11 +170,11 @@ CREATE TABLE IF NOT EXISTS ph_drug (
   KEY idx_category (category_id),
   KEY idx_approval (approval_no),
   KEY idx_type_status (drug_type, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='药品/商品档案';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_drug';
 
-CREATE TABLE IF NOT EXISTS ph_drug_barcode (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_drug_barcode (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   barcode         VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '条码(EAN-13/店内码/追溯码)',
   barcode_type    TINYINT      NOT NULL DEFAULT 0 COMMENT '0商品条码/1店内码/2追溯码',
   is_default      TINYINT      NOT NULL DEFAULT 0 COMMENT '默认扫码码',
@@ -174,10 +187,10 @@ CREATE TABLE IF NOT EXISTS ph_drug_barcode (
   PRIMARY KEY (id),
   UNIQUE KEY uk_barcode (barcode),
   KEY idx_drug (drug_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品条码表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_drug_barcode';
 
-CREATE TABLE IF NOT EXISTS ph_supplier (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_supplier (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   supplier_code   VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '供应商编码(唯一)',
   supplier_name   VARCHAR(128) NOT NULL DEFAULT '' COMMENT '名称',
   credit_code     VARCHAR(64)  DEFAULT NULL COMMENT '统一社会信用代码',
@@ -197,14 +210,17 @@ CREATE TABLE IF NOT EXISTS ph_supplier (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  audit_by BIGINT DEFAULT NULL COMMENT '审核员工',
+  audit_at DATETIME DEFAULT NULL COMMENT '审核时间',
+  audit_opinion VARCHAR(500) DEFAULT NULL COMMENT '意见，历史写业务审计',
   PRIMARY KEY (id),
   UNIQUE KEY uk_supplier_code (supplier_code),
   KEY idx_approve (approve_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='供应商表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_supplier';
 
-CREATE TABLE IF NOT EXISTS ph_supplier_license (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  supplier_id     BIGINT UNSIGNED NOT NULL COMMENT '供应商(ph_supplier)',
+CREATE TABLE ph_supplier_license (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  supplier_id     BIGINT NOT NULL COMMENT '供应商(ph_supplier)',
   license_type    TINYINT      NOT NULL DEFAULT 0 COMMENT '0经营许可证/1生产许可证/2GSP证/3营业执照/4其他',
   license_no      VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '证照号',
   issue_date      DATE         DEFAULT NULL COMMENT '发证日期',
@@ -219,24 +235,24 @@ CREATE TABLE IF NOT EXISTS ph_supplier_license (
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
   PRIMARY KEY (id),
   KEY idx_supplier_expire (supplier_id, expire_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='供应商证照表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_supplier_license';
 
-CREATE TABLE IF NOT EXISTS ph_po_order (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_po_order (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   order_no        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '订单号(PO-门店-yyyyMMdd-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '采购门店',
-  warehouse_id    BIGINT UNSIGNED DEFAULT NULL COMMENT '收货仓库',
-  supplier_id     BIGINT UNSIGNED NOT NULL COMMENT '供应商(ph_supplier)',
+  store_id        BIGINT NOT NULL COMMENT '采购门店',
+  warehouse_id    BIGINT DEFAULT NULL COMMENT '收货仓库',
+  supplier_id     BIGINT NOT NULL COMMENT '供应商(ph_supplier)',
   order_date      DATE         NOT NULL COMMENT '下单日期',
   expect_date     DATE         DEFAULT NULL COMMENT '预计到货',
   total_qty       INT          NOT NULL DEFAULT 0 COMMENT '总数量',
   total_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '含税总金额',
   discount_amount DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '优惠金额',
   payable_amount  DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '应付金额',
-  status          TINYINT      NOT NULL DEFAULT 0 COMMENT '状态机(见上)',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '0草稿1提交2审批3发出4部分到货5完成-1取消',
   is_auto         TINYINT      NOT NULL DEFAULT 0 COMMENT '是否采购建议生成(ADM-005)',
   remark          VARCHAR(500) DEFAULT NULL COMMENT '备注',
-  audit_by        BIGINT UNSIGNED DEFAULT NULL COMMENT '审批人',
+  audit_by        BIGINT DEFAULT NULL COMMENT '审批人',
   audit_at        DATETIME     DEFAULT NULL COMMENT '审批时间',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -244,18 +260,19 @@ CREATE TABLE IF NOT EXISTS ph_po_order (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  CONSTRAINT ck_po_order_status CHECK (status IN (-1,0,1,2,3,4,5)),
   PRIMARY KEY (id),
   UNIQUE KEY uk_order_no (order_no),
   KEY idx_supplier (supplier_id),
   KEY idx_status (status),
   KEY idx_store_date (store_id, order_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购订单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_po_order';
 
-CREATE TABLE IF NOT EXISTS ph_po_order_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  order_id        BIGINT UNSIGNED NOT NULL COMMENT '订单头(ph_po_order)',
+CREATE TABLE ph_po_order_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  order_id        BIGINT NOT NULL COMMENT '订单头(ph_po_order)',
   line_no         INT          NOT NULL DEFAULT 0 COMMENT '行号',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   order_qty       INT          NOT NULL DEFAULT 0 COMMENT '订购数量',
   received_qty    INT          NOT NULL DEFAULT 0 COMMENT '已收数量',
   unit_price      DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '含税单价',
@@ -268,18 +285,21 @@ CREATE TABLE IF NOT EXISTS ph_po_order_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_po_line (order_id,line_no),
+  CONSTRAINT ck_po_order_line_qty CHECK (order_qty > 0 AND received_qty >= 0 AND received_qty <= order_qty),
+  CONSTRAINT ck_po_order_line_amount CHECK (unit_price >= 0 AND line_amount >= 0 AND discount_rate BETWEEN 0 AND 1),
   PRIMARY KEY (id),
   KEY idx_order (order_id),
   KEY idx_drug (drug_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='采购订单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_po_order_line';
 
-CREATE TABLE IF NOT EXISTS ph_po_receipt (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_po_receipt (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   receipt_no      VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '收货单号(GR-门店-yyyyMMdd-流水,唯一)',
-  order_id        BIGINT UNSIGNED DEFAULT NULL COMMENT '关联采购单(无单收货为NULL)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
-  warehouse_id    BIGINT UNSIGNED NOT NULL COMMENT '入仓库',
-  receive_by      BIGINT UNSIGNED NOT NULL COMMENT '收货人(库管员)',
+  order_id        BIGINT DEFAULT NULL COMMENT '关联采购单(无单收货为NULL)',
+  store_id        BIGINT NOT NULL COMMENT '门店',
+  warehouse_id    BIGINT NOT NULL COMMENT '入仓库',
+  receive_by      BIGINT NOT NULL COMMENT '收货人(库管员)',
   receive_date    DATETIME     NOT NULL COMMENT '收货时间',
   total_qty       INT          NOT NULL DEFAULT 0 COMMENT '实收总量',
   total_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '实收金额',
@@ -293,18 +313,20 @@ CREATE TABLE IF NOT EXISTS ph_po_receipt (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  posted_at DATETIME DEFAULT NULL COMMENT '入账时间，状态CAS防重复',
+  KEY idx_receipt_store_status (store_id,status,receive_date),
   PRIMARY KEY (id),
   UNIQUE KEY uk_receipt_no (receipt_no),
   KEY idx_order (order_id),
   KEY idx_receiver (receive_by)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收货单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_po_receipt';
 
-CREATE TABLE IF NOT EXISTS ph_po_receipt_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  receipt_id      BIGINT UNSIGNED NOT NULL COMMENT '收货单头(ph_po_receipt)',
+CREATE TABLE ph_po_receipt_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  receipt_id      BIGINT NOT NULL COMMENT '收货单头(ph_po_receipt)',
   line_no         INT          NOT NULL DEFAULT 0 COMMENT '行号',
-  order_line_id   BIGINT UNSIGNED DEFAULT NULL COMMENT '采购单行(ph_po_order_line)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+  order_line_id   BIGINT DEFAULT NULL COMMENT '采购单行(ph_po_order_line)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   batch_no        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '批号(必须,WH-002)',
   manufacture_date DATE        DEFAULT NULL COMMENT '生产日期',
   expiry_date     DATE         NOT NULL COMMENT '有效期至(必须)',
@@ -314,35 +336,39 @@ CREATE TABLE IF NOT EXISTS ph_po_receipt_line (
   quality_flag    TINYINT      NOT NULL DEFAULT 0 COMMENT '质检:0待检/1通过/2异常(拒收)',
   qa_remark       VARCHAR(200) DEFAULT NULL COMMENT '质检说明',
   cold_chain_temp DECIMAL(5,2) DEFAULT NULL COMMENT '冷链到货温度(REG-010)',
-  create_batch_id BIGINT UNSIGNED DEFAULT NULL COMMENT '生出批次(入账后写inv_batch)',
+  create_batch_id BIGINT DEFAULT NULL COMMENT '生出批次(入账后写inv_batch)',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT DEFAULT NULL COMMENT '入库目标货位，入账必须填写并校验仓库',
+  KEY idx_receipt_order_line (order_line_id),
+  CONSTRAINT ck_po_receipt_line_qty CHECK (qty > 0 AND unit_price >= 0 AND amount >= 0),
+  CONSTRAINT ck_po_receipt_line_dates CHECK (manufacture_date IS NULL OR expiry_date >= manufacture_date),
   PRIMARY KEY (id),
   UNIQUE KEY uk_receipt_line (receipt_id, line_no),
   KEY idx_drug (drug_id),
   KEY idx_batch (batch_no),
   KEY idx_expiry (expiry_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收货单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_po_receipt_line';
 
-CREATE TABLE IF NOT EXISTS ph_inv_batch (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店(数据隔离COMM-008)',
-  warehouse_id    BIGINT UNSIGNED NOT NULL COMMENT '仓库(ph_warehouse)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_inv_batch (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  store_id        BIGINT NOT NULL COMMENT '门店(数据隔离COMM-008)',
+  warehouse_id    BIGINT NOT NULL COMMENT '仓库(ph_warehouse)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   batch_no        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '批号',
   manufacture_date DATE        DEFAULT NULL COMMENT '生产日期',
   expiry_date     DATE         NOT NULL COMMENT '有效期至',
-  supplier_id     BIGINT UNSIGNED DEFAULT NULL COMMENT '供货商(溯源)',
+  supplier_id     BIGINT DEFAULT NULL COMMENT '供货商(溯源)',
   source_type     TINYINT      NOT NULL DEFAULT 0 COMMENT '来源:0采购/1退货回补/2调拨/3期初/4盘点溢余',
   source_no       VARCHAR(32)  DEFAULT NULL COMMENT '来源单号',
-  qty_total       INT          NOT NULL DEFAULT 0 COMMENT '期初在库总数',
+  qty_total INT NOT NULL DEFAULT 0 COMMENT '当前在库量=可用+冻结，不含累计已售',
   qty_avail       INT          NOT NULL DEFAULT 0 COMMENT '可用量',
   qty_frozen      INT          NOT NULL DEFAULT 0 COMMENT '冻结量',
-  qty_sold        INT          NOT NULL DEFAULT 0 COMMENT '累计已售(统计)',
+  qty_sold INT NOT NULL DEFAULT 0 COMMENT '累计净销售量，销售增加退货减少，不参与在库守恒',
   quality_status  TINYINT      NOT NULL DEFAULT 0 COMMENT '质量:0正常/1质量停售/2召回(REG-003)',
   expiry_status   TINYINT      NOT NULL DEFAULT 0 COMMENT '效期:0正常/1近效期/2已过期',
   last_issue_at   DATETIME     DEFAULT NULL COMMENT '最近出库时间',
@@ -353,18 +379,23 @@ CREATE TABLE IF NOT EXISTS ph_inv_batch (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  cost_price DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '批次加权平均成本',
+  version INT NOT NULL DEFAULT 0 COMMENT '每次库存变更递增',
+  KEY idx_batch_fefo (store_id,drug_id,quality_status,expiry_date,id),
+  CONSTRAINT ck_inv_batch_quantity CHECK (qty_total >= 0 AND qty_avail >= 0 AND qty_frozen >= 0 AND qty_sold >= 0 AND qty_total = qty_avail + qty_frozen),
+  CONSTRAINT ck_inv_batch_cost CHECK (cost_price >= 0),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_batch (store_id, drug_id, batch_no),
+  UNIQUE KEY uk_batch (tenant_id,warehouse_id,drug_id,batch_no),
   KEY idx_expiry (expiry_date),
   KEY idx_quality (quality_status),
   KEY idx_supplier (supplier_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='库存批次表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_batch';
 
-CREATE TABLE IF NOT EXISTS ph_inv_location_stock (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch)',
-  location_id     BIGINT UNSIGNED NOT NULL COMMENT '货位(ph_location)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(冗余便于货位扫码查)',
+CREATE TABLE ph_inv_location_stock (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  location_id     BIGINT NOT NULL COMMENT '货位(ph_location)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(冗余便于货位扫码查)',
   qty             INT          NOT NULL DEFAULT 0 COMMENT '该货位数量',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -372,25 +403,27 @@ CREATE TABLE IF NOT EXISTS ph_inv_location_stock (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  qty_frozen INT NOT NULL DEFAULT 0 COMMENT '货位冻结量，可用=qty-qty_frozen',
+  CONSTRAINT ck_inv_location_stock_qty CHECK (qty >= 0 AND qty_frozen >= 0 AND qty_frozen <= qty),
   PRIMARY KEY (id),
   UNIQUE KEY uk_batch_loc (batch_id, location_id),
   KEY idx_location_drug (location_id, drug_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='货位批次库存表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_location_stock';
 
-CREATE TABLE IF NOT EXISTS ph_inv_flow (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_inv_flow (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  store_id        BIGINT NOT NULL COMMENT '门店',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   batch_no        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '批号',
-  flow_type       TINYINT      NOT NULL DEFAULT 0 COMMENT '类型:1入库/2出库/3调整(见15章枚举)',
+  flow_type TINYINT NOT NULL COMMENT '10采购入20销售出21销售退40盘点50报损70期初80锁定81释放82锁定转出库',
   in_qty          INT          NOT NULL DEFAULT 0 COMMENT '入库数量',
   out_qty         INT          NOT NULL DEFAULT 0 COMMENT '出库数量',
   balance_qty     INT          NOT NULL DEFAULT 0 COMMENT '变动后总量',
-  biz_type        TINYINT      NOT NULL DEFAULT 0 COMMENT '业务来源(销售/收货/盘点/报损/调拨...)',
+  biz_type TINYINT NOT NULL COMMENT '1收货2销售3销售退货4盘点5报损6线上订单7期初',
   biz_no          VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '业务单号',
   flow_time       DATETIME     NOT NULL COMMENT '发生时间',
-  operator        BIGINT UNSIGNED DEFAULT NULL COMMENT '操作人',
+  operator        BIGINT DEFAULT NULL COMMENT '操作人',
   remark          VARCHAR(200) DEFAULT NULL COMMENT '备注',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -398,17 +431,23 @@ CREATE TABLE IF NOT EXISTS ph_inv_flow (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '每笔变更按货位拆分',
+  biz_line_id BIGINT NOT NULL COMMENT '来源单据明细ID',
+  frozen_delta INT NOT NULL DEFAULT 0 COMMENT '冻结变化，锁定正释放负',
+  unit_cost DECIMAL(18,4) NOT NULL DEFAULT 0 COMMENT '成本快照',
+  UNIQUE KEY uk_flow_event (tenant_id,biz_type,biz_no,biz_line_id,batch_id,location_id,flow_type),
+  CONSTRAINT ck_inv_flow_qty CHECK (in_qty >= 0 AND out_qty >= 0 AND balance_qty >= 0 AND NOT (in_qty > 0 AND out_qty > 0)),
   PRIMARY KEY (id),
   KEY idx_batch_time (batch_id, flow_time),
   KEY idx_drug_time (drug_id, flow_time),
   KEY idx_biz (biz_type, biz_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='库存流水表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_flow';
 
-CREATE TABLE IF NOT EXISTS ph_inv_stocktake (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_inv_stocktake (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   stocktake_no    VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '盘点单号(PD-门店-yyyyMMdd-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
-  warehouse_id    BIGINT UNSIGNED DEFAULT NULL COMMENT '仓库(空=全场)',
+  store_id        BIGINT NOT NULL COMMENT '门店',
+  warehouse_id    BIGINT DEFAULT NULL COMMENT '仓库(空=全场)',
   stocktake_type  TINYINT      NOT NULL DEFAULT 0 COMMENT '0全盘/1循环抽盘(ADM-011)',
   blind_flag      TINYINT      NOT NULL DEFAULT 0 COMMENT '0明盘/1盲盘(WH-005)',
   scope           VARCHAR(100) DEFAULT NULL COMMENT '范围描述(货位/品类)',
@@ -416,23 +455,26 @@ CREATE TABLE IF NOT EXISTS ph_inv_stocktake (
   total_item      INT          NOT NULL DEFAULT 0 COMMENT '应盘项数',
   done_item       INT          NOT NULL DEFAULT 0 COMMENT '已盘项数',
   status          TINYINT      NOT NULL DEFAULT 0 COMMENT '0草稿/1进行中/2已完成/3已调整',
-  initiator_id    BIGINT UNSIGNED NOT NULL COMMENT '发起人(与审计creator通常同值)',
+  initiator_id    BIGINT NOT NULL COMMENT '发起人(与审计creator通常同值)',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  audit_by BIGINT DEFAULT NULL COMMENT '差异审批人',
+  audit_at DATETIME DEFAULT NULL COMMENT '审批时间',
+  adjusted_at DATETIME DEFAULT NULL COMMENT '差异入账时间',
   PRIMARY KEY (id),
   UNIQUE KEY uk_stocktake_no (stocktake_no),
   KEY idx_status_store (status, store_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='盘点单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_stocktake';
 
-CREATE TABLE IF NOT EXISTS ph_inv_stocktake_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  stocktake_id    BIGINT UNSIGNED NOT NULL COMMENT '盘点单(ph_inv_stocktake)',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_inv_stocktake_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  stocktake_id    BIGINT NOT NULL COMMENT '盘点单(ph_inv_stocktake)',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   book_qty        INT          NOT NULL DEFAULT 0 COMMENT '账面数',
   real_qty        INT          DEFAULT NULL COMMENT '实盘数',
   diff_qty        INT          NOT NULL DEFAULT 0 COMMENT '差异(real-book)',
@@ -445,39 +487,48 @@ CREATE TABLE IF NOT EXISTS ph_inv_stocktake_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '盘点货位',
+  UNIQUE KEY uk_stocktake_batch_loc (stocktake_id,batch_id,location_id),
+  CONSTRAINT ck_inv_stocktake_line_qty CHECK (book_qty >= 0 AND (real_qty IS NULL OR real_qty >= 0)),
   PRIMARY KEY (id),
   KEY idx_stocktake (stocktake_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='盘点单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_stocktake_line';
 
-CREATE TABLE IF NOT EXISTS ph_inv_damage (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_inv_damage (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   damage_no       VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '单号(LS-门店-yyyyMMdd-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
+  store_id        BIGINT NOT NULL COMMENT '门店',
   damage_type     TINYINT      NOT NULL DEFAULT 0 COMMENT '0报损/1报溢(ADM-012)',
   reason          TINYINT      NOT NULL DEFAULT 0 COMMENT '原因字典(过期/破损/污染/召回/质量问题/其他)',
   total_qty       INT          NOT NULL DEFAULT 0 COMMENT '总数量',
   total_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '总金额(按成本价)',
   status          TINYINT      NOT NULL DEFAULT 0 COMMENT '0草稿/1待审批/2已审批/3已执行/4已取消',
-  audit_by        BIGINT UNSIGNED DEFAULT NULL COMMENT '审批人',
+  audit_by        BIGINT DEFAULT NULL COMMENT '审批人',
   audit_at        DATETIME     DEFAULT NULL COMMENT '审批时间',
-  execute_by      BIGINT UNSIGNED DEFAULT NULL COMMENT '执行人(WH-007)',
-  review_by       BIGINT UNSIGNED DEFAULT NULL COMMENT '复核人(双人WH-007)',
+  execute_by      BIGINT DEFAULT NULL COMMENT '执行人(WH-007)',
+  review_by       BIGINT DEFAULT NULL COMMENT '复核人(双人WH-007)',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  execute_at DATETIME DEFAULT NULL COMMENT '执行出账时间',
+  destroy_method VARCHAR(64) DEFAULT NULL COMMENT '销毁方式，一期一单一次处置',
+  destroy_company VARCHAR(200) DEFAULT NULL COMMENT '销毁单位',
+  supervisor_id BIGINT DEFAULT NULL COMMENT '监销员工',
+  destroy_at DATETIME DEFAULT NULL COMMENT '销毁时间',
+  destroy_images JSON DEFAULT NULL COMMENT '销毁影像地址数组',
   PRIMARY KEY (id),
   UNIQUE KEY uk_damage_no (damage_no),
   KEY idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报损报溢单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_damage';
 
-CREATE TABLE IF NOT EXISTS ph_inv_damage_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  damage_id       BIGINT UNSIGNED NOT NULL COMMENT '报损单(ph_inv_damage)',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_inv_damage_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  damage_id       BIGINT NOT NULL COMMENT '报损单(ph_inv_damage)',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   batch_no        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '批号',
   qty             INT          NOT NULL DEFAULT 0 COMMENT '数量',
   cost_price      DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '成本价',
@@ -489,19 +540,22 @@ CREATE TABLE IF NOT EXISTS ph_inv_damage_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '报损报溢货位',
+  UNIQUE KEY uk_damage_batch_loc (damage_id,batch_id,location_id),
+  CONSTRAINT ck_inv_damage_line_qty CHECK (qty > 0 AND cost_price >= 0 AND amount >= 0),
   PRIMARY KEY (id),
   KEY idx_damage (damage_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报损报溢单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_damage_line';
 
-CREATE TABLE IF NOT EXISTS ph_inv_expiry_alert (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_inv_expiry_alert (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  store_id        BIGINT NOT NULL COMMENT '门店',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   alert_level     TINYINT      NOT NULL DEFAULT 0 COMMENT '1级红(≤30天)/2级橙(≤60天)/3级黄(≤90天)',
   expire_days     INT          NOT NULL DEFAULT 0 COMMENT '距到期天数',
   handle_type     TINYINT      NOT NULL DEFAULT 0 COMMENT '0未处理/1促销/2退货/3报损/4继续销售(店长确认)',
-  handle_by       BIGINT UNSIGNED DEFAULT NULL COMMENT '处理人',
+  handle_by       BIGINT DEFAULT NULL COMMENT '处理人',
   handle_at       DATETIME     DEFAULT NULL COMMENT '处理时间',
   alert_date      DATE         NOT NULL COMMENT '预警日期',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
@@ -510,17 +564,19 @@ CREATE TABLE IF NOT EXISTS ph_inv_expiry_alert (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_expiry_daily (tenant_id,batch_id,alert_date),
+  CONSTRAINT ck_inv_expiry_alert_level CHECK (alert_level IN (1,2,3)),
   PRIMARY KEY (id),
   KEY idx_batch_level (batch_id, alert_level),
   KEY idx_handle (handle_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='效期预警记录表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_expiry_alert';
 
-CREATE TABLE IF NOT EXISTS ph_pos_shift (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_pos_shift (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   shift_no        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '班次号(SC-门店-pos-yyyyMMdd-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
+  store_id        BIGINT NOT NULL COMMENT '门店',
   pos_no          VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '收银台号',
-  cashier_id      BIGINT UNSIGNED NOT NULL COMMENT '收银员(ph_employee)',
+  cashier_id      BIGINT NOT NULL COMMENT '收银员(ph_employee)',
   open_at         DATETIME     NOT NULL COMMENT '开台时间',
   close_at        DATETIME     DEFAULT NULL COMMENT '交班时间',
   cash_expected   DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '系统应收现金',
@@ -539,20 +595,20 @@ CREATE TABLE IF NOT EXISTS ph_pos_shift (
   PRIMARY KEY (id),
   UNIQUE KEY uk_shift_no (shift_no),
   KEY idx_cashier (store_id, cashier_id, open_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收银班次表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_pos_shift';
 
-CREATE TABLE IF NOT EXISTS ph_sale_order (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_sale_order (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   order_no        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '销售单号(SO-门店-yyyyMMddHHmmss-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
+  store_id        BIGINT NOT NULL COMMENT '门店',
   pos_no          VARCHAR(16)  NOT NULL DEFAULT '' COMMENT '收银台',
-  shift_id        BIGINT UNSIGNED DEFAULT NULL COMMENT '班次(ph_pos_shift)',
-  cashier_id      BIGINT UNSIGNED NOT NULL COMMENT '收银员',
-  pharmacist_id   BIGINT UNSIGNED DEFAULT NULL COMMENT '审方药师(处方单,POS-005)',
-  member_id       BIGINT UNSIGNED DEFAULT NULL COMMENT '会员用户编号(关联芋道member_user,散客为空)',
+  shift_id        BIGINT DEFAULT NULL COMMENT '班次(ph_pos_shift)',
+  cashier_id BIGINT DEFAULT NULL COMMENT '柜台销售必填员工，线上自动成交可为空',
+  pharmacist_id   BIGINT DEFAULT NULL COMMENT '审方药师(处方单,POS-005)',
+  member_id       BIGINT DEFAULT NULL COMMENT '会员用户编号(关联芋道member_user,散客为空)',
   customer_name   VARCHAR(32)  DEFAULT NULL COMMENT '顾客姓名(散客)',
   source          TINYINT      NOT NULL DEFAULT 0 COMMENT '0柜台/1小程序(WX-005)',
-  wx_order_id     BIGINT UNSIGNED DEFAULT NULL COMMENT '线上订单来源(ph_wx_order)',
+  wx_order_id     BIGINT DEFAULT NULL COMMENT '线上订单来源(ph_wx_order)',
   sale_type       TINYINT      NOT NULL DEFAULT 0 COMMENT '0销售/1换货',
   return_flag     TINYINT      NOT NULL DEFAULT 0 COMMENT '整单退货:0正常/1部分退/2全退',
   total_qty       INT          NOT NULL DEFAULT 0 COMMENT '总数量',
@@ -565,7 +621,7 @@ CREATE TABLE IF NOT EXISTS ph_sale_order (
   change_amount   DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '找零',
   cost_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '成本合计',
   points_earned   INT          NOT NULL DEFAULT 0 COMMENT '奖励积分',
-  status          TINYINT      NOT NULL DEFAULT 1 COMMENT '1有效/0作废/2已退款',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '0待支付1完成2全额退款3部分退款-1取消',
   offline_flag    TINYINT      NOT NULL DEFAULT 0 COMMENT '是否离线单(COMM-006)',
   offline_no      VARCHAR(32)  DEFAULT NULL COMMENT '本地流水号',
   remark          VARCHAR(500) DEFAULT NULL COMMENT '备注',
@@ -576,21 +632,23 @@ CREATE TABLE IF NOT EXISTS ph_sale_order (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  CONSTRAINT ck_sale_order_amount CHECK (subtotal >= 0 AND discount_amount >= 0 AND coupon_amount >= 0 AND points_deduct >= 0 AND payable_amount >= 0 AND paid_amount >= 0 AND change_amount >= 0),
+  CONSTRAINT ck_sale_order_status CHECK (status IN (-1,0,1,2,3)),
   PRIMARY KEY (id),
   UNIQUE KEY uk_order_no (order_no),
   KEY idx_member_time (member_id, sale_time),
   KEY idx_shift (shift_id),
   KEY idx_time (store_id, sale_time),
-  KEY idx_wx (wx_order_id),
+  UNIQUE KEY uk_sale_wx (wx_order_id),
   KEY idx_offline (offline_flag, offline_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_sale_order';
 
-CREATE TABLE IF NOT EXISTS ph_sale_order_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  order_id        BIGINT UNSIGNED NOT NULL COMMENT '销售单(ph_sale_order)',
+CREATE TABLE ph_sale_order_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  order_id        BIGINT NOT NULL COMMENT '销售单(ph_sale_order)',
   line_no         INT          NOT NULL DEFAULT 0 COMMENT '行号',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(ph_inv_batch,POS-002先进先出)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch,POS-002先进先出)',
   batch_no        VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '批号(小票/台账冗余)',
   expiry_date     DATE         NOT NULL COMMENT '效期(冗余)',
   qty             INT          NOT NULL DEFAULT 0 COMMENT '数量',
@@ -600,7 +658,7 @@ CREATE TABLE IF NOT EXISTS ph_sale_order_line (
   line_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '行金额',
   cost_price      DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '出库成本价',
   is_rx           TINYINT      NOT NULL DEFAULT 0 COMMENT '是否处方药行(POS-005)',
-  presc_id        BIGINT UNSIGNED DEFAULT NULL COMMENT '关联处方(ph_presc_record)',
+  presc_id        BIGINT DEFAULT NULL COMMENT '关联处方(ph_presc_record)',
   returned_qty    INT          NOT NULL DEFAULT 0 COMMENT '已退货数量',
   is_gift         TINYINT      NOT NULL DEFAULT 0 COMMENT '是否赠品',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
@@ -609,16 +667,23 @@ CREATE TABLE IF NOT EXISTS ph_sale_order_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '出库货位，跨批次货位拆行',
+  drug_name VARCHAR(128) NOT NULL COMMENT '成交名称快照',
+  specification VARCHAR(64) NOT NULL DEFAULT '' COMMENT '规格快照',
+  unit VARCHAR(8) NOT NULL DEFAULT '' COMMENT '单位快照',
+  UNIQUE KEY uk_sale_line (order_id,line_no),
+  CONSTRAINT ck_sale_order_line_qty CHECK (qty > 0 AND returned_qty >= 0 AND returned_qty <= qty),
+  CONSTRAINT ck_sale_order_line_amount CHECK (price >= 0 AND line_amount >= 0 AND cost_price >= 0 AND discount >= 0),
   PRIMARY KEY (id),
   KEY idx_order (order_id),
   KEY idx_batch (batch_id),
   KEY idx_presc (presc_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_sale_order_line';
 
-CREATE TABLE IF NOT EXISTS ph_sale_payment (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  order_id        BIGINT UNSIGNED NOT NULL COMMENT '销售单(ph_sale_order)',
-  pay_no          VARCHAR(32)  DEFAULT NULL COMMENT '支付流水号(外部交易号,回调后回填)',
+CREATE TABLE ph_sale_payment (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  order_id        BIGINT NOT NULL COMMENT '销售单(ph_sale_order)',
+  pay_no VARCHAR(64) DEFAULT NULL COMMENT '外部交易号，按渠道唯一',
   pay_method      TINYINT      NOT NULL DEFAULT 1 COMMENT '1现金/2微信/3支付宝/4银行卡/5储值/6医保/7积分',
   pay_amount      DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '金额',
   channel         VARCHAR(16)  DEFAULT NULL COMMENT '渠道(如wxpay/alipay)',
@@ -632,24 +697,29 @@ CREATE TABLE IF NOT EXISTS ph_sale_payment (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  payment_no VARCHAR(64) NOT NULL COMMENT '本系统分笔支付幂等号，现金也必须生成',
+  pay_order_id BIGINT DEFAULT NULL COMMENT '关联pay_order，现金为空',
+  UNIQUE KEY uk_payment_no (payment_no),
+  UNIQUE KEY uk_payment_order (pay_order_id),
+  CONSTRAINT ck_sale_payment_amount CHECK (pay_amount >= 0),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_pay_no (pay_no),
+  UNIQUE KEY uk_channel_pay_no (channel,pay_no),
   KEY idx_order (order_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='销售支付明细';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_sale_payment';
 
-CREATE TABLE IF NOT EXISTS ph_sale_return (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_sale_return (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   return_no       VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '退货单号(SR-门店-yyyyMMdd-流水,唯一)',
-  sale_order_id   BIGINT UNSIGNED NOT NULL COMMENT '原销售单(ph_sale_order)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
+  sale_order_id   BIGINT NOT NULL COMMENT '原销售单(ph_sale_order)',
+  store_id        BIGINT NOT NULL COMMENT '门店',
   return_type     TINYINT      NOT NULL DEFAULT 0 COMMENT '0退货/1换货(POS-009)',
   reason          TINYINT      NOT NULL DEFAULT 0 COMMENT '原因字典(质量/不想要/错发/其他)',
   total_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '退款金额',
   refund_method   TINYINT      NOT NULL DEFAULT 0 COMMENT '0原路/1现金/2余额',
   status          TINYINT      NOT NULL DEFAULT 0 COMMENT '0草稿/1待审批/2已审核/3已完成/4已取消',
-  cashier_id      BIGINT UNSIGNED NOT NULL COMMENT '经办人',
+  cashier_id      BIGINT NOT NULL COMMENT '经办人',
   pharmacist_confirm TINYINT   NOT NULL DEFAULT 0 COMMENT '药师复核(处方药退货)',
-  audit_by        BIGINT UNSIGNED DEFAULT NULL COMMENT '审批人(店长授权)',
+  audit_by        BIGINT DEFAULT NULL COMMENT '审批人(店长授权)',
   return_at       DATETIME     DEFAULT NULL COMMENT '完成时间',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -657,17 +727,20 @@ CREATE TABLE IF NOT EXISTS ph_sale_return (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  pay_refund_id BIGINT DEFAULT NULL COMMENT '单渠道电子退款关联pay_refund',
+  refund_status TINYINT NOT NULL DEFAULT 0 COMMENT '0未退款1退款中2成功3失败',
+  refund_error VARCHAR(500) DEFAULT NULL COMMENT '退款失败原因',
   PRIMARY KEY (id),
   UNIQUE KEY uk_return_no (return_no),
   KEY idx_sale (sale_order_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='退货单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_sale_return';
 
-CREATE TABLE IF NOT EXISTS ph_sale_return_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  return_id       BIGINT UNSIGNED NOT NULL COMMENT '退货单(ph_sale_return)',
-  sale_line_id    BIGINT UNSIGNED NOT NULL COMMENT '原销售行(ph_sale_order_line)',
-  batch_id        BIGINT UNSIGNED NOT NULL COMMENT '批次(回补原批次,POS-009)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '药品(ph_drug)',
+CREATE TABLE ph_sale_return_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  return_id       BIGINT NOT NULL COMMENT '退货单(ph_sale_return)',
+  sale_line_id    BIGINT NOT NULL COMMENT '原销售行(ph_sale_order_line)',
+  batch_id        BIGINT NOT NULL COMMENT '批次(回补原批次,POS-009)',
+  drug_id         BIGINT NOT NULL COMMENT '药品(ph_drug)',
   qty             INT          NOT NULL DEFAULT 0 COMMENT '退货数量',
   price           DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '原价',
   amount          DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '金额',
@@ -678,15 +751,18 @@ CREATE TABLE IF NOT EXISTS ph_sale_return_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '验收回库货位',
+  UNIQUE KEY uk_return_sale_line (return_id,sale_line_id),
+  CONSTRAINT ck_sale_return_line_qty CHECK (qty > 0 AND amount >= 0),
   PRIMARY KEY (id),
   KEY idx_return (return_id),
   KEY idx_sale_line (sale_line_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='退货单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_sale_return_line';
 
-CREATE TABLE IF NOT EXISTS ph_presc_record (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_presc_record (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   presc_no        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '处方号(PX-门店-yyyyMMdd-流水,唯一)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '门店',
+  store_id        BIGINT NOT NULL COMMENT '门店',
   source          TINYINT      NOT NULL DEFAULT 0 COMMENT '0纸质拍照/1电子处方平台/2复诊续方(POS-005)',
   hospital        VARCHAR(128) DEFAULT NULL COMMENT '开具医院',
   doctor_name     VARCHAR(32)  DEFAULT NULL COMMENT '医师姓名',
@@ -698,31 +774,34 @@ CREATE TABLE IF NOT EXISTS ph_presc_record (
   presc_date      DATE         DEFAULT NULL COMMENT '开方日期',
   image_url       VARCHAR(512) DEFAULT NULL COMMENT '处方影像URL',
   review_status   TINYINT      NOT NULL DEFAULT 0 COMMENT '审方:0待审/1通过/2驳回',
-  pharmacist_id   BIGINT UNSIGNED DEFAULT NULL COMMENT '审方药师(ph_employee)',
+  pharmacist_id   BIGINT DEFAULT NULL COMMENT '审方药师(ph_employee)',
   review_at       DATETIME     DEFAULT NULL COMMENT '审方时间',
   review_opinion  VARCHAR(300) DEFAULT NULL COMMENT '审方意见(驳回必填)',
   review_snapshot VARCHAR(255) DEFAULT NULL COMMENT '电子签名信息(POS-005)',
   is_special      TINYINT      NOT NULL DEFAULT 0 COMMENT '是否特管登记(双人复核)',
-  dbl_check_by    BIGINT UNSIGNED DEFAULT NULL COMMENT '双人复核人',
+  dbl_check_by    BIGINT DEFAULT NULL COMMENT '双人复核人',
   limit_check     TINYINT      NOT NULL DEFAULT 0 COMMENT '是否超量复核(POS-005-7)',
   status          TINYINT      NOT NULL DEFAULT 0 COMMENT '0有效/1已完成/2作废',
-  wx_member_id    BIGINT UNSIGNED DEFAULT NULL COMMENT '小程序上传人(WX-006)',
+  wx_member_id    BIGINT DEFAULT NULL COMMENT '小程序上传人(WX-006)',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
   create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  images JSON DEFAULT NULL COMMENT '最多5张影像，由应用校验',
+  prescribed_items JSON DEFAULT NULL COMMENT '药品ID、核准数量与用法，购药累计在事务内核验',
+  KEY idx_presc_member (wx_member_id,create_time),
   PRIMARY KEY (id),
   UNIQUE KEY uk_presc_no (presc_no),
   KEY idx_patient (patient_name, patient_id_no),
   KEY idx_status (review_status, presc_date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='处方记录表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_presc_record';
 
-CREATE TABLE IF NOT EXISTS ph_wx_cart (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  member_id       BIGINT UNSIGNED NOT NULL COMMENT '会员用户编号(关联芋道member_user)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '商品(ph_drug)',
+CREATE TABLE ph_wx_cart (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  member_id       BIGINT NOT NULL COMMENT '会员用户编号(关联芋道member_user)',
+  drug_id         BIGINT NOT NULL COMMENT '商品(ph_drug)',
   qty             INT          NOT NULL DEFAULT 1 COMMENT '数量',
   selected_flag   TINYINT      NOT NULL DEFAULT 1 COMMENT '是否勾选',
   add_time        DATETIME     NOT NULL COMMENT '加购时间',
@@ -732,15 +811,17 @@ CREATE TABLE IF NOT EXISTS ph_wx_cart (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  store_id BIGINT NOT NULL COMMENT '购物车门店',
+  CONSTRAINT ck_wx_cart_qty CHECK (qty > 0),
   PRIMARY KEY (id),
-  UNIQUE KEY uk_member_drug (member_id, drug_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='小程序购物车';
+  UNIQUE KEY uk_member_drug (tenant_id,member_id,store_id,drug_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_wx_cart';
 
-CREATE TABLE IF NOT EXISTS ph_wx_order (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+CREATE TABLE ph_wx_order (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
   order_no        VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '线上订单号(WX-门店-yyyyMMdd-流水,唯一)',
-  member_id       BIGINT UNSIGNED NOT NULL COMMENT '会员用户编号(关联芋道member_user)',
-  store_id        BIGINT UNSIGNED NOT NULL COMMENT '履约门店',
+  member_id       BIGINT NOT NULL COMMENT '会员用户编号(关联芋道member_user)',
+  store_id        BIGINT NOT NULL COMMENT '履约门店',
   order_type      TINYINT      NOT NULL DEFAULT 0 COMMENT '0到店自提/1同城配送(WX-005)',
   goods_amount    DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '商品金额',
   coupon_amount   DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '券抵扣',
@@ -750,8 +831,8 @@ CREATE TABLE IF NOT EXISTS ph_wx_order (
   pay_no          VARCHAR(32)  DEFAULT NULL COMMENT '微信支付交易号',
   pay_status      TINYINT      NOT NULL DEFAULT 0 COMMENT '0待支付/1已支付/2已退款',
   paid_at         DATETIME     DEFAULT NULL COMMENT '支付时间',
-  presc_id        BIGINT UNSIGNED DEFAULT NULL COMMENT '处方案(处方药线上自提WX-006)',
-  status          TINYINT      NOT NULL DEFAULT 0 COMMENT '状态机(见上,WX-007)',
+  presc_id        BIGINT DEFAULT NULL COMMENT '处方案(处方药线上自提WX-006)',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '0待支付1待拣货2拣货中3待自提4完成-1取消',
   cancel_reason   VARCHAR(200) DEFAULT NULL COMMENT '取消原因',
   address_snapshot VARCHAR(300) DEFAULT NULL COMMENT '配送地址快照',
   remark          VARCHAR(500) DEFAULT NULL COMMENT '备注',
@@ -762,20 +843,30 @@ CREATE TABLE IF NOT EXISTS ph_wx_order (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  pay_order_id BIGINT DEFAULT NULL COMMENT '关联pay_order',
+  expire_at DATETIME NOT NULL COMMENT '未支付截止时间，建议创建后30分钟',
+  pickup_code VARCHAR(32) DEFAULT NULL COMMENT '一次性取货码',
+  verify_by BIGINT DEFAULT NULL COMMENT '核销员工',
+  verify_at DATETIME DEFAULT NULL COMMENT '核销时间',
+  UNIQUE KEY uk_wx_pay_order (pay_order_id),
+  UNIQUE KEY uk_pickup_code (pickup_code),
+  KEY idx_wx_expire (pay_status,status,expire_at),
+  CONSTRAINT ck_wx_order_amount CHECK (goods_amount >= 0 AND payable_amount >= 0 AND freight_amount >= 0),
+  CONSTRAINT ck_wx_order_status CHECK (status IN (-1,0,1,2,3,4)),
   PRIMARY KEY (id),
   UNIQUE KEY uk_order_no (order_no),
   KEY idx_member (member_id, create_time),
   KEY idx_store_status (store_id, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='线上订单头';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_wx_order';
 
-CREATE TABLE IF NOT EXISTS ph_wx_order_line (
-  id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
-  wx_order_id     BIGINT UNSIGNED NOT NULL COMMENT '线上订单(ph_wx_order)',
-  drug_id         BIGINT UNSIGNED NOT NULL COMMENT '商品(ph_drug)',
+CREATE TABLE ph_wx_order_line (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  wx_order_id     BIGINT NOT NULL COMMENT '线上订单(ph_wx_order)',
+  drug_id         BIGINT NOT NULL COMMENT '商品(ph_drug)',
   qty             INT          NOT NULL DEFAULT 0 COMMENT '数量',
   price           DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '单价',
   line_amount     DECIMAL(18,2) NOT NULL DEFAULT 0 COMMENT '金额',
-  batch_id        BIGINT UNSIGNED DEFAULT NULL COMMENT '拣货批次(拣货后回填)',
+  batch_id        BIGINT DEFAULT NULL COMMENT '拣货批次(拣货后回填)',
   batch_no        VARCHAR(64)  DEFAULT NULL COMMENT '批号',
   picked_qty      INT          NOT NULL DEFAULT 0 COMMENT '已拣数量',
   creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
@@ -784,200 +875,216 @@ CREATE TABLE IF NOT EXISTS ph_wx_order_line (
   update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
   tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT DEFAULT NULL COMMENT '锁定时绑定的货位',
+  drug_name VARCHAR(128) NOT NULL COMMENT '下单名称快照',
+  specification VARCHAR(64) NOT NULL DEFAULT '' COMMENT '规格快照',
+  unit VARCHAR(8) NOT NULL DEFAULT '' COMMENT '单位快照',
+  CONSTRAINT ck_wx_order_line_qty CHECK (qty > 0 AND picked_qty >= 0 AND picked_qty <= qty),
+  CONSTRAINT ck_wx_order_line_amount CHECK (price >= 0 AND line_amount >= 0),
   PRIMARY KEY (id),
   KEY idx_wx_order (wx_order_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='线上订单行';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_wx_order_line';
 
-DROP TABLE IF EXISTS `member_user`;
 CREATE TABLE `member_user`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
-  `mobile` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '手机号',
-  `password` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '密码',
-  `status` tinyint NOT NULL COMMENT '状态',
-  `register_ip` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '注册 IP',
+  `mobile` varchar(11) NULL DEFAULT NULL COMMENT '手机号',
+  `password` varchar(100) NOT NULL DEFAULT '' COMMENT '密码',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '框架0启用1禁用，与ph表不同',
+  `register_ip` varchar(32) NOT NULL COMMENT '注册 IP',
   `register_terminal` tinyint NULL DEFAULT NULL COMMENT '注册终端',
-  `login_ip` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '最后登录IP',
+  `login_ip` varchar(50) NULL DEFAULT '' COMMENT '最后登录IP',
   `login_date` datetime NULL DEFAULT NULL COMMENT '最后登录时间',
-  `nickname` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '用户昵称',
-  `avatar` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL DEFAULT '' COMMENT '头像',
-  `name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '真实名字',
+  `nickname` varchar(30) NOT NULL DEFAULT '' COMMENT '用户昵称',
+  `avatar` varchar(512) NOT NULL DEFAULT '' COMMENT '头像',
+  `name` varchar(30) NULL DEFAULT '' COMMENT '真实名字',
   `sex` tinyint NULL DEFAULT 0 COMMENT '用户性别',
   `area_id` bigint NULL DEFAULT NULL COMMENT '所在地',
   `birthday` datetime NULL DEFAULT NULL COMMENT '出生日期',
-  `mark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '会员备注',
+  `mark` varchar(255) NULL DEFAULT NULL COMMENT '会员备注',
   `point` int NOT NULL DEFAULT 0 COMMENT '积分',
-  `tag_ids` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '用户标签编号列表，以逗号分隔',
+  `tag_ids` varchar(255) NULL DEFAULT NULL COMMENT '用户标签编号列表，以逗号分隔',
   `level_id` bigint NULL DEFAULT NULL COMMENT '等级编号',
   `experience` int NOT NULL DEFAULT 0 COMMENT '经验',
   `group_id` bigint NULL DEFAULT NULL COMMENT '用户分组编号',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '创建者',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  email VARCHAR(255) DEFAULT NULL COMMENT '邮箱，对齐当前MemberUserDO',
+  UNIQUE KEY uk_member_mobile (tenant_id,mobile),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 286 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '会员用户';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='member_user';
 
-DROP TABLE IF EXISTS `member_address`;
 CREATE TABLE `member_address`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '收件地址编号',
   `user_id` bigint NOT NULL COMMENT '用户编号',
-  `name` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '收件人名称',
-  `mobile` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '手机号',
+  `name` varchar(10) NOT NULL COMMENT '收件人名称',
+  `mobile` varchar(20) NOT NULL COMMENT '手机号',
   `area_id` bigint NOT NULL COMMENT '地区编码',
-  `detail_address` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '收件详细地址',
+  `detail_address` varchar(250) NOT NULL COMMENT '收件详细地址',
   `default_status` bit(1) NOT NULL COMMENT '是否默认',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_userId`(`user_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 32 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '用户收件地址';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='member_address';
 
-DROP TABLE IF EXISTS `member_level`;
 CREATE TABLE `member_level`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
-  `name` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '等级名称',
+  `name` varchar(30) NOT NULL DEFAULT '' COMMENT '等级名称',
   `level` int NOT NULL DEFAULT 0 COMMENT '等级',
   `experience` int NOT NULL DEFAULT 0 COMMENT '升级经验',
   `discount_percent` tinyint NOT NULL DEFAULT 100 COMMENT '享受折扣',
-  `icon` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '等级图标',
-  `background_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '等级背景图',
+  `icon` varchar(255) NOT NULL DEFAULT '' COMMENT '等级图标',
+  `background_url` varchar(255) NOT NULL DEFAULT '' COMMENT '等级背景图',
   `status` tinyint NOT NULL DEFAULT 0 COMMENT '状态',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_member_level (tenant_id,level),
+  CONSTRAINT ck_member_level_discount CHECK (discount_percent BETWEEN 0 AND 100),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '会员等级';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='member_level';
 
-DROP TABLE IF EXISTS `member_point_record`;
 CREATE TABLE `member_point_record`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '自增主键',
   `user_id` bigint NOT NULL COMMENT '用户编号',
-  `biz_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '业务编码',
+  `biz_id` varchar(255) NOT NULL COMMENT '业务编码',
   `biz_type` tinyint NOT NULL COMMENT '业务类型',
-  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '积分标题',
-  `description` varchar(5000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '积分描述',
+  `title` varchar(255) NOT NULL COMMENT '积分标题',
+  `description` varchar(5000) NULL DEFAULT NULL COMMENT '积分描述',
   `point` int NOT NULL COMMENT '积分',
   `total_point` int NOT NULL COMMENT '变动后的积分',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_point_event (tenant_id,user_id,biz_type,biz_id),
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `index_userId`(`user_id` ASC) USING BTREE,
   INDEX `index_title`(`title` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 89 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '用户积分记录';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='member_point_record';
 
-DROP TABLE IF EXISTS `pay_app`;
 CREATE TABLE `pay_app`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '应用编号',
-  `name` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '应用名',
+  `name` varchar(64) NOT NULL COMMENT '应用名',
   `status` tinyint NOT NULL COMMENT '开启状态',
-  `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '备注',
-  `order_notify_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付结果的回调地址',
-  `refund_notify_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '退款结果的回调地址',
-  `transfer_notify_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '转账结果的回调地址',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `remark` varchar(255) NULL DEFAULT NULL COMMENT '备注',
+  `order_notify_url` varchar(1024) NOT NULL COMMENT '支付结果的回调地址',
+  `refund_notify_url` varchar(1024) NOT NULL COMMENT '退款结果的回调地址',
+  `transfer_notify_url` varchar(1024) NOT NULL COMMENT '转账结果的回调地址',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  app_key VARCHAR(64) NOT NULL COMMENT '支付应用标识，对齐当前DO',
+  UNIQUE KEY uk_pay_app_key (app_key),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 9 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '支付应用信息';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_app';
 
-DROP TABLE IF EXISTS `pay_channel`;
 CREATE TABLE `pay_channel`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '商户编号',
-  `code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '渠道编码',
+  `code` varchar(32) NOT NULL COMMENT '渠道编码',
   `status` tinyint NOT NULL COMMENT '开启状态',
-  `remark` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '备注',
+  `remark` varchar(255) NULL DEFAULT NULL COMMENT '备注',
   `fee_rate` double NOT NULL DEFAULT 0 COMMENT '渠道费率，单位：百分比',
   `app_id` bigint NOT NULL COMMENT '应用编号',
-  `config` varchar(8192) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付渠道配置',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `config` varchar(8192) NOT NULL COMMENT '支付渠道配置',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_pay_channel_app (app_id,code),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 38 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '支付渠道\n';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_channel';
 
-DROP TABLE IF EXISTS `pay_order`;
 CREATE TABLE `pay_order`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '支付订单编号',
   `app_id` bigint NOT NULL COMMENT '应用编号',
   `channel_id` bigint NULL DEFAULT NULL COMMENT '渠道编号',
-  `channel_code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道编码',
-  `merchant_order_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商户订单编号',
-  `subject` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品标题',
-  `body` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商品描述',
-  `notify_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '异步通知地址',
-  `price` bigint NOT NULL COMMENT '支付金额，单位：分',
+  `channel_code` varchar(32) NULL DEFAULT NULL COMMENT '渠道编码',
+  `merchant_order_id` varchar(64) NOT NULL COMMENT '商户订单编号',
+  `subject` varchar(32) NOT NULL COMMENT '商品标题',
+  `body` varchar(128) NOT NULL COMMENT '商品描述',
+  `notify_url` varchar(1024) NOT NULL COMMENT '异步通知地址',
+  price INT NOT NULL DEFAULT 0 COMMENT '金额单位分，与Java Integer对应',
   `channel_fee_rate` double NULL DEFAULT 0 COMMENT '渠道手续费，单位：百分比',
-  `channel_fee_price` bigint NULL DEFAULT 0 COMMENT '渠道手续金额，单位：分',
+  channel_fee_price INT NOT NULL DEFAULT 0 COMMENT '金额单位分，与Java Integer对应',
   `status` tinyint NOT NULL COMMENT '支付状态',
-  `user_ip` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户 IP',
+  `user_ip` varchar(50) NOT NULL COMMENT '用户 IP',
   `expire_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '订单失效时间',
-  `success_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '订单支付成功时间',
+  success_time DATETIME DEFAULT NULL COMMENT '真实成功时间，未成功为空',
   `extension_id` bigint NULL DEFAULT NULL COMMENT '支付成功的订单拓展单编号',
-  `no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '支付订单号',
-  `refund_price` bigint NOT NULL COMMENT '退款总金额，单位：分',
-  `channel_user_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道用户编号',
-  `channel_order_no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道订单号',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `no` varchar(64) NULL DEFAULT NULL COMMENT '支付订单号',
+  refund_price INT NOT NULL DEFAULT 0 COMMENT '金额单位分，与Java Integer对应',
+  `channel_user_id` varchar(255) NULL DEFAULT NULL COMMENT '渠道用户编号',
+  `channel_order_no` varchar(64) NULL DEFAULT NULL COMMENT '渠道订单号',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  user_id BIGINT DEFAULT NULL COMMENT '付款用户ID',
+  user_type TINYINT DEFAULT NULL COMMENT '框架用户类型',
+  UNIQUE KEY uk_pay_merchant (app_id,merchant_order_id),
+  KEY idx_pay_expire (status,expire_time),
+  CONSTRAINT ck_pay_order_amount CHECK (price >= 0 AND refund_price >= 0 AND refund_price <= price),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 394 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '支付订单\n';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_order';
 
-DROP TABLE IF EXISTS `pay_refund`;
 CREATE TABLE `pay_refund`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '支付退款编号',
-  `no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '退款单号',
+  `no` varchar(64) NOT NULL COMMENT '退款单号',
   `app_id` bigint NOT NULL COMMENT '应用编号',
   `channel_id` bigint NOT NULL COMMENT '渠道编号',
-  `channel_code` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '渠道编码',
+  `channel_code` varchar(32) NOT NULL COMMENT '渠道编码',
   `order_id` bigint NOT NULL COMMENT '支付订单编号 pay_order 表id',
-  `order_no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付订单 no',
-  `merchant_order_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商户订单编号（商户系统生成）',
-  `merchant_refund_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '商户退款订单号（商户系统生成）',
-  `notify_url` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '异步通知商户地址',
+  `order_no` varchar(64) NOT NULL COMMENT '支付订单 no',
+  `merchant_order_id` varchar(64) NOT NULL COMMENT '商户订单编号（商户系统生成）',
+  `merchant_refund_id` varchar(64) NOT NULL COMMENT '商户退款订单号（商户系统生成）',
+  `notify_url` varchar(1024) NOT NULL COMMENT '异步通知商户地址',
   `status` tinyint NOT NULL COMMENT '退款状态',
-  `pay_price` bigint NOT NULL COMMENT '支付金额,单位分',
-  `refund_price` bigint NOT NULL COMMENT '退款金额,单位分',
-  `reason` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '退款原因',
-  `user_ip` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '用户 IP',
-  `channel_order_no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '渠道订单号，pay_order 中的 channel_order_no 对应',
-  `channel_refund_no` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道退款单号，渠道返回',
+  pay_price INT NOT NULL DEFAULT 0 COMMENT '金额单位分，与Java Integer对应',
+  refund_price INT NOT NULL DEFAULT 0 COMMENT '金额单位分，与Java Integer对应',
+  `reason` varchar(256) NOT NULL COMMENT '退款原因',
+  `user_ip` varchar(50) NULL DEFAULT NULL COMMENT '用户 IP',
+  `channel_order_no` varchar(64) NOT NULL COMMENT '渠道订单号，pay_order 中的 channel_order_no 对应',
+  `channel_refund_no` varchar(64) NULL DEFAULT NULL COMMENT '渠道退款单号，渠道返回',
   `success_time` datetime NULL DEFAULT NULL COMMENT '退款成功时间',
-  `channel_error_code` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道调用报错时，错误码',
-  `channel_error_msg` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '渠道调用报错时，错误信息',
-  `channel_notify_data` varchar(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '支付渠道异步通知的内容',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `channel_error_code` varchar(128) NULL DEFAULT NULL COMMENT '渠道调用报错时，错误码',
+  `channel_error_msg` varchar(256) NULL DEFAULT NULL COMMENT '渠道调用报错时，错误信息',
+  `channel_notify_data` varchar(4096) NULL DEFAULT NULL COMMENT '支付渠道异步通知的内容',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  user_id BIGINT DEFAULT NULL COMMENT '付款用户ID',
+  user_type TINYINT DEFAULT NULL COMMENT '框架用户类型',
+  UNIQUE KEY uk_refund_no (no),
+  UNIQUE KEY uk_refund_merchant (app_id,merchant_refund_id),
+  KEY idx_refund_order (order_id),
+  CONSTRAINT ck_pay_refund_amount CHECK (refund_price > 0 AND refund_price <= pay_price),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 97 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '退款订单';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_refund';
 
-DROP TABLE IF EXISTS `pay_wallet`;
 CREATE TABLE `pay_wallet`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
   `user_id` bigint NOT NULL COMMENT '用户编号',
@@ -986,13 +1093,153 @@ CREATE TABLE `pay_wallet`  (
   `total_expense` int NOT NULL DEFAULT 0 COMMENT '累计支出，单位分',
   `total_recharge` int NOT NULL DEFAULT 0 COMMENT '累计充值，单位分',
   `freeze_price` int NOT NULL DEFAULT 0 COMMENT '冻结金额，单位分',
-  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '更新者',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_wallet_user (tenant_id,user_type,user_id),
+  CONSTRAINT ck_pay_wallet_amount CHECK (balance >= 0 AND freeze_price >= 0 AND total_expense >= 0 AND total_recharge >= 0),
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 6 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '会员钱包表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_wallet';
 
-SET FOREIGN_KEY_CHECKS = 1;
+CREATE TABLE ph_inv_lock (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  store_id        BIGINT NOT NULL COMMENT '门店',
+  batch_id        BIGINT NOT NULL COMMENT '批次(ph_inv_batch)',
+  qty             INT          NOT NULL DEFAULT 0 COMMENT '锁定数量',
+  lock_type       TINYINT      NOT NULL DEFAULT 0 COMMENT '0订单占用/1盘点冻结/2质量停售冻结',
+  biz_type        TINYINT      NOT NULL DEFAULT 0 COMMENT '来源类型(销售单/线上订单/盘点)',
+  biz_no          VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '来源单号',
+  status          TINYINT      NOT NULL DEFAULT 0 COMMENT '0锁定中/1已释放/2已出库转化',
+  lock_at         DATETIME     NOT NULL COMMENT '锁定时间',
+  release_at      DATETIME     DEFAULT NULL COMMENT '释放时间',
+  creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
+  create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
+  update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
+  tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  location_id BIGINT NOT NULL COMMENT '冻结货位',
+  biz_line_id BIGINT NOT NULL COMMENT '来源明细ID',
+  expire_at DATETIME DEFAULT NULL COMMENT '订单占用截止时间',
+  UNIQUE KEY uk_lock_event (tenant_id,biz_type,biz_no,biz_line_id,batch_id,location_id),
+  KEY idx_lock_expire (status,expire_at),
+  CONSTRAINT ck_inv_lock_qty CHECK (qty > 0),
+  PRIMARY KEY (id),
+  KEY idx_biz (biz_type, biz_no),
+  KEY idx_batch_status (batch_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_inv_lock';
+
+CREATE TABLE ph_audit_log (
+  id              BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
+  user_id         BIGINT DEFAULT NULL COMMENT '操作人',
+  user_name       VARCHAR(32)  DEFAULT NULL COMMENT '操作人姓名(快照)',
+  client_type     TINYINT      NOT NULL DEFAULT 0 COMMENT '0POS/1ADM/2WHD/3WX/4系统任务',
+  ip              VARCHAR(45)  DEFAULT NULL COMMENT 'IP/设备',
+  module          VARCHAR(32)  NOT NULL DEFAULT '' COMMENT '模块',
+  action          VARCHAR(64)  NOT NULL DEFAULT '' COMMENT '操作(sale/create/price_change...)',
+  target_type     VARCHAR(32)  DEFAULT NULL COMMENT '对象类型',
+  target_no       VARCHAR(64)  DEFAULT NULL COMMENT '对象单号/编码',
+  before_snapshot JSON         DEFAULT NULL COMMENT '变更前快照',
+  after_snapshot  JSON         DEFAULT NULL COMMENT '变更后快照',
+  result          TINYINT      NOT NULL DEFAULT 0 COMMENT '0成功/1失败/2越权',
+  occur_time      DATETIME     NOT NULL COMMENT '事件发生时间(离线/补录场景以occur_time为准,见2.2)',
+  creator         VARCHAR(64)  NULL DEFAULT '' COMMENT '创建者(用户编号/系统标识)',
+  create_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updater         VARCHAR(64)  NULL DEFAULT '' COMMENT '更新者(用户编号/系统标识)',
+  update_time     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  deleted         BIT(1)       NOT NULL DEFAULT b'0' COMMENT '是否删除(逻辑删除)',
+  tenant_id       BIGINT       NOT NULL DEFAULT 0 COMMENT '租户编号',
+  PRIMARY KEY (id),
+  KEY idx_user_time (user_id, occur_time),
+  KEY idx_target (target_type, target_no),
+  KEY idx_action_time (module, occur_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ph_audit_log';
+
+CREATE TABLE `pay_order_extension`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '支付订单编号',
+  `no` varchar(64) NOT NULL COMMENT '支付订单号',
+  `order_id` bigint NOT NULL COMMENT '支付订单编号',
+  `channel_id` bigint NOT NULL COMMENT '渠道编号',
+  `channel_code` varchar(32) NOT NULL COMMENT '渠道编码',
+  `user_ip` varchar(50) NOT NULL COMMENT '用户 IP',
+  `status` tinyint NOT NULL COMMENT '支付状态',
+  `channel_extras` varchar(256) NULL DEFAULT NULL COMMENT '支付渠道的额外参数',
+  `channel_error_code` varchar(128) NULL DEFAULT NULL COMMENT '渠道调用报错时，错误码',
+  `channel_error_msg` varchar(256) NULL DEFAULT NULL COMMENT '渠道调用报错时，错误信息',
+  `channel_notify_data` varchar(4096) NULL DEFAULT NULL COMMENT '支付渠道异步通知的内容',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_extension_no (no),
+  KEY idx_extension_order (order_id),
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_order_extension';
+
+CREATE TABLE `pay_notify_task`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '任务编号',
+  `app_id` bigint NOT NULL COMMENT '应用编号',
+  `type` tinyint NOT NULL COMMENT '通知类型',
+  `data_id` bigint NOT NULL COMMENT '数据编号',
+  `status` tinyint NOT NULL COMMENT '通知状态',
+  `merchant_order_id` varchar(64) NULL DEFAULT NULL COMMENT '商户订单编号',
+  `merchant_transfer_id` varchar(64) NULL DEFAULT NULL COMMENT '商户转账单编号',
+  `next_notify_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下一次通知时间',
+  `last_execute_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最后一次执行时间',
+  `notify_times` tinyint NOT NULL COMMENT '当前通知次数',
+  `max_notify_times` tinyint NOT NULL COMMENT '最大可通知次数',
+  `notify_url` varchar(1024) NOT NULL COMMENT '异步通知地址',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  merchant_refund_id VARCHAR(64) DEFAULT NULL COMMENT '商户退款号，对齐当前DO',
+  UNIQUE KEY uk_notify_event (app_id,type,data_id),
+  KEY idx_notify_due (status,next_notify_time),
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_notify_task';
+
+CREATE TABLE `pay_notify_log`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '日志编号',
+  `task_id` bigint NOT NULL COMMENT '通知任务编号',
+  `notify_times` tinyint NOT NULL COMMENT '第几次被通知',
+  `response` varchar(2048) NOT NULL COMMENT '请求参数',
+  `status` tinyint NOT NULL COMMENT '通知状态',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  KEY idx_notify_task_time (task_id,create_time),
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_notify_log';
+
+CREATE TABLE `pay_wallet_transaction`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `wallet_id` bigint NOT NULL COMMENT '会员钱包 id',
+  `biz_type` tinyint NOT NULL COMMENT '关联类型',
+  `biz_id` varchar(64) NOT NULL COMMENT '关联业务编号',
+  `no` varchar(64) NOT NULL COMMENT '流水号',
+  `title` varchar(128) NOT NULL COMMENT '流水标题',
+  `price` int NOT NULL COMMENT '交易金额, 单位分',
+  `balance` int NOT NULL COMMENT '余额, 单位分',
+  `creator` varchar(64) NULL DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) NULL DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
+  UNIQUE KEY uk_wallet_tx_no (no),
+  UNIQUE KEY uk_wallet_tx_event (wallet_id,biz_type,biz_id),
+  KEY idx_wallet_tx_time (wallet_id,create_time),
+  CONSTRAINT ck_pay_wallet_transaction_balance CHECK (balance >= 0),
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='pay_wallet_transaction';

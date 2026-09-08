@@ -1,0 +1,22 @@
+﻿# 环境变量（含密码，禁止上传）
+.env
+
+# Java 构建产物
+target/
+*.class
+*.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Node
+node_modules/
+
+# 系统文件
+Thumbs.db
+.DS_Store
