@@ -4,6 +4,17 @@
 
 > 数据库文件本身不入库，通过 Docker 让每位成员得到一致的开发库，见下文。
 
+## 项目结构
+
+本仓库采用单仓库管理，三端代码和数据库脚本放在同一个 GitHub 项目中：
+
+`	ext
+backend/       基于 ruoyi-vue-pro 的 Java 后端
+admin-ui/      基于 yudao-ui-admin-vue3 的管理后台
+mall-uniapp/   基于 yudao-mall-uniapp 的会员小程序
+sql/           FirstSun 药店业务初始化 SQL
+docker-compose.yml  团队统一 MySQL 开发环境
+`
 ## 本地开发数据库（Docker MySQL）
 
 ### 前提
@@ -70,5 +81,7 @@ docker compose up -d
 1. 修改或新增 `sql/*.sql`（用新文件名如 `alter_v2.sql`，保证可按顺序重复执行）。
 2. 提交并推送（`main` 分支受保护，需走分支 + Pull Request）。
 3. 其他成员 `git pull` 后，执行上面的「重建数据库」命令即可获得一致结构。
+
+
 
 
