@@ -11,8 +11,20 @@ backend/       基于 ruoyi-vue-pro 的 Java 后端
 admin-ui/      基于 yudao-ui-admin-vue3 的管理后台
 mall-uniapp/   基于 yudao-mall-uniapp 的会员小程序
 sql/           FirstSun 药店业务初始化 SQL
+docs/          团队分工、开发规范和协作文档
 docker-compose.yml  团队统一 Docker 开发环境
 ```
+
+## 开发文档
+
+所有成员开始开发前，应按以下顺序阅读：
+
+1. [团队开发须知](./docs/团队开发须知.md)：环境启动、Git 分支、提交、数据库迁移和冲突处理。
+2. [六人全栈开发方案](./docs/六人全栈开发方案.md)：A～F 的模块、页面、数据表及跨模块接口分工。
+3. [开发规范与 AI 协作规则](./docs/开发规范与AI协作规则.md)：成员和 AI 工具必须遵守的修改范围及交付要求。
+4. [前端界面统一规范](./docs/前端界面统一规范.md)：管理端页面结构、组件、样式和交互约定。
+
+开发文档索引见 [docs/README.md](./docs/README.md)。每位成员应从最新 `main` 创建自己的功能分支，并且只修改本人负责范围。若使用 AI 编程工具，需要同时提供本人分工、AI 协作规则和本次任务的验收标准。
 
 ## 一键启动开发环境
 
