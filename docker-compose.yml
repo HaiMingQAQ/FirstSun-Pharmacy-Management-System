@@ -1,0 +1,86 @@
+# FirstSun Pharmacy Management System - 团队 Docker 开发环境
+# 首次启动：docker compose up -d --build
+# 停止：docker compose down
+# 重置数据库：docker compose down -v && docker compose up -d --build
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: firstsun-pharmacy-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-firstsun_pharmacy}
+      MYSQL_USER: ${MYSQL_USER:-pharmacy}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-pharmacy123}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./backend/sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-yudao.sql:ro
+      - ./sql/firstsun_pharmacy_init.sql:/docker-entrypoint-initdb.d/02-firstsun.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: firstsun-pharmacy-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: firstsun-pharmacy-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
+      ARGS: >-
+        --spring.profiles.active=local
+        --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-firstsun_pharmacy}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+        --spring.datasource.dynamic.datasource.master.username=${MYSQL_USER:-pharmacy}
+        --spring.datasource.dynamic.datasource.master.password=${MYSQL_PASSWORD:-pharmacy123}
+        --spring.datasource.dynamic.datasource.slave.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-firstsun_pharmacy}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+        --spring.datasource.dynamic.datasource.slave.username=${MYSQL_USER:-pharmacy}
+        --spring.datasource.dynamic.datasource.slave.password=${MYSQL_PASSWORD:-pharmacy123}
+        --spring.redis.host=redis
+        --spring.redis.port=6379
+    ports:
+      - "${BACKEND_PORT:-48080}:48080"
+
+  admin-ui:
+    build:
+      context: ./admin-ui
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE_URL: ${VITE_BASE_URL:-http://localhost:48080}
+    container_name: firstsun-pharmacy-admin-ui
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${ADMIN_PORT:-80}:80"
+
+volumes:
+  mysql-data:
