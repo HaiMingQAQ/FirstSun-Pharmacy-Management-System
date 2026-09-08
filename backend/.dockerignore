@@ -1,0 +1,8 @@
+target
+**/target
+.git
+.idea
+.vscode
+*.iml
+.flattened-pom.xml
+**/.flattened-pom.xml

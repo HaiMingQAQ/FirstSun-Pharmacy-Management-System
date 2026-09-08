@@ -1,0 +1,14 @@
+node_modules
+dist
+.vite
+.git
+.idea
+.vscode
+.hbuilderx
+.env
+.env.local
+.env.dev
+.env.prod
+.env.stage
+.env.test
+package-lock.json

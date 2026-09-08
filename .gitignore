@@ -25,7 +25,9 @@ Thumbs.db
 
 # 前端构建产物
 **/dist/
-**/build/
 **/.vite/
 **/.hbuilderx/
 
+
+**/.flattened-pom.xml
+**/package-lock.json
