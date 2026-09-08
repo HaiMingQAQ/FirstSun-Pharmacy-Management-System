@@ -32,6 +32,13 @@
             <version>${revision}</version>
         </dependency>
 
+        <!-- 药店业务模块（A 成员维护：基础资料与公共平台） -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-pharmacy</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- 会员中心。默认注释，保证编译速度 -->
 <!--        <dependency>-->
 <!--            <groupId>cn.iocoder.boot</groupId>-->
