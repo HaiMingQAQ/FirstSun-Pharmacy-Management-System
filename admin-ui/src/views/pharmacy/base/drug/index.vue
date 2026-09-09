@@ -1,5 +1,5 @@
 <template>
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <!-- 搜索 -->
     <el-form
       class="-mb-15px"
@@ -57,7 +57,17 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="审核状态" prop="approveStatus">
+      <el-form-item label="启用状态" prop="status">
+        <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-180px">
+          <el-option
+            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
+            :key="dict.value"
+            :label="dict.label"
+            :value="dict.value"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item v-show="expandQuery" label="审核状态" prop="approveStatus">
         <el-select
           v-model="queryParams.approveStatus"
           placeholder="请选择"
@@ -72,25 +82,19 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="启用状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-180px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
         <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+        <el-button text @click="expandQuery = !expandQuery">
+          {{ expandQuery ? '收起' : '更多筛选' }}
+          <Icon :icon="expandQuery ? 'ep:arrow-up' : 'ep:arrow-down'" class="ml-5px" />
+        </el-button>
       </el-form-item>
     </el-form>
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-button
       type="primary"
       :icon="Plus"
@@ -112,24 +116,32 @@
     </el-button>
 
     <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
-      <el-table-column label="编号" align="center" prop="id" width="80" />
-      <el-table-column label="药品编码" align="center" prop="drugCode" width="120" />
-      <el-table-column label="通用名" align="center" prop="genericName" width="160" />
-      <el-table-column label="商品名" align="center" prop="tradeName" width="140" />
-      <el-table-column label="规格" align="center" prop="specification" width="140" />
-      <el-table-column label="分类" align="center" prop="categoryName" width="120" />
-      <el-table-column label="类型" align="center" prop="drugType" width="100">
+      <el-table-column label="药品编码" align="left" prop="drugCode" width="120" />
+      <el-table-column label="通用名" align="left" prop="genericName" min-width="140" />
+      <el-table-column label="商品名" align="left" prop="tradeName" min-width="120" />
+      <el-table-column label="规格" align="left" prop="specification" min-width="120" />
+      <el-table-column label="分类" align="left" prop="categoryName" min-width="100" />
+      <el-table-column label="药品类型" align="center" prop="drugType" width="150">
         <template #default="scope">
           <dict-tag :type="DICT_TYPE.PHARMACY_DRUG_TYPE" :value="scope.row.drugType" />
+          <el-tag
+            v-if="isDrugTypeInconsistent(scope.row)"
+            type="warning"
+            size="small"
+            class="ml-5px"
+            >属性不一致</el-tag
+          >
+          <el-tag
+            v-else
+            :type="scope.row.isRx === 1 ? 'danger' : 'info'"
+            size="small"
+            class="ml-5px"
+          >
+            {{ scope.row.isRx === 1 ? 'Rx' : '非处方' }}
+          </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="处方药" align="center" prop="isRx" width="80">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_YES_NO" :value="scope.row.isRx" />
-        </template>
-      </el-table-column>
-      <el-table-column label="零售价" align="center" prop="retailPrice" width="100" />
-      <el-table-column label="单位" align="center" prop="unit" width="80" />
+      <el-table-column label="零售价" align="right" prop="retailPrice" width="100" />
       <el-table-column label="审核状态" align="center" prop="approveStatus" width="100">
         <template #default="scope">
           <dict-tag
@@ -143,7 +155,7 @@
           <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="220" fixed="right">
+      <el-table-column label="操作" align="center" width="140" fixed="right">
         <template #default="scope">
           <el-button
             link
@@ -152,29 +164,33 @@
             v-hasPermi="['pharmacy:base:drug:update']"
             >编辑</el-button
           >
-          <el-button
-            v-if="scope.row.approveStatus === 0"
-            link
-            type="success"
-            @click="handleApprove(scope.row.id, 1)"
-            v-hasPermi="['pharmacy:base:drug:approve']"
-            >通过</el-button
+          <el-dropdown
+            v-hasPermi="['pharmacy:base:drug:approve', 'pharmacy:base:drug:delete']"
+            @command="(command) => handleCommand(command, scope.row)"
           >
-          <el-button
-            v-if="scope.row.approveStatus === 0"
-            link
-            type="warning"
-            @click="handleApprove(scope.row.id, 2)"
-            v-hasPermi="['pharmacy:base:drug:approve']"
-            >驳回</el-button
-          >
-          <el-button
-            link
-            type="danger"
-            @click="handleDelete(scope.row.id)"
-            v-hasPermi="['pharmacy:base:drug:delete']"
-            >删除</el-button
-          >
+            <el-button link type="primary">
+              更多<Icon icon="ep:arrow-down" class="ml-5px" />
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item
+                  v-if="scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])"
+                  command="approve"
+                >
+                  通过审核
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-if="scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])"
+                  command="reject"
+                >
+                  驳回
+                </el-dropdown-item>
+                <el-dropdown-item v-if="checkPermi(['pharmacy:base:drug:delete'])" command="delete">
+                  删除
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </template>
       </el-table-column>
     </el-table>
@@ -191,9 +207,11 @@
 <script setup lang="ts">
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { Search, Refresh, Plus, Download } from '@element-plus/icons-vue'
+import { checkPermi } from '@/utils/permission'
 import * as DrugApi from '@/api/pharmacy/base/drug'
 import * as CategoryApi from '@/api/pharmacy/base/category'
 import { handleTree } from '@/utils/tree'
+import DrugForm from './DrugForm.vue'
 
 defineOptions({ name: 'PharmacyBaseDrug' })
 
@@ -203,6 +221,8 @@ const { t } = useI18n() // 国际化
 const loading = ref(true)
 const total = ref(0)
 const list = ref<any[]>([])
+/** 查询区「更多筛选」展开状态：默认仅展示高频条件，审核状态收入展开区 */
+const expandQuery = ref(false)
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -215,6 +235,23 @@ const queryParams = reactive({
   status: undefined
 })
 const queryFormRef = ref()
+
+/**
+ * 药品类型与处方药一致性判断（不静默隐藏不一致数据）：
+ * drugType=0(处方) 期望 isRx=1；drugType=1/2(OTC) 期望 isRx=0；其余类型不强制。
+ */
+const isDrugTypeInconsistent = (row: any): boolean => {
+  if (row.drugType === 0 && row.isRx !== 1) return true
+  if ((row.drugType === 1 || row.drugType === 2) && row.isRx === 1) return true
+  return false
+}
+
+/** 「更多」下拉操作分发 */
+const handleCommand = (command: string, row: any) => {
+  if (command === 'approve') handleApprove(row.id, 1)
+  else if (command === 'reject') handleApprove(row.id, 2)
+  else if (command === 'delete') handleDelete(row.id)
+}
 
 /** 分类树 */
 const categoryTree = ref<any[]>([])

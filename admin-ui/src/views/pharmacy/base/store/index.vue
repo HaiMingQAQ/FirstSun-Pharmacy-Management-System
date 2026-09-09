@@ -1,5 +1,5 @@
 <template>
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -71,7 +71,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
       <el-table-column label="门店编号" align="center" prop="id" width="100" />
       <el-table-column label="门店编码" align="center" prop="storeCode" width="120" />

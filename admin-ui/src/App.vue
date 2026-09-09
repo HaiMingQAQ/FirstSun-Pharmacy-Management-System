@@ -1,5 +1,4 @@
 <script lang="ts" setup>
-import { isDark } from '@/utils/is'
 import { useAppStore } from '@/store/modules/app'
 import { useDesign } from '@/hooks/web/useDesign'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
@@ -14,13 +13,10 @@ const currentSize = computed(() => appStore.getCurrentSize)
 const greyMode = computed(() => appStore.getGreyMode)
 const { wsCache } = useCache()
 
-// 根据浏览器当前主题设置系统主题色
+// 首次访问无缓存时默认浅色，用户手动切换后尊重其选择
 const setDefaultTheme = () => {
-  let isDarkTheme = wsCache.get(CACHE_KEY.IS_DARK)
-  if (isDarkTheme === null) {
-    isDarkTheme = isDark()
-  }
-  appStore.setIsDark(isDarkTheme)
+  const cachedIsDark = wsCache.get(CACHE_KEY.IS_DARK)
+  appStore.setIsDark(cachedIsDark === null ? false : cachedIsDark)
 }
 setDefaultTheme()
 </script>

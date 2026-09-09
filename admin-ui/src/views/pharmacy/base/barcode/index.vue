@@ -1,10 +1,10 @@
 <template>
-  <div class="app-container">
+  <div class="app-container pharmacy-page">
     <el-row :gutter="8">
       <el-col :span="24">
         <!-- 搜索栏 -->
         <el-form
-          class="-mb-15px"
+          class="-mb-15px pharmacy-panel"
           :model="queryParams"
           ref="queryFormRef"
           :inline="true"

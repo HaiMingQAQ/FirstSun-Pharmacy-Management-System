@@ -75,7 +75,9 @@ const dialogVisible = ref(false) // 弹窗的是否展示
 const dialogTitle = ref('') // 弹窗的标题
 const formLoading = ref(false) // 表单的加载中：1）修改时的数据加载；2）提交的按钮禁用
 const formType = ref('') // 表单的类型：create - 新增；update - 修改
-const formData = ref({
+
+/** 统一默认值，避免隐式 any 与类型漂移 */
+const createDefaultFormData = (): CategoryApi.CategoryVO => ({
   id: undefined,
   catCode: '',
   catName: '',
@@ -84,6 +86,9 @@ const formData = ref({
   sort: 0,
   status: 1
 })
+
+const formData = ref<CategoryApi.CategoryVO>(createDefaultFormData())
+
 const formRules = reactive({
   catCode: [{ required: true, message: '分类编码不能为空', trigger: 'blur' }],
   catName: [{ required: true, message: '分类名不能为空', trigger: 'blur' }],
@@ -93,13 +98,35 @@ const formRules = reactive({
 })
 const formRef = ref() // 表单 Ref
 
-/** 上级分类树 */
+/** 上级分类树（含虚拟根节点 id=0 = 顶级分类） */
 const categoryTree = ref<any[]>([])
-const getCategoryTree = async () => {
-  const list = await CategoryApi.getSimpleCategoryList()
-  // 补一个虚拟根节点（顶级 parentId 为 0）
-  const root = { id: 0, catName: '顶级分类', children: handleTree(list, 'id', 'parentId') }
-  categoryTree.value = [root]
+
+/**
+ * 构建上级分类树，递归排除当前编辑分类及其全部子孙，防止循环引用。
+ * 数据源使用分页接口（pageSize=-1，后端 PageParam.PAGE_SIZE_NONE）取「启用+停用」完整平面列表，
+ * 不依赖 /simple-list（仅返回启用分类，无法识别停用分类的后代）。
+ */
+const getCategoryTree = async (excludeId?: number) => {
+  const page = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize: -1 })
+  const all = (page.list || []) as CategoryApi.CategoryVO[]
+  // 递归收集 excludeId 的全部后代 id
+  const excludeSet = new Set<number>()
+  if (excludeId) {
+    excludeSet.add(excludeId)
+    const stack = [excludeId]
+    while (stack.length) {
+      const cur = stack.pop()!
+      for (const item of all) {
+        if (item.parentId === cur && !excludeSet.has(item.id!)) {
+          excludeSet.add(item.id!)
+          stack.push(item.id!)
+        }
+      }
+    }
+  }
+  const filtered = all.filter((c) => !excludeSet.has(c.id!))
+  const tree = handleTree(filtered, 'id', 'parentId')
+  categoryTree.value = [{ id: 0, catName: '顶级分类', children: tree }]
 }
 
 /** 打开弹窗 */
@@ -108,20 +135,38 @@ const open = async (type: string, id?: number) => {
   dialogTitle.value = t('action.' + type)
   formType.value = type
   resetForm()
-  // 加载上级分类树（仅启用）
-  await getCategoryTree()
-  // 修改时，设置数据
-  if (id) {
-    formLoading.value = true
-    try {
+  formLoading.value = true
+  try {
+    if (id) {
+      // 先取详情设置 formData.id，再据此构建过滤树（时序保证 excludeId 可用）
       const data = await CategoryApi.getCategory(id)
-      formData.value = data
-    } finally {
-      formLoading.value = false
+      formData.value = { ...createDefaultFormData(), ...data }
+      await getCategoryTree(formData.value.id)
+    } else {
+      await getCategoryTree()
     }
+  } finally {
+    formLoading.value = false
   }
 }
 defineExpose({ open }) // 提供 open 方法，用于打开弹窗
+
+/** 构造保存载荷，显式逐字段返回，不使用 as 断言 */
+const buildSaveData = (): CategoryApi.CategoryVO => {
+  const v = formData.value
+  const payload: CategoryApi.CategoryVO = {
+    catCode: v.catCode,
+    catName: v.catName,
+    parentId: v.parentId ?? 0,
+    catType: v.catType,
+    sort: v.sort,
+    status: v.status
+  }
+  if (formType.value === 'update') {
+    payload.id = v.id
+  }
+  return payload
+}
 
 /** 提交表单 */
 const emit = defineEmits(['success']) // 定义 success 事件，用于操作成功后的回调
@@ -133,7 +178,7 @@ const submitForm = async () => {
   // 提交请求
   formLoading.value = true
   try {
-    const data = formData.value as unknown as CategoryApi.CategoryVO
+    const data = buildSaveData()
     if (formType.value === 'create') {
       await CategoryApi.createCategory(data)
       message.success(t('common.createSuccess'))
@@ -151,15 +196,7 @@ const submitForm = async () => {
 
 /** 重置表单 */
 const resetForm = () => {
-  formData.value = {
-    id: undefined,
-    catCode: '',
-    catName: '',
-    parentId: 0,
-    catType: 0,
-    sort: 0,
-    status: 1
-  } as any
+  formData.value = createDefaultFormData()
   formRef.value?.resetFields()
 }
 </script>

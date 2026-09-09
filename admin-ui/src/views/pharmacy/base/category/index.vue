@@ -1,5 +1,5 @@
 <template>
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -27,7 +27,12 @@
         />
       </el-form-item>
       <el-form-item label="分类类型" prop="catType">
-        <el-select v-model="queryParams.catType" placeholder="请选择分类类型" clearable class="!w-240px">
+        <el-select
+          v-model="queryParams.catType"
+          placeholder="请选择分类类型"
+          clearable
+          class="!w-240px"
+        >
           <el-option
             v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_CATEGORY_TYPE)"
             :key="dict.value"
@@ -71,11 +76,15 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
-      <el-table-column label="分类编号" align="center" prop="id" width="100" />
       <el-table-column label="分类编码" align="center" prop="catCode" />
       <el-table-column label="分类名" align="center" prop="catName" />
+      <el-table-column label="上级分类" align="center" prop="parentId">
+        <template #default="scope">
+          {{ parentMap[scope.row.parentId]?.catName ?? '顶级分类' }}
+        </template>
+      </el-table-column>
       <el-table-column label="分类类型" align="center" prop="catType">
         <template #default="scope">
           <dict-tag :type="DICT_TYPE.PHARMACY_CATEGORY_TYPE" :value="scope.row.catType" />
@@ -87,13 +96,6 @@
           <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
         </template>
       </el-table-column>
-      <el-table-column
-        label="创建时间"
-        align="center"
-        prop="createTime"
-        width="180"
-        :formatter="dateFormatter"
-      />
       <el-table-column label="操作" align="center" width="160">
         <template #default="scope">
           <el-button
@@ -125,11 +127,10 @@
   </ContentWrap>
 
   <!-- 表单弹窗：添加/修改 -->
-  <CategoryForm ref="formRef" @success="getList" />
+  <CategoryForm ref="formRef" @success="handleFormSuccess" />
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
-import { dateFormatter } from '@/utils/formatTime'
 import download from '@/utils/download'
 import * as CategoryApi from '@/api/pharmacy/base/category'
 import CategoryForm from './CategoryForm.vue'
@@ -153,6 +154,18 @@ const queryParams = reactive({
 const queryFormRef = ref() // 搜索的表单
 const exportLoading = ref(false) // 导出的加载中
 
+/** 上级分类映射：用完整列表（含停用）构建，避免停用父分类显示为「顶级分类」 */
+const parentMap = ref<Record<number, CategoryApi.CategoryVO>>({})
+const loadAllCategories = async () => {
+  const page = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize: -1 })
+  const all = (page.list || []) as CategoryApi.CategoryVO[]
+  const map: Record<number, CategoryApi.CategoryVO> = {}
+  for (const item of all) {
+    if (item.id != null) map[item.id] = item
+  }
+  parentMap.value = map
+}
+
 /** 查询药品分类列表 */
 const getList = async () => {
   loading.value = true
@@ -163,6 +176,12 @@ const getList = async () => {
   } finally {
     loading.value = false
   }
+}
+
+/** 新增/修改成功后同时刷新列表与上级分类映射，保证父分类名不显示旧数据 */
+const handleFormSuccess = async () => {
+  await getList()
+  await loadAllCategories()
 }
 
 /** 搜索按钮操作 */
@@ -191,8 +210,9 @@ const handleDelete = async (id: number) => {
     // 发起删除
     await CategoryApi.deleteCategory(id)
     message.success(t('common.delSuccess'))
-    // 刷新列表
+    // 刷新列表与上级分类映射
     await getList()
+    await loadAllCategories()
   } catch {}
 }
 
@@ -212,7 +232,8 @@ const handleExport = async () => {
 }
 
 /** 初始化 **/
-onMounted(() => {
-  getList()
+onMounted(async () => {
+  await loadAllCategories()
+  await getList()
 })
 </script>

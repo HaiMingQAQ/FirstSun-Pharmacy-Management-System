@@ -1,0 +1,207 @@
+/**
+ * FirstSun 药店管理系统 - 公共设计令牌
+ *
+ * 依据：docs/V2现代化UI风格规范-初版.md §3.2
+ *
+ * 设计原则：
+ * - 仅声明带 `--pharmacy-` 命名空间的 CSS 自定义属性，不覆盖 Element Plus 全局变量
+ *   （--el-color-primary 等系统级主题由 store/modules/app.ts 统一管理）。
+ * - 变量在 :root 声明（仅声明，不产生样式副作用），由药店页面通过明确作用域引用。
+ * - 仅在至少两个药店页面真正复用时提取，不创建空壳抽象。
+ *
+ * 令牌清单：
+ *   --pharmacy-color-primary     品牌主色 #176B5B（侧边栏重点、主按钮、选中态）
+ *   --pharmacy-color-accent      交互强调 #16A085（链接、悬停、辅助强调）
+ *   --pharmacy-bg-page            页面背景 #F5F7F8
+ *   --pharmacy-bg-panel           面板背景 #FFFFFF（查询区、表格、表单内容面）
+ *   --pharmacy-text-primary       主文字 #1F2933
+ *   --pharmacy-text-secondary     次级文字 #667085
+ *   --pharmacy-text-weak          弱文字 #98A2B3（占位、次要时间、禁用）
+ *   --pharmacy-border-color       边框 #E4E7EC
+ *   --pharmacy-border-light        浅边框 #F0F2F5（表格分隔、弱层级）
+ *   --pharmacy-radius-sm          小圆角 6px（输入框、按钮、面板）
+ *   --pharmacy-radius-md          中圆角 8px（大面板、抽屉内分区）
+ *   --pharmacy-spacing-xs         4px（图标与紧凑文字）
+ *   --pharmacy-spacing-sm         8px（按钮组、标签、紧凑控件）
+ *   --pharmacy-spacing-md         16px（常规组件间距）
+ *   --pharmacy-spacing-lg         24px（页面区块间距）
+ */
+
+:root {
+  // 品牌与强调色
+  --pharmacy-color-primary: #176b5b;
+  --pharmacy-color-accent: #16a085;
+
+  // 背景层级
+  --pharmacy-bg-page: #f5f7f8;
+  --pharmacy-bg-panel: #ffffff;
+
+  // 文字层级
+  --pharmacy-text-primary: #1f2933;
+  --pharmacy-text-secondary: #667085;
+  --pharmacy-text-weak: #98a2b3;
+
+  // 边框
+  --pharmacy-border-color: #e4e7ec;
+  --pharmacy-border-light: #f0f2f5;
+
+  // 圆角（6/8px 为主，不使用超大圆角）
+  --pharmacy-radius-sm: 6px;
+  --pharmacy-radius-md: 8px;
+
+  // 间距体系（4/8px 基础）
+  --pharmacy-spacing-xs: 4px;
+  --pharmacy-spacing-sm: 8px;
+  --pharmacy-spacing-md: 16px;
+  --pharmacy-spacing-lg: 24px;
+}
+
+/**
+ * 深色模式令牌覆盖
+ *
+ * 复用 Element Plus 深色变量，不建立第二套独立主题系统。
+ * 仅覆盖背景、文字、边框三类令牌，品牌主色保持一致。
+ * 作用域与 Element Plus dark class 对齐：html.dark 或 .dark。
+ */
+html.dark {
+  --pharmacy-bg-page: var(--el-bg-color-page, #141414);
+  --pharmacy-bg-panel: var(--el-bg-color, #141414);
+  --pharmacy-text-primary: var(--el-text-color-primary, #e5eaf3);
+  --pharmacy-text-secondary: var(--el-text-color-regular, #cfd3dc);
+  --pharmacy-text-weak: var(--el-text-color-secondary, #a3a6ad);
+  --pharmacy-border-color: var(--el-border-color, #414243);
+  --pharmacy-border-light: var(--el-border-color-light, #414243);
+}
+
+/**
+ * 药店页面作用域
+ *
+ * 药店业务页面通过根容器添加 `pharmacy-page` 类启用统一视觉：
+ *   <div class="pharmacy-page"> ... </div>
+ *
+ * 作用域内仅调整药店页面的背景、面板间距与文字层级，
+ * 不影响 system、bpm、mall、wms、fms 等非药店模块。
+ * 渐变、玻璃模糊、超大圆角、卡片嵌套卡片均不使用。
+ */
+.pharmacy-page {
+  // 页面背景：冷灰白，业务内容面白色
+  background-color: var(--pharmacy-bg-page);
+  color: var(--pharmacy-text-primary);
+
+  // 页面标题（非营销 Hero，仅业务标题）
+  .pharmacy-page-title {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+    color: var(--pharmacy-text-primary);
+  }
+
+  // 区块标题
+  .pharmacy-section-title {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+    color: var(--pharmacy-text-primary);
+  }
+
+  // 次级说明文字
+  .pharmacy-text-secondary {
+    color: var(--pharmacy-text-secondary);
+  }
+
+  // 占位/弱文字（不小于 12px）
+  .pharmacy-text-weak {
+    color: var(--pharmacy-text-weak);
+    font-size: 12px;
+    line-height: 20px;
+  }
+}
+
+/**
+ * 药店面板（独立作用域）
+ *
+ * 用于查询区、表格、表单容器等内容面。
+ * 可直接添加到 ContentWrap/ElCard 等组件上，无需 pharmacy-page 父级。
+ * 浅色模式白底，深色模式跟随 Element Plus dark 变量。
+ */
+.pharmacy-panel {
+  background-color: var(--pharmacy-bg-panel);
+  border: 1px solid var(--pharmacy-border-color);
+  border-radius: var(--pharmacy-radius-sm);
+}
+
+/**
+ * 工作台 KPI 卡片
+ *
+ * 仅用于药店工作台首页。有真实接口数据时正常显示；
+ * 暂无统计数据时降低视觉权重（不出现一排无意义的 "--"），
+ * 改用 "暂无统计数据" 弱文字提示。
+ */
+.pharmacy-kpi {
+  background-color: var(--pharmacy-bg-panel);
+  border: 1px solid var(--pharmacy-border-color);
+  border-radius: var(--pharmacy-radius-md);
+  padding: var(--pharmacy-spacing-md) var(--pharmacy-spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--pharmacy-spacing-xs);
+
+  &__label {
+    font-size: 13px;
+    line-height: 22px;
+    color: var(--pharmacy-text-secondary);
+  }
+
+  &__value {
+    font-size: 26px;
+    line-height: 32px;
+    font-weight: 700;
+    color: var(--pharmacy-text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  // 暂无数据时降低视觉权重，不抢首页焦点
+  &__empty {
+    font-size: 13px;
+    line-height: 22px;
+    color: var(--pharmacy-text-weak);
+    font-weight: 400;
+  }
+
+  &__hint {
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--pharmacy-text-secondary);
+  }
+}
+
+/**
+ * 工作台快捷入口
+ *
+ * 跳转到真实存在且用户有权限访问的药店业务页面，
+ * 不写死到不存在的路由。
+ */
+.pharmacy-shortcut {
+  display: flex;
+  align-items: center;
+  gap: var(--pharmacy-spacing-sm);
+  padding: var(--pharmacy-spacing-sm) var(--pharmacy-spacing-md);
+  background-color: var(--pharmacy-bg-panel);
+  border: 1px solid var(--pharmacy-border-color);
+  border-radius: var(--pharmacy-radius-sm);
+  color: var(--pharmacy-text-primary);
+  cursor: pointer;
+  transition:
+    border-color 0.16s,
+    color 0.16s;
+
+  &:hover {
+    border-color: var(--pharmacy-color-accent);
+    color: var(--pharmacy-color-accent);
+  }
+
+  &__label {
+    font-size: 14px;
+    line-height: 22px;
+  }
+}

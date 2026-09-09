@@ -1,5 +1,5 @@
 <template>
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <!-- 搜索 -->
     <el-form class="-mb-15px" :model="queryParams" ref="queryFormRef" :inline="true" label-width="68px">
       <el-form-item label="工号" prop="empNo">
@@ -46,7 +46,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-button type="primary" :icon="Plus" plain @click="openForm('create')" v-hasPermi="['pharmacy:base:employee:create']">
       新增
     </el-button>
