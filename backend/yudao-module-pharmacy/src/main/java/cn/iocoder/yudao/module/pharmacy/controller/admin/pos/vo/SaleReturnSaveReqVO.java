@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.util.List;
@@ -29,11 +30,14 @@ public class SaleReturnSaveReqVO {
     @Schema(description = "药师复核(处方药退货必须)")
     private Integer pharmacistConfirm;
 
+    @Schema(description = "经办人(收银员编号，为空时取原销售单收银员)")
+    private Long cashierId;
+
     @Schema(description = "备注")
     private String remark;
 
     @NotEmpty(message = "退货明细不能为空")
-    private List<Item> items;
+    private List<@Valid Item> items;
 
     @Data
     public static class Item {

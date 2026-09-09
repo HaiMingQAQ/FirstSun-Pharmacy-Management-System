@@ -22,6 +22,8 @@ public interface ErrorCodeConstants {
     // ========== 库存依赖 ==========
     ErrorCode INV_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_001, "库存服务未就绪，本次操作无法扣减/回补库存");
     ErrorCode INV_RETURN_BACK_FAILED = new ErrorCode(1_029_002_002, "库存回补失败");
+    ErrorCode PAY_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_003, "支付服务未就绪，退款失败");
+    ErrorCode MEMBER_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_004, "会员积分服务未就绪，积分回退失败");
 
     // ========== 退货单 ==========
     ErrorCode SALE_RETURN_QTY_EXCEED = new ErrorCode(1_029_003_001, "退货数量超过可退数量");
@@ -34,4 +36,5 @@ public interface ErrorCodeConstants {
     ErrorCode SHIFT_NOT_EXISTS = new ErrorCode(1_029_004_001, "班次不存在");
     ErrorCode SHIFT_ALREADY_CLOSED = new ErrorCode(1_029_004_002, "班次已交班，不能重复交班");
     ErrorCode SHIFT_DIFF_REASON_REQUIRED = new ErrorCode(1_029_004_003, "现金长款/短款必须填写原因");
+    ErrorCode SHIFT_OPENING_EXISTS = new ErrorCode(1_029_004_004, "该收银台已有进行中的班次，请先交班");
 }

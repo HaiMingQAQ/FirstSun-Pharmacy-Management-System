@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderDetailRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderPageReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderDO;
@@ -199,5 +200,15 @@ public class SaleOrderServiceImpl implements SaleOrderService {
             throw ServiceExceptionUtil.exception(SALE_ORDER_NOT_EXISTS);
         }
         return order;
+    }
+
+    @Override
+    public SaleOrderDetailRespVO getSaleOrderDetail(Long id) {
+        PhSaleOrderDO order = getSaleOrder(id);
+        SaleOrderDetailRespVO detail = new SaleOrderDetailRespVO();
+        detail.setOrder(order);
+        detail.setLines(saleOrderLineMapper.selectListByOrderId(id));
+        detail.setPayments(salePaymentMapper.selectListByOrderId(id));
+        return detail;
     }
 }

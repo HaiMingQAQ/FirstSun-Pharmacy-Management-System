@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import javax.validation.Valid;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import java.math.BigDecimal;
@@ -37,11 +38,11 @@ public class SaleOrderSaveReqVO {
 
     @Schema(description = "商品明细")
     @NotEmpty(message = "销售商品不能为空")
-    private List<Item> items;
+    private List<@Valid Item> items;
 
     @Schema(description = "支付明细")
     @NotEmpty(message = "销售支付信息不能为空")
-    private List<Payment> payments;
+    private List<@Valid Payment> payments;
 
     @Schema(description = "备注")
     private String remark;
@@ -75,6 +76,7 @@ public class SaleOrderSaveReqVO {
         private Integer isGift;
 
         /** 商品名称快照(用于小票) */
+        @NotEmpty(message = "商品名称不能为空")
         private String drugName;
 
         /** 规格快照 */

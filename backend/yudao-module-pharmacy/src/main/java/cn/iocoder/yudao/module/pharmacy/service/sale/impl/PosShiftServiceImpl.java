@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.PosShiftMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SalePaymentMapper;
 import cn.iocoder.yudao.module.pharmacy.service.sale.PosShiftService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -23,6 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SHIFT_ALREADY_CLOSED;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SHIFT_DIFF_REASON_REQUIRED;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SHIFT_NOT_EXISTS;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SHIFT_OPENING_EXISTS;
 
 /**
  * 班次服务实现：开台与交班。
@@ -45,6 +47,15 @@ public class PosShiftServiceImpl implements PosShiftService {
 
     @Override
     public Long openShift(Long storeId, String posNo, Long cashierId) {
+        // 同一收银台已有进行中班次（status=0）时禁止重复开台，避免账目混乱
+        Long openingCount = posShiftMapper.selectCount(new LambdaQueryWrapper<PhPosShiftDO>()
+                .eq(PhPosShiftDO::getStoreId, storeId)
+                .eq(PhPosShiftDO::getPosNo, posNo)
+                .eq(PhPosShiftDO::getStatus, 0));
+        if (openingCount != null && openingCount > 0) {
+            throw ServiceExceptionUtil.exception(SHIFT_OPENING_EXISTS);
+        }
+
         PhPosShiftDO shift = new PhPosShiftDO();
         shift.setShiftNo("SC-" + storeId + "-" + LocalDateTime.now().format(TIME_FMT)
                 + "-" + String.format("%03d", SEQ.incrementAndGet() % 1000));
