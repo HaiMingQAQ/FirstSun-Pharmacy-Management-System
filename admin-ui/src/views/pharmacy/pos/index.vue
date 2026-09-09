@@ -340,6 +340,7 @@ const removeItem = (index: number) => {
 
 const clearCart = () => {
   cart.value = []
+  genIdempotency() // 放弃本次结算意图，重置幂等键
 }
 
 /** 生成订单号：SO-门店-yyyyMMddHHmmss-流水 */
@@ -349,6 +350,15 @@ const genOrderNo = () => {
   const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
   return `SO-${storeId.value}-${ts}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`
 }
+
+/** 幂等键：一次结算意图固定订单号/支付号，提交成功后重置；失败保留以便重试（防重复提交重复扣库） */
+let pendingOrderNo = ''
+let pendingPaymentNo = ''
+const genIdempotency = () => {
+  pendingOrderNo = genOrderNo()
+  pendingPaymentNo = `PAY-${genOrderNo()}`
+}
+genIdempotency()
 
 /** 提交现金销售单 */
 const handleSubmit = async () => {
@@ -376,7 +386,7 @@ const handleSubmit = async () => {
       unit: item.unit
     }))
     const data: SaleOrderSaveReqVO = {
-      orderNo: genOrderNo(),
+      orderNo: pendingOrderNo,
       storeId: storeId.value,
       shiftId: shiftId.value,
       cashierId: cashierId.value,
@@ -387,13 +397,14 @@ const handleSubmit = async () => {
         {
           payMethod: 1, // 现金
           payAmount: paidAmount.value,
-          paymentNo: `PAY-${genOrderNo()}` // 幂等号
+          paymentNo: pendingPaymentNo // 幂等号
         }
       ],
       remark: remark.value
     }
     const orderId = await SaleOrderApi.createSaleOrder(data)
     message.success('销售成功')
+    genIdempotency() // 新订单新幂等键
     // 加载小票数据
     lastOrder.value = await SaleOrderApi.getSaleOrder(orderId)
     lastOrderLines.value = (lastOrder.value as any).lines || []
