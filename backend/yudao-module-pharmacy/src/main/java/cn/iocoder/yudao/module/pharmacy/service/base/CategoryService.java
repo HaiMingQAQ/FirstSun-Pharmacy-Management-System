@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.category.Catego
 import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.category.CategorySaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.CategoryDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 

@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.barcode.Barcode
 import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.barcode.BarcodeSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.BarcodeDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 
