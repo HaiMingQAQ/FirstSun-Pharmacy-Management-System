@@ -64,8 +64,8 @@ services:
         --spring.datasource.dynamic.datasource.slave.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-firstsun_pharmacy}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
         --spring.datasource.dynamic.datasource.slave.username=${MYSQL_USER:-pharmacy}
         --spring.datasource.dynamic.datasource.slave.password=${MYSQL_PASSWORD:-pharmacy123}
-        --spring.redis.host=redis
-        --spring.redis.port=6379
+        --spring.data.redis.host=redis
+        --spring.data.redis.port=6379
     ports:
       - "${BACKEND_PORT:-48080}:48080"
 

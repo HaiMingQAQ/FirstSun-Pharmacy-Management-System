@@ -7,10 +7,10 @@ import cn.iocoder.yudao.module.hrm.controller.admin.salary.vo.config.HrmSalaryCo
 import cn.iocoder.yudao.module.hrm.dal.dataobject.salary.config.HrmSalaryConfigDO;
 import cn.iocoder.yudao.module.hrm.dal.mysql.salary.config.HrmSalaryConfigMapper;
 import cn.iocoder.yudao.module.hrm.enums.salary.config.HrmSalarySocialSecurityMonthTypeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
@@ -37,7 +37,7 @@ public class HrmSalaryConfigServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmSalaryConfigMapper salaryConfigMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmSalaryMonthRecordService salaryMonthRecordService;
 
     @Test

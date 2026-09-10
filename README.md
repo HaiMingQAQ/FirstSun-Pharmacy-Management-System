@@ -4,6 +4,20 @@
 
 > 数据库文件本身不上传 GitHub，通过 Docker 初始化脚本让每位成员得到一致的开发环境。
 
+## 统一技术版本
+
+| 组件 | 版本 |
+|---|---|
+| Java | 17（本机编译与 Docker 运行） |
+| Spring Boot | 3.5.15 |
+| Maven | 3.9.x |
+| Node.js | 22 |
+| pnpm | 11.22.0 |
+| MySQL | 8.0 |
+| Redis | 7 |
+
+后端基于 RuoYi-Vue-Pro 官方 `master-jdk17` 分支。成员本机的 JDK 安装路径可以不同，但 `java -version` 和 `mvn -version` 必须显示 Java 17 或更高版本；也可以完全使用 Docker 构建运行。
+
 ## 项目结构
 
 ```text
@@ -11,14 +25,26 @@ backend/       基于 ruoyi-vue-pro 的 Java 后端
 admin-ui/      基于 yudao-ui-admin-vue3 的管理后台
 mall-uniapp/   基于 yudao-mall-uniapp 的会员小程序
 sql/           FirstSun 药店业务初始化 SQL
+docs/          团队分工、开发规范和协作文档
 docker-compose.yml  团队统一 Docker 开发环境
 ```
+
+## 开发文档
+
+所有成员开始开发前，应按以下顺序阅读：
+
+1. [团队开发须知](./docs/团队开发须知.md)：环境启动、Git 分支、提交、数据库迁移和冲突处理。
+2. [六人全栈开发方案](./docs/六人全栈开发方案.md)：A～F 的模块、页面、数据表及跨模块接口分工。
+3. [开发规范与 AI 协作规则](./docs/开发规范与AI协作规则.md)：成员和 AI 工具必须遵守的修改范围及交付要求。
+4. [前端界面统一规范](./docs/前端界面统一规范.md)：管理端页面结构、组件、样式和交互约定。
+
+开发文档索引见 [docs/README.md](./docs/README.md)。每位成员应从最新 `main` 创建自己的功能分支，并且只修改本人负责范围。若使用 AI 编程工具，需要同时提供本人分工、AI 协作规则和本次任务的验收标准。
 
 ## 一键启动开发环境
 
 ### 前提
 
-安装并启动 Docker Desktop。首次构建后端镜像会下载 Maven 依赖，耗时会比较久；之后会复用 Docker 缓存。
+安装并启动 Docker Desktop。本机直接编译后端时还需要 JDK 17+ 和 Maven 3.9.x。首次构建后端镜像会下载 Maven 依赖，耗时会比较久；之后会复用 Docker 缓存。
 
 ### 首次启动
 

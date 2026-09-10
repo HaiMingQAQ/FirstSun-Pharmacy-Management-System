@@ -1,8 +1,8 @@
 package cn.iocoder.yudao.module.hrm.controller.admin.portal.performance.vo.review;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;

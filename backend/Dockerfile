@@ -1,10 +1,10 @@
-FROM maven:3.9.11-eclipse-temurin-8 AS builder
+FROM maven:3.9-eclipse-temurin-17 AS builder
 
 WORKDIR /build
 COPY . .
 RUN mvn -pl yudao-server -am package -DskipTests
 
-FROM eclipse-temurin:8-jre
+FROM eclipse-temurin:17-jre
 
 WORKDIR /yudao-server
 COPY --from=builder /build/yudao-server/target/yudao-server.jar app.jar
