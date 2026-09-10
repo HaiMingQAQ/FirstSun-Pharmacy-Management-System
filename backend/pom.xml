@@ -15,6 +15,7 @@
         <!-- 各种 module 拓展 -->
         <module>yudao-module-system</module>
         <module>yudao-module-infra</module>
+        <!-- 药店业务模块（A 基础资料域 + D POS 销售域） -->
         <module>yudao-module-pharmacy</module>
 <!--        <module>yudao-module-member</module>-->
 <!--        <module>yudao-module-bpm</module>-->
