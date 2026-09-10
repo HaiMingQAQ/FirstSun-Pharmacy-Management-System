@@ -1,6 +1,17 @@
 <template>
-  <div>
-    <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="销售单详情"
+      eyebrow="ORDER DETAIL"
+      icon="ep:document"
+      total-label="销售单号"
+      :total="Number(detail?.order?.id ?? 0)"
+      :current-count="detail?.lines?.length ?? 0"
+      page-type="销售档案"
+      :loading="!detail"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
       <el-page-header @back="router.back()" :content="'销售单详情'">
         <template #title>
           <span>返回</span>
@@ -8,7 +19,7 @@
       </el-page-header>
     </ContentWrap>
 
-    <ContentWrap v-if="detail">
+    <ContentWrap v-if="detail" class="pharmacy-panel">
       <!-- 主单信息 -->
       <el-descriptions :column="3" border title="销售单信息" class="mb-15px">
         <el-descriptions-item label="单号">{{ detail.order.orderNo }}</el-descriptions-item>

@@ -1,5 +1,17 @@
 <template>
-  <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="支付明细"
+      eyebrow="PAYMENTS"
+      icon="ep:wallet"
+      total-label="支付笔数"
+      :total="total"
+      :current-count="list.length"
+      page-type="支付档案"
+      :loading="loading"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -32,7 +44,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
       <el-table-column label="销售单" align="center" prop="orderId" width="110" />
       <el-table-column label="支付方式" align="center" width="100">
@@ -59,6 +71,7 @@
       @pagination="getList"
     />
   </ContentWrap>
+  </div>
 </template>
 
 <script lang="ts" setup>

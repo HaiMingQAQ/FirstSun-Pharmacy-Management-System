@@ -1,5 +1,17 @@
 <template>
-  <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="退货单"
+      eyebrow="SALE RETURNS"
+      icon="ep:refresh-left"
+      total-label="退货单总数"
+      :total="total"
+      :current-count="list.length"
+      page-type="退货管理"
+      :loading="loading"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -34,7 +46,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
       <el-table-column label="退货单号" align="center" prop="returnNo" min-width="180" />
       <el-table-column label="原销售单" align="center" prop="saleOrderId" width="110" />
@@ -187,6 +199,7 @@
       </el-table>
     </template>
   </el-dialog>
+  </div>
 </template>
 
 <script lang="ts" setup>

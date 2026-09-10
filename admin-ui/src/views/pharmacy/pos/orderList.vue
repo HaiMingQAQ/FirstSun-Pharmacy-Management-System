@@ -1,5 +1,17 @@
 <template>
-  <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="销售单"
+      eyebrow="SALE ORDERS"
+      icon="ep:tickets"
+      total-label="销售单总数"
+      :total="total"
+      :current-count="list.length"
+      page-type="销售档案"
+      :loading="loading"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -47,7 +59,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
       <el-table-column label="单号" align="center" prop="orderNo" min-width="190" />
       <el-table-column label="门店" align="center" prop="storeId" width="70" />
@@ -88,6 +100,7 @@
       @pagination="getList"
     />
   </ContentWrap>
+  </div>
 </template>
 
 <script lang="ts" setup>

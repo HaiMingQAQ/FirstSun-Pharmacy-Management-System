@@ -1,31 +1,22 @@
 <template>
-  <div class="pos-cashier">
+  <div class="pharmacy-modern-page pos-cashier">
     <!-- 页头 + 实时统计 -->
-    <div class="pos-header">
-      <div class="pos-header-left">
-        <div class="pos-title">药店 POS 管理 · 收银台</div>
-        <div class="pos-subtitle">OTC 现金销售 → 小票预览 → 交班；扣库/支付/积分由 C·E·F 服务提供，未就绪时后端将拦截并提示</div>
-      </div>
-      <div class="pos-stats">
-        <div class="stat-card">
-          <div class="stat-label">当前班次</div>
-          <div class="stat-value" :class="{ 'stat-muted': !shiftId || shiftId < 1 }">{{ shiftId && shiftId > 0 ? '班次 #' + shiftId : '未开台' }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">购物车</div>
-          <div class="stat-value">{{ cart.length }} 件</div>
-        </div>
-        <div class="stat-card stat-card-accent">
-          <div class="stat-label">应收合计</div>
-          <div class="stat-value stat-amount">¥ {{ formatMoney(payableAmount) }}</div>
-        </div>
-      </div>
-    </div>
+    <PharmacyPageHeader
+      title="收银台"
+      eyebrow="CASHIER DESK"
+      icon="ep:money"
+      total-label="当前班次"
+      :total="shiftId && shiftId > 0 ? shiftId : 0"
+      :current-count="cart.length"
+      page-type="现金收银"
+      :loading="submitLoading"
+      subtitle="OTC 现金销售 → 小票预览 → 交班；扣库/支付/积分由 C·E·F 服务提供，未就绪时后端将拦截并提示"
+    />
 
     <el-row :gutter="16">
       <!-- 左侧：购物车 + 结算 -->
       <el-col :span="16">
-        <ContentWrap class="mb-15px">
+        <ContentWrap class="pharmacy-panel mb-15px">
           <div class="panel-head">
             <span class="panel-title"><Icon icon="ep:shopping-cart" class="mr-5px" />销售商品</span>
             <div>
@@ -77,7 +68,7 @@
           </el-table>
         </ContentWrap>
 
-        <ContentWrap>
+        <ContentWrap class="pharmacy-panel">
           <div class="panel-head">
             <span class="panel-title"><Icon icon="ep:money" class="mr-5px" />现金结算</span>
           </div>
@@ -121,7 +112,7 @@
 
       <!-- 右侧：班次 + 小票预览 -->
       <el-col :span="8">
-        <ContentWrap class="mb-15px">
+        <ContentWrap class="pharmacy-panel mb-15px">
           <div class="panel-head">
             <span class="panel-title"><Icon icon="ep:timer" class="mr-5px" />当前班次</span>
           </div>
@@ -144,7 +135,7 @@
           </div>
         </ContentWrap>
 
-        <ContentWrap>
+        <ContentWrap class="pharmacy-panel">
           <div class="panel-head">
             <span class="panel-title"><Icon icon="ep:list" class="mr-5px" />小票预览</span>
           </div>
@@ -479,60 +470,10 @@ const handleCloseShiftConfirm = async () => {
 </script>
 
 <style scoped>
-.pos-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
+.pos-cashier .pharmacy-panel {
+  overflow: hidden;
 }
-.pos-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a1a;
-}
-.pos-subtitle {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 2px;
-}
-.pos-stats {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.stat-card {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 10px;
-  padding: 8px 18px;
-  min-width: 96px;
-  text-align: center;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
-}
-.stat-card-accent {
-  background: linear-gradient(135deg, #fef0f0, #fff);
-  border-color: #f8d0d0;
-}
-.stat-label {
-  font-size: 12px;
-  color: #909399;
-}
-.stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  color: #303133;
-  margin-top: 2px;
-}
-.stat-amount {
-  color: #f56c6c;
-}
-.stat-muted {
-  color: #c0c4cc;
-  font-size: 14px;
-  font-weight: 400;
-}
+
 .panel-head {
   display: flex;
   justify-content: space-between;
@@ -542,16 +483,16 @@ const handleCloseShiftConfirm = async () => {
 .panel-title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--pharmacy-text-primary);
 }
 .money-cell {
   color: #f56c6c;
   font-weight: 600;
 }
 .settle-panel {
-  background: linear-gradient(135deg, #fdf6ec, #fff);
-  border: 1px solid #f5e3c4;
-  border-radius: 10px;
+  background-color: var(--pharmacy-bg-panel);
+  border: 1px solid var(--pharmacy-border-color);
+  border-radius: var(--pharmacy-radius-sm);
   padding: 14px;
 }
 .settle-row {

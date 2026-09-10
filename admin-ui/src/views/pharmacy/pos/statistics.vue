@@ -1,5 +1,17 @@
 <template>
-  <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="销售统计"
+      eyebrow="SALES STATISTICS"
+      icon="ep:data-analysis"
+      total-label="统计天数"
+      :total="rows.length"
+      :current-count="sum('orderCount')"
+      page-type="经营分析"
+      :loading="loading"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
     <!-- 查询栏 -->
     <el-form class="-mb-15px" :inline="true" label-width="80px">
       <el-form-item label="门店">
@@ -25,7 +37,7 @@
 
   <el-row :gutter="16">
     <el-col :span="8">
-      <ContentWrap>
+      <ContentWrap class="pharmacy-panel">
         <div class="font-600 mb-10px">汇总</div>
         <el-descriptions :column="1" border>
           <el-descriptions-item label="订单笔数">
@@ -44,13 +56,13 @@
       </ContentWrap>
     </el-col>
     <el-col :span="16">
-      <ContentWrap>
+      <ContentWrap class="pharmacy-panel">
         <Echart :options="echartsOption" height="360px" />
       </ContentWrap>
     </el-col>
   </el-row>
 
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="rows">
       <el-table-column label="日期" align="center" prop="bizDate" width="140" />
       <el-table-column label="订单笔数" align="center" prop="orderCount" width="110" />
@@ -68,6 +80,7 @@
     </el-table>
     <el-empty v-if="!loading && rows.length === 0" description="暂无统计数据" />
   </ContentWrap>
+  </div>
 </template>
 
 <script lang="ts" setup>

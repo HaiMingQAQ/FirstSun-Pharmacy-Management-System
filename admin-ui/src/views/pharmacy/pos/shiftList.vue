@@ -1,5 +1,17 @@
 <template>
-  <ContentWrap>
+  <div class="pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="收银班次"
+      eyebrow="CASHIER SHIFTS"
+      icon="ep:timer"
+      total-label="班次总数"
+      :total="total"
+      :current-count="list.length"
+      page-type="班次管理"
+      :loading="loading"
+      subtitle="FirstSun 药店管理系统 · 药店 POS"
+    />
+    <ContentWrap class="pharmacy-panel">
     <!-- 搜索工作栏 -->
     <el-form
       class="-mb-15px"
@@ -42,7 +54,7 @@
   </ContentWrap>
 
   <!-- 列表 -->
-  <ContentWrap>
+  <ContentWrap class="pharmacy-panel">
     <el-table v-loading="loading" :data="list">
       <el-table-column label="班次号" align="center" prop="shiftNo" min-width="170" />
       <el-table-column label="门店" align="center" prop="storeId" width="70" />
@@ -116,8 +128,7 @@
   </el-dialog>
 
   <!-- 交班弹窗 -->
-  <el-dialog v-model="closeShiftDialogVisible" title="交班" width="480px">
-    <el-form label-width="110px">
+  <el-dialog v-model="closeShiftDialogVisible" title="交班" width="480px">    <el-form label-width="110px">
       <el-form-item label="班次号">
         <span>{{ closeShiftForm.shiftNo }}</span>
       </el-form-item>
@@ -148,6 +159,7 @@
       <el-button @click="closeShiftDialogVisible = false">取消</el-button>
     </template>
   </el-dialog>
+  </div>
 </template>
 
 <script lang="ts" setup>
