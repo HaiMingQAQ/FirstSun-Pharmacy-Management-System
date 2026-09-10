@@ -40,14 +40,20 @@
       <el-table-column label="原销售单" align="center" prop="saleOrderId" width="110" />
       <el-table-column label="门店" align="center" prop="storeId" width="70" />
       <el-table-column label="类型" align="center" width="80">
-        <template #default="scope">{{ scope.row.returnType === 0 ? '退货' : '换货' }}</template>
+        <template #default="scope">
+          <el-tag :type="scope.row.returnType === 0 ? 'primary' : 'warning'" effect="light">
+            {{ scope.row.returnType === 0 ? '退货' : '换货' }}
+          </el-tag>
+        </template>
       </el-table-column>
       <el-table-column label="退款金额(元)" align="center" width="120">
         <template #default="scope">{{ formatMoney(scope.row.totalAmount) }}</template>
       </el-table-column>
       <el-table-column label="退款方式" align="center" width="90">
         <template #default="scope">
-          {{ scope.row.refundMethod === 0 ? '原路' : scope.row.refundMethod === 1 ? '现金' : '余额' }}
+          <el-tag :type="scope.row.refundMethod === 0 ? 'info' : 'success'" effect="plain">
+            {{ scope.row.refundMethod === 0 ? '原路' : scope.row.refundMethod === 1 ? '现金' : '余额' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="状态" align="center" width="90">

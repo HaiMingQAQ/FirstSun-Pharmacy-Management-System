@@ -1,34 +1,47 @@
 <template>
   <div class="pos-cashier">
-    <!-- 联调受限提示 -->
-    <el-alert
-      type="warning"
-      :closable="false"
-      show-icon
-      class="mb-15px"
-      title="依赖服务未就绪提示：商品查询/库存选批依赖 A、C 服务，未就绪时请手动录入商品行；库存扣减/处方校验在后端未就绪时将被拒绝并回滚。"
-    />
+    <!-- 页头 + 实时统计 -->
+    <div class="pos-header">
+      <div class="pos-header-left">
+        <div class="pos-title">药店 POS 管理 · 收银台</div>
+        <div class="pos-subtitle">OTC 现金销售 → 小票预览 → 交班；扣库/支付/积分由 C·E·F 服务提供，未就绪时后端将拦截并提示</div>
+      </div>
+      <div class="pos-stats">
+        <div class="stat-card">
+          <div class="stat-label">当前班次</div>
+          <div class="stat-value" :class="{ 'stat-muted': !shiftId || shiftId < 1 }">{{ shiftId && shiftId > 0 ? '班次 #' + shiftId : '未开台' }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">购物车</div>
+          <div class="stat-value">{{ cart.length }} 件</div>
+        </div>
+        <div class="stat-card stat-card-accent">
+          <div class="stat-label">应收合计</div>
+          <div class="stat-value stat-amount">¥ {{ formatMoney(payableAmount) }}</div>
+        </div>
+      </div>
+    </div>
 
     <el-row :gutter="16">
-      <!-- 左侧：购物车 -->
+      <!-- 左侧：购物车 + 结算 -->
       <el-col :span="16">
-        <ContentWrap>
-          <div class="flex items-center justify-between mb-10px">
-            <div class="font-size-16px font-600">销售商品</div>
+        <ContentWrap class="mb-15px">
+          <div class="panel-head">
+            <span class="panel-title"><Icon icon="ep:shopping-cart" class="mr-5px" />销售商品</span>
             <div>
-              <el-button type="primary" plain @click="openAddDialog">
+              <el-button type="primary" plain size="small" @click="openAddDialog">
                 <Icon icon="ep:plus" class="mr-5px" /> 添加商品
               </el-button>
-              <el-button type="danger" plain :disabled="cart.length === 0" @click="clearCart">
+              <el-button type="danger" plain size="small" :disabled="cart.length === 0" @click="clearCart">
                 <Icon icon="ep:delete" class="mr-5px" /> 清空
               </el-button>
             </div>
           </div>
-          <el-table :data="cart" border max-height="420">
+          <el-table :data="cart" border max-height="380" empty-text="暂无商品，点击「添加商品」手动录入（库存选批依赖 C 服务）">
             <el-table-column label="药品名称" align="center" prop="drugName" min-width="140" />
             <el-table-column label="规格" align="center" prop="specification" min-width="100" />
             <el-table-column label="单位" align="center" prop="unit" width="60" />
-            <el-table-column label="单价(元)" align="center" width="100">
+            <el-table-column label="单价(元)" align="center" width="110">
               <template #default="scope">
                 <el-input-number
                   v-model="scope.row.price"
@@ -40,7 +53,7 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column label="数量" align="center" width="110">
+            <el-table-column label="数量" align="center" width="120">
               <template #default="scope">
                 <el-input-number
                   v-model="scope.row.qty"
@@ -53,7 +66,7 @@
             </el-table-column>
             <el-table-column label="金额(元)" align="center" width="110">
               <template #default="scope">
-                {{ formatMoney(scope.row.qty * scope.row.price) }}
+                <span class="money-cell">{{ formatMoney(scope.row.qty * scope.row.price) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="操作" align="center" width="70">
@@ -62,86 +75,99 @@
               </template>
             </el-table-column>
           </el-table>
+        </ContentWrap>
 
-          <!-- 结算区 -->
-          <el-form label-width="90px" class="mt-15px">
-            <el-form-item label="应收合计(元)">
-              <span class="font-700 color-#f56c6c font-size-18px">{{ formatMoney(payableAmount) }}</span>
-            </el-form-item>
-            <el-form-item label="实收现金(元)">
-              <el-input-number
-                v-model="paidAmount"
-                :min="0"
-                :precision="2"
-                :controls="false"
-                class="!w-200px"
-                placeholder="实收金额"
-              />
-            </el-form-item>
-            <el-form-item label="找零(元)">
-              <span class="font-600">{{ formatMoney(changeAmount) }}</span>
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input v-model="remark" type="textarea" :rows="2" placeholder="备注" class="!w-400px" />
-            </el-form-item>
-            <el-form-item>
+        <ContentWrap>
+          <div class="panel-head">
+            <span class="panel-title"><Icon icon="ep:money" class="mr-5px" />现金结算</span>
+          </div>
+          <div class="settle-panel">
+            <div class="settle-row">
+              <span class="settle-label">应收合计</span>
+              <span class="settle-amount">¥ {{ formatMoney(payableAmount) }}</span>
+            </div>
+            <div class="settle-grid">
+              <div class="settle-field">
+                <div class="settle-label">实收现金(元)</div>
+                <el-input-number
+                  v-model="paidAmount"
+                  :min="0"
+                  :precision="2"
+                  :controls="false"
+                  class="!w-full"
+                  placeholder="实收金额"
+                />
+              </div>
+              <div class="settle-field">
+                <div class="settle-label">找零(元)</div>
+                <div class="settle-change">{{ formatMoney(changeAmount) }}</div>
+              </div>
+            </div>
+            <div class="settle-field mb-10px">
+              <div class="settle-label">备注</div>
+              <el-input v-model="remark" type="textarea" :rows="2" placeholder="备注（选填）" />
+            </div>
+            <div class="settle-actions">
               <el-button type="primary" size="large" :loading="submitLoading" @click="handleSubmit">
                 <Icon icon="ep:money" class="mr-5px" /> 现金结算并提交
               </el-button>
               <el-button size="large" :disabled="!lastOrder" @click="handlePrint">
                 <Icon icon="ep:printer" class="mr-5px" /> 重打小票
               </el-button>
-            </el-form-item>
-          </el-form>
+            </div>
+          </div>
         </ContentWrap>
       </el-col>
 
-      <!-- 右侧：班次与小票预览 -->
+      <!-- 右侧：班次 + 小票预览 -->
       <el-col :span="8">
+        <ContentWrap class="mb-15px">
+          <div class="panel-head">
+            <span class="panel-title"><Icon icon="ep:timer" class="mr-5px" />当前班次</span>
+          </div>
+          <el-descriptions :column="1" size="small" border>
+            <el-descriptions-item label="门店编号">{{ storeId }}</el-descriptions-item>
+            <el-descriptions-item label="收银台号">{{ posNo }}</el-descriptions-item>
+            <el-descriptions-item label="收银员ID">{{ cashierId }}</el-descriptions-item>
+            <el-descriptions-item label="班次ID">
+              <el-tag v-if="shiftId && shiftId > 0" type="success" effect="light">{{ shiftId }}</el-tag>
+              <el-tag v-else type="info" effect="plain">未开台</el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+          <div class="mt-12px shift-actions">
+            <el-button type="success" plain @click="handleOpenShift" :loading="openShiftLoading">
+              <Icon icon="ep:switch" class="mr-5px" /> 开台
+            </el-button>
+            <el-button type="warning" plain @click="handleCloseShift" :loading="closeShiftLoading">
+              <Icon icon="ep:switch-button" class="mr-5px" /> 交班
+            </el-button>
+          </div>
+        </ContentWrap>
+
         <ContentWrap>
-          <div class="font-size-16px font-600 mb-10px">当前班次</div>
-          <el-form label-width="80px" label-position="left">
-            <el-form-item label="门店编号">
-              <el-input-number v-model="storeId" :min="1" :controls="false" class="!w-140px" />
-            </el-form-item>
-            <el-form-item label="收银台号">
-              <el-input v-model="posNo" placeholder="如 POS-01" class="!w-160px" />
-            </el-form-item>
-            <el-form-item label="收银员ID">
-              <el-input-number v-model="cashierId" :min="1" :controls="false" class="!w-140px" />
-            </el-form-item>
-            <el-form-item label="班次ID">
-              <el-input-number v-model="shiftId" :min="1" :controls="false" class="!w-140px" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="success" plain @click="handleOpenShift" :loading="openShiftLoading">
-                <Icon icon="ep:switch" class="mr-5px" /> 开台
-              </el-button>
-              <el-button type="warning" plain @click="handleCloseShift" :loading="closeShiftLoading">
-                <Icon icon="ep:switch-button" class="mr-5px" /> 交班
-              </el-button>
-            </el-form-item>
-          </el-form>
-          <el-divider />
-          <div class="font-size-16px font-600 mb-10px">小票预览</div>
-          <div class="pos-receipt p-12px text-13px color-#303133">
-            <div class="text-center font-700">FirstSun 药店</div>
-            <div class="text-center mb-8px">收银小票</div>
-            <div v-if="lastOrder">单号：{{ lastOrder.orderNo }}</div>
-            <div v-if="lastOrder">时间：{{ formatDate(lastOrder.saleTime) }}</div>
-            <el-table :data="lastOrderLines" size="small" class="mt-8px">
+          <div class="panel-head">
+            <span class="panel-title"><Icon icon="ep:list" class="mr-5px" />小票预览</span>
+          </div>
+          <div class="pos-receipt">
+            <div class="receipt-head">
+              <div class="receipt-title">FirstSun 药店</div>
+              <div class="receipt-sub">收银小票</div>
+            </div>
+            <div v-if="lastOrder" class="receipt-meta">单号：{{ lastOrder.orderNo }}</div>
+            <div v-if="lastOrder" class="receipt-meta">时间：{{ formatDate(lastOrder.saleTime) }}</div>
+            <el-table :data="lastOrderLines" size="small" class="receipt-table">
               <el-table-column label="品名" prop="drugName" />
-              <el-table-column label="数量" prop="qty" width="60" />
-              <el-table-column label="金额" width="80">
+              <el-table-column label="数量" prop="qty" width="56" align="center" />
+              <el-table-column label="金额" width="80" align="right">
                 <template #default="scope">
                   {{ formatMoney(scope.row.lineAmount) }}
                 </template>
               </el-table-column>
             </el-table>
-            <div v-if="lastOrder" class="mt-8px">应付：{{ formatMoney(lastOrder.payableAmount) }}</div>
-            <div v-if="lastOrder">实收：{{ formatMoney(lastOrder.paidAmount) }}</div>
-            <div v-if="lastOrder">找零：{{ formatMoney(lastOrder.changeAmount) }}</div>
-            <div class="text-center mt-8px">谢谢惠顾，祝您健康！</div>
+            <div v-if="lastOrder" class="receipt-total">应付：{{ formatMoney(lastOrder.payableAmount) }}</div>
+            <div v-if="lastOrder" class="receipt-total">实收：{{ formatMoney(lastOrder.paidAmount) }}</div>
+            <div v-if="lastOrder" class="receipt-total">找零：{{ formatMoney(lastOrder.changeAmount) }}</div>
+            <div class="receipt-foot">谢谢惠顾，祝您健康！</div>
           </div>
         </ContentWrap>
       </el-col>
@@ -239,7 +265,6 @@
     </div>
   </div>
 </template>
-
 <script lang="ts" setup>
 import { SaleOrderApi, SaleOrderSaveReqVO, SaleOrderItemVO, SaleOrderVO } from '@/api/pharmacy/pos/saleOrder'
 import { PosShiftApi } from '@/api/pharmacy/pos/shift'
@@ -454,11 +479,159 @@ const handleCloseShiftConfirm = async () => {
 </script>
 
 <style scoped>
-.pos-receipt {
-  border: 1px dashed #dcdfe6;
-  border-radius: 4px;
+.pos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.pos-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+.pos-subtitle {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+.pos-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.stat-card {
   background: #fff;
-  max-height: 340px;
+  border: 1px solid #ebeef5;
+  border-radius: 10px;
+  padding: 8px 18px;
+  min-width: 96px;
+  text-align: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.stat-card-accent {
+  background: linear-gradient(135deg, #fef0f0, #fff);
+  border-color: #f8d0d0;
+}
+.stat-label {
+  font-size: 12px;
+  color: #909399;
+}
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
+  margin-top: 2px;
+}
+.stat-amount {
+  color: #f56c6c;
+}
+.stat-muted {
+  color: #c0c4cc;
+  font-size: 14px;
+  font-weight: 400;
+}
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+.money-cell {
+  color: #f56c6c;
+  font-weight: 600;
+}
+.settle-panel {
+  background: linear-gradient(135deg, #fdf6ec, #fff);
+  border: 1px solid #f5e3c4;
+  border-radius: 10px;
+  padding: 14px;
+}
+.settle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.settle-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+.settle-amount {
+  font-size: 26px;
+  font-weight: 700;
+  color: #f56c6c;
+}
+.settle-grid {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.settle-field {
+  flex: 1;
+}
+.settle-change {
+  font-size: 18px;
+  font-weight: 600;
+  color: #67c23a;
+  line-height: 32px;
+}
+.settle-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.shift-actions {
+  display: flex;
+  gap: 8px;
+}
+.shift-actions .el-button {
+  flex: 1;
+}
+.pos-receipt {
+  border: 1px dashed #c0c4cc;
+  border-radius: 8px;
+  background: #fdfdfd;
+  padding: 12px;
+  font-family: 'Courier New', 'SimSun', monospace;
+  font-size: 13px;
+  color: #303133;
+  max-height: 380px;
   overflow: auto;
+}
+.receipt-head {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.receipt-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.receipt-sub {
+  font-size: 12px;
+  color: #606266;
+}
+.receipt-meta {
+  margin-bottom: 2px;
+}
+.receipt-table {
+  --el-table-border-color: #e4e7ed;
+  --el-table-header-bg-color: #f5f7fa;
+}
+.receipt-total {
+  margin-top: 6px;
+}
+.receipt-foot {
+  text-align: center;
+  margin-top: 10px;
+  color: #909399;
 }
 </style>
