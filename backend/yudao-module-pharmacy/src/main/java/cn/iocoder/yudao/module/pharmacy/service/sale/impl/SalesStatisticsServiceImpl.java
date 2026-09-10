@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderMapper.DailySale
 import cn.iocoder.yudao.module.pharmacy.service.sale.SalesStatisticsService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.List;
 

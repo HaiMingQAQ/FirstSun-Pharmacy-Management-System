@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SalePaymentMapper;
 import cn.iocoder.yudao.module.pharmacy.service.sale.SalePaymentService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.List;
 
 @Service
