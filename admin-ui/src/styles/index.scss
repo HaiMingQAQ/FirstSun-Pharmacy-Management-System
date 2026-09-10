@@ -1,6 +1,7 @@
 @use './var.css';
 @use './FormCreate/index.scss';
 @use './theme.scss';
+@use './pharmacy/index.scss' as pharmacy;
 @use 'element-plus/theme-chalk/dark/css-vars.css';
 
 .reset-margin [class*='el-icon'] + span {

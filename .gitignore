@@ -18,6 +18,10 @@ target/
 
 # Node
 node_modules/
+.pnpm-store/
+
+# Local AI workspace
+.trae/
 
 # 系统文件
 Thumbs.db
