@@ -35,3 +35,4 @@ Thumbs.db
 
 **/.flattened-pom.xml
 **/package-lock.json
+.reasonix/

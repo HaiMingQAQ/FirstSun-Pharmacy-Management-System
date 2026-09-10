@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.store.StorePage
 import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.store.StoreSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.StoreDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 

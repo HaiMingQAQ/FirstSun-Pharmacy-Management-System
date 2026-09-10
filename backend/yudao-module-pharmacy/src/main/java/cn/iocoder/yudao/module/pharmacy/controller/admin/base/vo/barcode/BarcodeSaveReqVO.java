@@ -3,9 +3,9 @@ package cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.barcode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 @Schema(description = "管理后台 - 药品条码创建/修改 Request VO")
 @Data

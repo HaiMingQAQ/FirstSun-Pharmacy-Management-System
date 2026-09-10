@@ -12,7 +12,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.mysql.base.DrugMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
