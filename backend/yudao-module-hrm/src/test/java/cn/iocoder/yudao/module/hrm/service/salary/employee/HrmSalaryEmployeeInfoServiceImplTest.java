@@ -23,11 +23,11 @@ import cn.iocoder.yudao.module.hrm.enums.salary.employee.HrmSalaryChangeReasonEn
 import cn.iocoder.yudao.module.hrm.enums.salary.employee.HrmSalaryChangeRecordStatusEnum;
 import cn.iocoder.yudao.module.hrm.enums.salary.employee.HrmSalaryChangeRecordTypeEnum;
 import cn.iocoder.yudao.module.hrm.enums.salary.employee.HrmSalaryEmployeeInfoChangeTypeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -64,13 +64,13 @@ public class HrmSalaryEmployeeInfoServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmSalaryEmployeeInfoMapper salaryEmployeeInfoMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmSalaryOptionService salaryOptionService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryChangeRecordService salaryChangeRecordService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryMonthRecordService salaryMonthRecordService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
 
     @Test

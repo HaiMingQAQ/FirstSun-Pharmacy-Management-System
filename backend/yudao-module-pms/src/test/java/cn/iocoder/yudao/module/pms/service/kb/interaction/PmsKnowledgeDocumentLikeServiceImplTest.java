@@ -4,10 +4,10 @@ import cn.hutool.core.collection.CollUtil;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.pms.dal.mysql.kb.interaction.PmsKnowledgeDocumentLikeMapper;
 import cn.iocoder.yudao.module.pms.enums.kb.PmsKnowledgeObjectTypeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Collections;
 
@@ -31,7 +31,7 @@ public class PmsKnowledgeDocumentLikeServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsKnowledgeDocumentLikeMapper documentLikeMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeInteractionTargetService interactionTargetService;
 
     @Test

@@ -4,6 +4,20 @@
 
 > 数据库文件本身不上传 GitHub，通过 Docker 初始化脚本让每位成员得到一致的开发环境。
 
+## 统一技术版本
+
+| 组件 | 版本 |
+|---|---|
+| Java | 17（本机编译与 Docker 运行） |
+| Spring Boot | 3.5.15 |
+| Maven | 3.9.x |
+| Node.js | 22 |
+| pnpm | 11.22.0 |
+| MySQL | 8.0 |
+| Redis | 7 |
+
+后端基于 RuoYi-Vue-Pro 官方 `master-jdk17` 分支。成员本机的 JDK 安装路径可以不同，但 `java -version` 和 `mvn -version` 必须显示 Java 17 或更高版本；也可以完全使用 Docker 构建运行。
+
 ## 项目结构
 
 ```text
@@ -30,7 +44,7 @@ docker-compose.yml  团队统一 Docker 开发环境
 
 ### 前提
 
-安装并启动 Docker Desktop。首次构建后端镜像会下载 Maven 依赖，耗时会比较久；之后会复用 Docker 缓存。
+安装并启动 Docker Desktop。本机直接编译后端时还需要 JDK 17+ 和 Maven 3.9.x。首次构建后端镜像会下载 Maven 依赖，耗时会比较久；之后会复用 Docker 缓存。
 
 ### 首次启动
 

@@ -12,10 +12,10 @@ import cn.iocoder.yudao.module.pms.dal.mysql.kb.content.PmsKnowledgeDocumentMapp
 import cn.iocoder.yudao.module.pms.enums.kb.content.PmsKnowledgeDocumentStatusEnum;
 import cn.iocoder.yudao.module.pms.enums.kb.content.PmsKnowledgeDocumentTypeEnum;
 import cn.iocoder.yudao.module.pms.service.kb.library.PmsKnowledgeLibraryMemberService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,9 +46,9 @@ public class PmsKnowledgeDocumentLabelServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsKnowledgeDocumentMapper documentMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeLibraryMemberService libraryMemberService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeContentPermissionService contentPermissionService;
 
     @Test

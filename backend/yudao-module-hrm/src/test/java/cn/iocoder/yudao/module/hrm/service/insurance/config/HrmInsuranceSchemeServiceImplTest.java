@@ -12,10 +12,10 @@ import cn.iocoder.yudao.module.hrm.dal.mysql.insurance.config.HrmInsuranceScheme
 import cn.iocoder.yudao.module.hrm.enums.insurance.config.HrmInsuranceProjectTypeEnum;
 import cn.iocoder.yudao.module.hrm.enums.insurance.config.HrmInsuranceSchemeTypeEnum;
 import cn.iocoder.yudao.module.hrm.service.insurance.employee.HrmInsuranceEmployeeInfoService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -51,9 +51,9 @@ public class HrmInsuranceSchemeServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmInsuranceSchemeProjectMapper insuranceSchemeProjectMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmInsuranceEmployeeInfoService insuranceEmployeeInfoService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceMonthEmployeeRecordService insuranceMonthEmployeeRecordService;
 
     @Test

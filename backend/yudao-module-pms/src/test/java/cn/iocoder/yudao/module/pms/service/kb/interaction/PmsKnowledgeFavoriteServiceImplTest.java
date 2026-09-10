@@ -9,10 +9,10 @@ import cn.iocoder.yudao.module.pms.controller.admin.kb.interaction.vo.favorite.P
 import cn.iocoder.yudao.module.pms.dal.dataobject.kb.interaction.PmsKnowledgeFavoriteDO;
 import cn.iocoder.yudao.module.pms.dal.mysql.kb.interaction.PmsKnowledgeFavoriteMapper;
 import cn.iocoder.yudao.module.pms.enums.kb.PmsKnowledgeObjectTypeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -45,7 +45,7 @@ public class PmsKnowledgeFavoriteServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsKnowledgeFavoriteMapper favoriteMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeInteractionTargetService interactionTargetService;
 
     @Test
