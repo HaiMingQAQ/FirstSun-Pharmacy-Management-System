@@ -1,15 +1,14 @@
 <template>
-  <div class="app-container pharmacy-page">
-    <el-row :gutter="8">
-      <el-col :span="24">
-        <!-- 搜索栏 -->
-        <el-form
-          class="-mb-15px pharmacy-panel"
-          :model="queryParams"
-          ref="queryFormRef"
-          :inline="true"
-          label-width="80px"
-        >
+  <div class="pharmacy-page">
+    <!-- 搜索栏 -->
+    <ContentWrap class="pharmacy-panel">
+      <el-form
+        class="-mb-15px"
+        :model="queryParams"
+        ref="queryFormRef"
+        :inline="true"
+        label-width="80px"
+      >
           <el-form-item label="药品" prop="drugId">
             <el-select
               v-model="queryParams.drugId"
@@ -69,37 +68,35 @@
             >
             <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" />重置</el-button>
           </el-form-item>
-        </el-form>
-      </el-col>
-      <el-col :span="6" :xs="24" />
-      <el-col :span="18" :xs="24">
-        <!-- 操作栏 -->
-        <el-row :gutter="10" class="mb8">
-          <el-col :span="1.5">
-            <el-button
-              type="primary"
-              plain
-              @click="openForm('create')"
-              v-hasPermi="['pharmacy:base:barcode:create']"
-              ><Icon icon="ep:plus" class="mr-5px" />新增</el-button
-            >
-          </el-col>
-          <el-col :span="1.5">
-            <el-button
-              type="warning"
-              plain
-              @click="handleExport"
-              :loading="exportLoading"
-              v-hasPermi="['pharmacy:base:barcode:export']"
-              ><Icon icon="ep:download" class="mr-5px" />导出</el-button
-            >
-          </el-col>
-        </el-row>
-      </el-col>
-    </el-row>
+      </el-form>
+    </ContentWrap>
 
-    <!-- 列表 -->
-    <el-table v-loading="loading" :data="list" :stripe="true" :show-overflow-tooltip="true">
+    <ContentWrap class="pharmacy-panel">
+      <!-- 操作栏 -->
+      <el-button
+        type="primary"
+        plain
+        @click="openForm('create')"
+        v-hasPermi="['pharmacy:base:barcode:create']"
+        ><Icon icon="ep:plus" class="mr-5px" />新增</el-button
+      >
+      <el-button
+        type="warning"
+        plain
+        @click="handleExport"
+        :loading="exportLoading"
+        v-hasPermi="['pharmacy:base:barcode:export']"
+        ><Icon icon="ep:download" class="mr-5px" />导出</el-button
+      >
+
+      <!-- 列表 -->
+      <el-table
+        v-loading="loading"
+        :data="list"
+        :stripe="true"
+        :show-overflow-tooltip="true"
+        class="mt-10px"
+      >
       <el-table-column label="编号" align="center" prop="id" width="80" />
       <el-table-column
         label="药品"
@@ -145,15 +142,16 @@
           >
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
 
-    <!-- 分页 -->
-    <Pagination
-      :total="total"
-      v-model:page="queryParams.pageNo"
-      v-model:limit="queryParams.pageSize"
-      @pagination="getList"
-    />
+      <!-- 分页 -->
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
 
     <!-- 表单弹窗 -->
     <BarcodeForm ref="formRef" @success="getList" />

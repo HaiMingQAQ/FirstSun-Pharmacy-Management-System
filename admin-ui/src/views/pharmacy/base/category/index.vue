@@ -77,7 +77,13 @@
 
   <!-- 列表 -->
   <ContentWrap class="pharmacy-panel">
-    <el-table v-loading="loading" :data="list">
+    <el-table
+      v-loading="loading"
+      :data="list"
+      row-key="id"
+      default-expand-all
+      :tree-props="{ children: 'children' }"
+    >
       <el-table-column label="分类编码" align="center" prop="catCode" />
       <el-table-column label="分类名" align="center" prop="catName" />
       <el-table-column label="上级分类" align="center" prop="parentId">
@@ -132,6 +138,7 @@
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import download from '@/utils/download'
+import { handleTree } from '@/utils/tree'
 import * as CategoryApi from '@/api/pharmacy/base/category'
 import CategoryForm from './CategoryForm.vue'
 
@@ -142,7 +149,7 @@ const { t } = useI18n() // 国际化
 
 const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数
-const list = ref([]) // 列表的数据
+const list = ref<CategoryApi.CategoryVO[]>([]) // 列表的数据
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -157,8 +164,14 @@ const exportLoading = ref(false) // 导出的加载中
 /** 上级分类映射：用完整列表（含停用）构建，避免停用父分类显示为「顶级分类」 */
 const parentMap = ref<Record<number, CategoryApi.CategoryVO>>({})
 const loadAllCategories = async () => {
-  const page = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize: -1 })
-  const all = (page.list || []) as CategoryApi.CategoryVO[]
+  const pageSize = 100
+  const firstPage = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize })
+  const all = [...((firstPage.list || []) as CategoryApi.CategoryVO[])]
+  const pageCount = Math.ceil(firstPage.total / pageSize)
+  for (let pageNo = 2; pageNo <= pageCount; pageNo++) {
+    const page = await CategoryApi.getCategoryPage({ pageNo, pageSize })
+    all.push(...((page.list || []) as CategoryApi.CategoryVO[]))
+  }
   const map: Record<number, CategoryApi.CategoryVO> = {}
   for (const item of all) {
     if (item.id != null) map[item.id] = item
@@ -171,7 +184,7 @@ const getList = async () => {
   loading.value = true
   try {
     const data = await CategoryApi.getCategoryPage(queryParams)
-    list.value = data.list
+    list.value = handleTree(data.list, 'id', 'parentId')
     total.value = data.total
   } finally {
     loading.value = false
@@ -233,7 +246,6 @@ const handleExport = async () => {
 
 /** 初始化 **/
 onMounted(async () => {
-  await loadAllCategories()
-  await getList()
+  await Promise.allSettled([loadAllCategories(), getList()])
 })
 </script>
