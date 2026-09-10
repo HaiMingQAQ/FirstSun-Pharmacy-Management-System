@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Bean;
 @AutoConfiguration
 @ConditionalOnClass(name = {
         "io.opentelemetry.api.trace.Tracer", // 来自 opentelemetry-api.jar
-        "javax.servlet.Filter"
+        "jakarta.servlet.Filter"
 })
 @EnableConfigurationProperties(TracerProperties.class)
 @ConditionalOnProperty(prefix = "yudao.tracer", value = "enable", matchIfMissing = true)

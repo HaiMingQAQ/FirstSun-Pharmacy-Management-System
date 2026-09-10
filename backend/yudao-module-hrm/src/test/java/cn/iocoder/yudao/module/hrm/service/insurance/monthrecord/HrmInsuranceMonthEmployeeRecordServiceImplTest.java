@@ -24,10 +24,10 @@ import cn.iocoder.yudao.module.hrm.service.employee.info.HrmEmployeeService;
 import cn.iocoder.yudao.module.hrm.service.insurance.config.HrmInsuranceSchemeService;
 import cn.iocoder.yudao.module.hrm.service.insurance.employee.HrmInsuranceEmployeeInfoService;
 import cn.iocoder.yudao.module.system.api.notify.NotifyMessageSendApi;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -62,15 +62,15 @@ public class HrmInsuranceMonthEmployeeRecordServiceImplTest extends BaseDbUnitTe
     @Resource
     private HrmInsuranceMonthEmployeeRecordMapper monthEmployeeRecordMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmInsuranceMonthRecordService monthRecordService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceSchemeService insuranceSchemeService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceEmployeeInfoService insuranceEmployeeInfoService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
-    @MockBean
+    @MockitoBean
     private NotifyMessageSendApi notifyMessageSendApi;
 
     @Test

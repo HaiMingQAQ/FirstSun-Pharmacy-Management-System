@@ -103,7 +103,7 @@ public interface HrmRecruitCandidateMapper extends BaseMapperX<HrmRecruitCandida
                 record -> MapUtil.getLong(record, "count"));
     }
 
-    default MPJLambdaWrapperX<HrmRecruitCandidateDO> buildQueryWrapper(HrmRecruitCandidatePageReqVO reqVO) {
+    private MPJLambdaWrapperX<HrmRecruitCandidateDO> buildQueryWrapper(HrmRecruitCandidatePageReqVO reqVO) {
         MPJLambdaWrapperX<HrmRecruitCandidateDO> query = new MPJLambdaWrapperX<HrmRecruitCandidateDO>()
                 .eqIfPresent(HrmRecruitCandidateDO::getPostId, reqVO.getPostId())
                 .eqIfPresent(HrmRecruitCandidateDO::getSex, reqVO.getSex())

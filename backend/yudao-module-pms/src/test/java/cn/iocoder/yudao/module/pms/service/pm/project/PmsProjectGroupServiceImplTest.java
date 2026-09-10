@@ -10,10 +10,10 @@ import cn.iocoder.yudao.module.pms.dal.dataobject.pm.project.PmsProjectGroupRela
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.project.PmsProjectGroupMapper;
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.project.PmsProjectGroupRelationMapper;
 import cn.iocoder.yudao.module.pms.enums.pm.project.PmsProjectGroupTypeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 import java.util.Map;
@@ -49,7 +49,7 @@ public class PmsProjectGroupServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsProjectGroupRelationMapper projectGroupRelationMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsProjectMemberService projectMemberService;
 
     @Test
