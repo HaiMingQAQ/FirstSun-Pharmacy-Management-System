@@ -20,7 +20,7 @@ E:\github\xmlg-2\2-资料2\小型药店管理系统界面原型V2
 2. docs/前端界面统一规范.md
 3. docs/开发规范与AI协作规则.md
 4. docs/团队开发须知.md
-5. .trae/documents/pharmacy-base-ui-simplification.md
+5. 如果本地存在 .trae/documents/pharmacy-base-ui-simplification.md，可将其作为 A 模块历史实施记录；不存在时不阻塞本次任务。
 
 当前分支应为 A-base。先执行 git branch --show-current、git status --short、git log -1 --oneline 并报告结果。工作区可能已有他人修改，不得覆盖、回滚、格式化或删除任何非本次变更；不得使用 git reset --hard、git checkout --、git clean。未经我明确要求，不提交、不合并、不推送 Git。
 

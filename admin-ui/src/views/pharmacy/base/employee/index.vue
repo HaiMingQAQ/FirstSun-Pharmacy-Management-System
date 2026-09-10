@@ -94,6 +94,7 @@ import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { Search, Refresh, Plus, Download } from '@element-plus/icons-vue'
 import * as EmployeeApi from '@/api/pharmacy/base/employee'
 import * as StoreApi from '@/api/pharmacy/base/store'
+import EmployeeForm from './EmployeeForm.vue'
 
 defineOptions({ name: 'PharmacyBaseEmployee' })
 

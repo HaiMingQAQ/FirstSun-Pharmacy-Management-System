@@ -15,6 +15,7 @@
 | 5 | `20260908_e_pharmacy_barcode_menu.sql` | 药品条码菜单 + 字典 `pharmacy_barcode_type` |
 | 6 | `20260909_f_pharmacy_menu_path_fix.sql` | 修复 22010「基础资料」二级目录 path 前导 `/` 导致前端动态路由 404 |
 | 7 | `20260909_g_pharmacy_role_menu_tenant_fix.sql` | 修复 system_role_menu 33 条关系 tenant_id=0 → 1，幂等校验含 tenant_id |
+| 8 | `20260909_h_pharmacy_barcode_menu_icon_fix.sql` | 修复药品条码菜单使用不存在的 `ep:barcode` 导致图标空白 |
 
 ## 统一执行方法
 
@@ -29,7 +30,8 @@ $scripts = @(
   "20260908_d_pharmacy_drug_menu.sql",
   "20260908_e_pharmacy_barcode_menu.sql",
   "20260909_f_pharmacy_menu_path_fix.sql",
-  "20260909_g_pharmacy_role_menu_tenant_fix.sql"
+  "20260909_g_pharmacy_role_menu_tenant_fix.sql",
+  "20260909_h_pharmacy_barcode_menu_icon_fix.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
