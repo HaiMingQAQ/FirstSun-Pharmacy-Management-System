@@ -87,5 +87,5 @@ docker exec firstsun-pharmacy-redis redis-cli FLUSHDB
 ## 角色
 
 - 超管角色（role_id=1，tenant_id=1）已绑定所有上述菜单，便于联调验证。
-- 团队共享开发账号为租户 `FirstSun`、用户名 `407`、密码 `123456`，并已绑定演示门店和员工身份。
+- 团队共享开发账号为租户 `FirstSun`、用户名 `0407`、密码 `123456`，并已绑定演示门店和员工身份。
 - 其他角色需手动分配对应权限。

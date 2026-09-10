@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.employee.Employ
 import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.employee.EmployeeSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.EmployeeDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 /**
  * 员工 Service

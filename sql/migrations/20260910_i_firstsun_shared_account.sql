@@ -1,5 +1,10 @@
 -- FirstSun 团队共享开发账号。
--- 登录信息：租户 FirstSun，用户名 407，密码 123456。
+-- 登录信息：租户 FirstSun，用户名 0407，密码 123456。
+
+-- 保留历史租户及其用户，但避免同名有效租户导致登录查询返回多行。
+UPDATE system_tenant
+SET name = CONCAT('FirstSun-', id)
+WHERE id <> 1 AND name = 'FirstSun' AND deleted = b'0';
 
 UPDATE system_tenant
 SET name = 'FirstSun',
@@ -11,7 +16,7 @@ INSERT INTO system_users (
   email, mobile, sex, avatar, status, login_ip, login_date,
   creator, create_time, updater, update_time, deleted, tenant_id
 ) VALUES (
-  407, '407', '$2a$04$.vd8nPeLwxt6hnSzmAoAyul8BOLX7Cib6QhcxRe30rfvrIPQHH1OG',
+  407, '0407', '$2a$10$isML7f7uwSNe.bBfaN7XFet7uzGqIRCNfTON98YRtQGn0NhpSjo9S',
   'FirstSun', '团队共享开发账号', 103, NULL,
   '', '', 0, '', 0, '', NULL,
   'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, b'0', 1

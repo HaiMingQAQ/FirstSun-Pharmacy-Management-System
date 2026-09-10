@@ -9,7 +9,7 @@ import cn.iocoder.yudao.module.pharmacy.service.base.BarcodeService;
 import cn.iocoder.yudao.module.pharmacy.service.base.DrugService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.Collection;
 import java.util.List;
 
