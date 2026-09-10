@@ -81,6 +81,14 @@ docker-compose.yml  团队统一 Docker 开发环境
    http://localhost/
    ```
 
+   团队共享开发账号：
+
+   | 租户 | 用户名 | 密码 |
+   |---|---|---|
+   | `FirstSun` | `407` | `123456` |
+
+   该账号仅用于本地开发和联调，拥有开发所需权限，并已绑定 FirstSun 演示门店和员工身份。
+
 后端接口地址：
 
 ```text
@@ -109,7 +117,7 @@ jdbc:mysql://localhost:3307/firstsun_pharmacy?useUnicode=true&characterEncoding=
 
 ## 重建数据库
 
-只有在初始化 SQL 更新后，或者需要清空本地测试数据时，才执行：
+MySQL 初始化脚本只会在数据卷为空时执行。首次拉取本次统一数据库配置，或初始化 SQL 更新后需要重建本地数据库时，执行：
 
 ```powershell
 docker compose down -v

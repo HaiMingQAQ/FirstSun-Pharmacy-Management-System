@@ -23,6 +23,15 @@ services:
       - mysql-data:/var/lib/mysql
       - ./backend/sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-yudao.sql:ro
       - ./sql/firstsun_pharmacy_init.sql:/docker-entrypoint-initdb.d/02-firstsun.sql:ro
+      - ./sql/migrations/20260908_a_pharmacy_module_init.sql:/docker-entrypoint-initdb.d/03-pharmacy-module.sql:ro
+      - ./sql/migrations/20260908_b_pharmacy_store_menu.sql:/docker-entrypoint-initdb.d/04-pharmacy-store-menu.sql:ro
+      - ./sql/migrations/20260908_c_pharmacy_employee_menu.sql:/docker-entrypoint-initdb.d/05-pharmacy-employee-menu.sql:ro
+      - ./sql/migrations/20260908_d_pharmacy_drug_menu.sql:/docker-entrypoint-initdb.d/06-pharmacy-drug-menu.sql:ro
+      - ./sql/migrations/20260908_e_pharmacy_barcode_menu.sql:/docker-entrypoint-initdb.d/07-pharmacy-barcode-menu.sql:ro
+      - ./sql/migrations/20260909_f_pharmacy_menu_path_fix.sql:/docker-entrypoint-initdb.d/08-pharmacy-menu-path-fix.sql:ro
+      - ./sql/migrations/20260909_g_pharmacy_role_menu_tenant_fix.sql:/docker-entrypoint-initdb.d/09-pharmacy-role-menu-fix.sql:ro
+      - ./sql/migrations/20260909_h_pharmacy_barcode_menu_icon_fix.sql:/docker-entrypoint-initdb.d/10-pharmacy-barcode-icon-fix.sql:ro
+      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/11-firstsun-shared-account.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
