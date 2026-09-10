@@ -1,208 +1,227 @@
 <template>
-  <ContentWrap class="pharmacy-panel">
-    <!-- 搜索 -->
-    <el-form
-      class="-mb-15px"
-      :model="queryParams"
-      ref="queryFormRef"
-      :inline="true"
-      label-width="68px"
-    >
-      <el-form-item label="药品编码" prop="drugCode">
-        <el-input
-          v-model="queryParams.drugCode"
-          placeholder="请输入编码"
-          clearable
-          @keyup.enter="handleQuery"
-          class="!w-180px"
-        />
-      </el-form-item>
-      <el-form-item label="通用名" prop="genericName">
-        <el-input
-          v-model="queryParams.genericName"
-          placeholder="请输入通用名"
-          clearable
-          @keyup.enter="handleQuery"
-          class="!w-180px"
-        />
-      </el-form-item>
-      <el-form-item label="商品名" prop="tradeName">
-        <el-input
-          v-model="queryParams.tradeName"
-          placeholder="请输入商品名"
-          clearable
-          @keyup.enter="handleQuery"
-          class="!w-180px"
-        />
-      </el-form-item>
-      <el-form-item label="分类" prop="categoryId">
-        <el-tree-select
-          v-model="queryParams.categoryId"
-          :data="categoryTree"
-          :props="treeProps"
-          check-strictly
-          placeholder="请选择分类"
-          clearable
-          node-key="id"
-          class="!w-180px"
-        />
-      </el-form-item>
-      <el-form-item label="药品类型" prop="drugType">
-        <el-select v-model="queryParams.drugType" placeholder="请选择" clearable class="!w-180px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_DRUG_TYPE)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="启用状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-180px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item v-show="expandQuery" label="审核状态" prop="approveStatus">
-        <el-select
-          v-model="queryParams.approveStatus"
-          placeholder="请选择"
-          clearable
-          class="!w-180px"
-        >
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_DRUG_APPROVE_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
-        <el-button text @click="expandQuery = !expandQuery">
-          {{ expandQuery ? '收起' : '更多筛选' }}
-          <Icon :icon="expandQuery ? 'ep:arrow-up' : 'ep:arrow-down'" class="ml-5px" />
-        </el-button>
-      </el-form-item>
-    </el-form>
-  </ContentWrap>
-
-  <!-- 列表 -->
-  <ContentWrap class="pharmacy-panel">
-    <el-button
-      type="primary"
-      :icon="Plus"
-      plain
-      @click="openForm('create')"
-      v-hasPermi="['pharmacy:base:drug:create']"
-    >
-      新增
-    </el-button>
-    <el-button
-      type="success"
-      :icon="Download"
-      plain
-      @click="handleExport"
-      v-hasPermi="['pharmacy:base:drug:export']"
-      class="ml-10px"
-    >
-      导出
-    </el-button>
-
-    <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
-      <el-table-column label="药品编码" align="left" prop="drugCode" width="120" />
-      <el-table-column label="通用名" align="left" prop="genericName" min-width="140" />
-      <el-table-column label="商品名" align="left" prop="tradeName" min-width="120" />
-      <el-table-column label="规格" align="left" prop="specification" min-width="120" />
-      <el-table-column label="分类" align="left" prop="categoryName" min-width="100" />
-      <el-table-column label="药品类型" align="center" prop="drugType" width="150">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_DRUG_TYPE" :value="scope.row.drugType" />
-          <el-tag
-            v-if="isDrugTypeInconsistent(scope.row)"
-            type="warning"
-            size="small"
-            class="ml-5px"
-            >属性不一致</el-tag
-          >
-          <el-tag
-            v-else
-            :type="scope.row.isRx === 1 ? 'danger' : 'info'"
-            size="small"
-            class="ml-5px"
-          >
-            {{ scope.row.isRx === 1 ? 'Rx' : '非处方' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="零售价" align="right" prop="retailPrice" width="100" />
-      <el-table-column label="审核状态" align="center" prop="approveStatus" width="100">
-        <template #default="scope">
-          <dict-tag
-            :type="DICT_TYPE.PHARMACY_DRUG_APPROVE_STATUS"
-            :value="scope.row.approveStatus"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="启用" align="center" prop="status" width="80">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" width="140" fixed="right">
-        <template #default="scope">
-          <el-button
-            link
-            type="primary"
-            @click="openForm('update', scope.row.id)"
-            v-hasPermi="['pharmacy:base:drug:update']"
-            >编辑</el-button
-          >
-          <el-dropdown
-            v-hasPermi="['pharmacy:base:drug:approve', 'pharmacy:base:drug:delete']"
-            @command="(command) => handleCommand(command, scope.row)"
-          >
-            <el-button link type="primary">
-              更多<Icon icon="ep:arrow-down" class="ml-5px" />
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item
-                  v-if="scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])"
-                  command="approve"
-                >
-                  通过审核
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-if="scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])"
-                  command="reject"
-                >
-                  驳回
-                </el-dropdown-item>
-                <el-dropdown-item v-if="checkPermi(['pharmacy:base:drug:delete'])" command="delete">
-                  删除
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-table-column>
-    </el-table>
-    <Pagination
+  <div class="pharmacy-page pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="药品档案"
+      eyebrow="DRUG MASTER"
+      icon="ep:document"
+      total-label="药品档案总数"
       :total="total"
-      v-model:page="queryParams.pageNo"
-      v-model:limit="queryParams.pageSize"
-      @pagination="getList"
+      :current-count="list.length"
+      page-type="核心档案"
+      :loading="loading"
     />
-  </ContentWrap>
+    <ContentWrap class="pharmacy-panel">
+      <!-- 搜索 -->
+      <el-form
+        class="-mb-15px"
+        :model="queryParams"
+        ref="queryFormRef"
+        :inline="true"
+        label-width="68px"
+      >
+        <el-form-item label="药品编码" prop="drugCode">
+          <el-input
+            v-model="queryParams.drugCode"
+            placeholder="请输入编码"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="通用名" prop="genericName">
+          <el-input
+            v-model="queryParams.genericName"
+            placeholder="请输入通用名"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="商品名" prop="tradeName">
+          <el-input
+            v-model="queryParams.tradeName"
+            placeholder="请输入商品名"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="分类" prop="categoryId">
+          <el-tree-select
+            v-model="queryParams.categoryId"
+            :data="categoryTree"
+            :props="treeProps"
+            check-strictly
+            placeholder="请选择分类"
+            clearable
+            node-key="id"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="药品类型" prop="drugType">
+          <el-select v-model="queryParams.drugType" placeholder="请选择" clearable class="!w-180px">
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_DRUG_TYPE)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="启用状态" prop="status">
+          <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-180px">
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-show="expandQuery" label="审核状态" prop="approveStatus">
+          <el-select
+            v-model="queryParams.approveStatus"
+            placeholder="请选择"
+            clearable
+            class="!w-180px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_DRUG_APPROVE_STATUS)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+          <el-button text @click="expandQuery = !expandQuery">
+            {{ expandQuery ? '收起' : '更多筛选' }}
+            <Icon :icon="expandQuery ? 'ep:arrow-up' : 'ep:arrow-down'" class="ml-5px" />
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </ContentWrap>
 
-  <DrugForm ref="formRef" @success="getList" />
+    <!-- 列表 -->
+    <ContentWrap class="pharmacy-panel">
+      <el-button
+        type="primary"
+        :icon="Plus"
+        plain
+        @click="openForm('create')"
+        v-hasPermi="['pharmacy:base:drug:create']"
+      >
+        新增
+      </el-button>
+      <el-button
+        type="success"
+        :icon="Download"
+        plain
+        @click="handleExport"
+        v-hasPermi="['pharmacy:base:drug:export']"
+        class="ml-10px"
+      >
+        导出
+      </el-button>
+
+      <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
+        <el-table-column label="药品编码" align="left" prop="drugCode" width="120" />
+        <el-table-column label="通用名" align="left" prop="genericName" min-width="140" />
+        <el-table-column label="商品名" align="left" prop="tradeName" min-width="120" />
+        <el-table-column label="规格" align="left" prop="specification" min-width="120" />
+        <el-table-column label="分类" align="left" prop="categoryName" min-width="100" />
+        <el-table-column label="药品类型" align="center" prop="drugType" width="150">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_DRUG_TYPE" :value="scope.row.drugType" />
+            <el-tag
+              v-if="isDrugTypeInconsistent(scope.row)"
+              type="warning"
+              size="small"
+              class="ml-5px"
+              >属性不一致</el-tag
+            >
+            <el-tag
+              v-else
+              :type="scope.row.isRx === 1 ? 'danger' : 'info'"
+              size="small"
+              class="ml-5px"
+            >
+              {{ scope.row.isRx === 1 ? 'Rx' : '非处方' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="零售价" align="right" prop="retailPrice" width="100" />
+        <el-table-column label="审核状态" align="center" prop="approveStatus" width="100">
+          <template #default="scope">
+            <dict-tag
+              :type="DICT_TYPE.PHARMACY_DRUG_APPROVE_STATUS"
+              :value="scope.row.approveStatus"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="启用" align="center" prop="status" width="80">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="140" fixed="right">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              @click="openForm('update', scope.row.id)"
+              v-hasPermi="['pharmacy:base:drug:update']"
+              >编辑</el-button
+            >
+            <el-dropdown
+              v-hasPermi="['pharmacy:base:drug:approve', 'pharmacy:base:drug:delete']"
+              @command="(command) => handleCommand(command, scope.row)"
+            >
+              <el-button link type="primary">
+                更多<Icon icon="ep:arrow-down" class="ml-5px" />
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-if="
+                      scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])
+                    "
+                    command="approve"
+                  >
+                    通过审核
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="
+                      scope.row.approveStatus === 0 && checkPermi(['pharmacy:base:drug:approve'])
+                    "
+                    command="reject"
+                  >
+                    驳回
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="checkPermi(['pharmacy:base:drug:delete'])"
+                    command="delete"
+                  >
+                    删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </template>
+        </el-table-column>
+      </el-table>
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
+
+    <DrugForm ref="formRef" @success="getList" />
+  </div>
 </template>
 <script setup lang="ts">
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'

@@ -1,5 +1,15 @@
 <template>
-  <div class="pharmacy-page">
+  <div class="pharmacy-page pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="药品条码"
+      eyebrow="BARCODE HUB"
+      icon="ep:postcard"
+      total-label="条码总数"
+      :total="total"
+      :current-count="list.length"
+      page-type="编码管理"
+      :loading="loading"
+    />
     <!-- 搜索栏 -->
     <ContentWrap class="pharmacy-panel">
       <el-form
@@ -9,65 +19,65 @@
         :inline="true"
         label-width="80px"
       >
-          <el-form-item label="药品" prop="drugId">
-            <el-select
-              v-model="queryParams.drugId"
-              filterable
-              remote
-              :remote-method="handleDrugSearch"
-              clearable
-              placeholder="请选择药品"
-              class="!w-240px"
-            >
-              <el-option
-                v-for="item in drugOptions"
-                :key="item.id"
-                :label="`${item.genericName}（${item.drugCode}）`"
-                :value="item.id"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="条码" prop="barcode">
-            <el-input
-              v-model="queryParams.barcode"
-              placeholder="请输入条码"
-              clearable
-              @keyup.enter="handleQuery"
-              class="!w-200px"
+        <el-form-item label="药品" prop="drugId">
+          <el-select
+            v-model="queryParams.drugId"
+            filterable
+            remote
+            :remote-method="handleDrugSearch"
+            clearable
+            placeholder="请选择药品"
+            class="!w-240px"
+          >
+            <el-option
+              v-for="item in drugOptions"
+              :key="item.id"
+              :label="`${item.genericName}（${item.drugCode}）`"
+              :value="item.id"
             />
-          </el-form-item>
-          <el-form-item label="条码类型" prop="barcodeType">
-            <el-select
-              v-model="queryParams.barcodeType"
-              placeholder="请选择"
-              clearable
-              class="!w-160px"
-            >
-              <el-option
-                v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_BARCODE_TYPE)"
-                :key="dict.value"
-                :label="dict.label"
-                :value="dict.value"
-              />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="默认" prop="isDefault">
-            <el-select
-              v-model="queryParams.isDefault"
-              placeholder="请选择"
-              clearable
-              class="!w-120px"
-            >
-              <el-option label="否" :value="0" />
-              <el-option label="是" :value="1" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="handleQuery"
-              ><Icon icon="ep:search" class="mr-5px" />搜索</el-button
-            >
-            <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" />重置</el-button>
-          </el-form-item>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="条码" prop="barcode">
+          <el-input
+            v-model="queryParams.barcode"
+            placeholder="请输入条码"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-200px"
+          />
+        </el-form-item>
+        <el-form-item label="条码类型" prop="barcodeType">
+          <el-select
+            v-model="queryParams.barcodeType"
+            placeholder="请选择"
+            clearable
+            class="!w-160px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_BARCODE_TYPE)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="默认" prop="isDefault">
+          <el-select
+            v-model="queryParams.isDefault"
+            placeholder="请选择"
+            clearable
+            class="!w-120px"
+          >
+            <el-option label="否" :value="0" />
+            <el-option label="是" :value="1" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleQuery"
+            ><Icon icon="ep:search" class="mr-5px" />搜索</el-button
+          >
+          <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" />重置</el-button>
+        </el-form-item>
       </el-form>
     </ContentWrap>
 
@@ -97,51 +107,51 @@
         :show-overflow-tooltip="true"
         class="mt-10px"
       >
-      <el-table-column label="编号" align="center" prop="id" width="80" />
-      <el-table-column
-        label="药品"
-        align="left"
-        prop="drugName"
-        min-width="160"
-        show-overflow-tooltip
-      />
-      <el-table-column label="条码" align="center" prop="barcode" width="160" />
-      <el-table-column label="条码类型" align="center" prop="barcodeType" width="100">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_BARCODE_TYPE" :value="scope.row.barcodeType" />
-        </template>
-      </el-table-column>
-      <el-table-column label="默认" align="center" prop="isDefault" width="80">
-        <template #default="scope">
-          <el-tag v-if="scope.row.isDefault === 1" type="success">是</el-tag>
-          <el-tag v-else type="info">否</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column
-        label="创建时间"
-        align="center"
-        prop="createTime"
-        width="180"
-        :formatter="dateFormatter"
-      />
-      <el-table-column label="操作" align="center" width="160" fixed="right">
-        <template #default="scope">
-          <el-button
-            link
-            type="primary"
-            @click="openForm('update', scope.row.id)"
-            v-hasPermi="['pharmacy:base:barcode:update']"
-            >编辑</el-button
-          >
-          <el-button
-            link
-            type="danger"
-            @click="handleDelete(scope.row.id)"
-            v-hasPermi="['pharmacy:base:barcode:delete']"
-            >删除</el-button
-          >
-        </template>
-      </el-table-column>
+        <el-table-column label="编号" align="center" prop="id" width="80" />
+        <el-table-column
+          label="药品"
+          align="left"
+          prop="drugName"
+          min-width="160"
+          show-overflow-tooltip
+        />
+        <el-table-column label="条码" align="center" prop="barcode" width="160" />
+        <el-table-column label="条码类型" align="center" prop="barcodeType" width="100">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_BARCODE_TYPE" :value="scope.row.barcodeType" />
+          </template>
+        </el-table-column>
+        <el-table-column label="默认" align="center" prop="isDefault" width="80">
+          <template #default="scope">
+            <el-tag v-if="scope.row.isDefault === 1" type="success">是</el-tag>
+            <el-tag v-else type="info">否</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="创建时间"
+          align="center"
+          prop="createTime"
+          width="180"
+          :formatter="dateFormatter"
+        />
+        <el-table-column label="操作" align="center" width="160" fixed="right">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              @click="openForm('update', scope.row.id)"
+              v-hasPermi="['pharmacy:base:barcode:update']"
+              >编辑</el-button
+            >
+            <el-button
+              link
+              type="danger"
+              @click="handleDelete(scope.row.id)"
+              v-hasPermi="['pharmacy:base:barcode:delete']"
+              >删除</el-button
+            >
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 分页 -->

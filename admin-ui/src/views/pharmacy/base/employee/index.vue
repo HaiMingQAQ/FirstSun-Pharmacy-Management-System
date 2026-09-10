@@ -1,93 +1,163 @@
 <template>
-  <ContentWrap class="pharmacy-panel">
-    <!-- 搜索 -->
-    <el-form class="-mb-15px" :model="queryParams" ref="queryFormRef" :inline="true" label-width="68px">
-      <el-form-item label="工号" prop="empNo">
-        <el-input v-model="queryParams.empNo" placeholder="请输入工号" clearable @keyup.enter="handleQuery" class="!w-180px" />
-      </el-form-item>
-      <el-form-item label="姓名" prop="empName">
-        <el-input v-model="queryParams.empName" placeholder="请输入姓名" clearable @keyup.enter="handleQuery" class="!w-180px" />
-      </el-form-item>
-      <el-form-item label="门店" prop="storeId">
-        <el-select v-model="queryParams.storeId" placeholder="请选择门店" clearable class="!w-180px">
-          <el-option
-            v-for="store in storeList"
-            :key="store.id"
-            :label="store.storeName"
-            :value="store.id"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="岗位" prop="position">
-        <el-select v-model="queryParams.position" placeholder="请选择岗位" clearable class="!w-180px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_EMPLOYEE_POSITION)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable class="!w-180px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_EMPLOYEE_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
-        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
-      </el-form-item>
-    </el-form>
-  </ContentWrap>
-
-  <!-- 列表 -->
-  <ContentWrap class="pharmacy-panel">
-    <el-button type="primary" :icon="Plus" plain @click="openForm('create')" v-hasPermi="['pharmacy:base:employee:create']">
-      新增
-    </el-button>
-    <el-button type="success" :icon="Download" plain @click="handleExport" v-hasPermi="['pharmacy:base:employee:export']" class="ml-10px">
-      导出
-    </el-button>
-
-    <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
-      <el-table-column label="员工编号" align="center" prop="id" width="100" />
-      <el-table-column label="工号" align="center" prop="empNo" width="120" />
-      <el-table-column label="姓名" align="center" prop="empName" width="100" />
-      <el-table-column label="所属门店" align="center" prop="storeName" width="160" />
-      <el-table-column label="岗位" align="center" prop="position" width="100">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_EMPLOYEE_POSITION" :value="scope.row.position" />
-        </template>
-      </el-table-column>
-      <el-table-column label="在职状态" align="center" prop="status" width="100">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_EMPLOYEE_STATUS" :value="scope.row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="关联用户" align="center" prop="userNickname" width="120" />
-      <el-table-column label="药师注册证号" align="center" prop="pharmacistNo" width="140" />
-      <el-table-column label="入职日期" align="center" prop="hireDate" width="120" />
-      <el-table-column label="操作" align="center" width="160" fixed="right">
-        <template #default="scope">
-          <el-button link type="primary" @click="openForm('update', scope.row.id)" v-hasPermi="['pharmacy:base:employee:update']">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(scope.row.id)" v-hasPermi="['pharmacy:base:employee:delete']">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <Pagination
+  <div class="pharmacy-page pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="员工管理"
+      eyebrow="PEOPLE DIRECTORY"
+      icon="ep:user"
+      total-label="员工总数"
       :total="total"
-      v-model:page="queryParams.pageNo"
-      v-model:limit="queryParams.pageSize"
-      @pagination="getList"
+      :current-count="list.length"
+      page-type="人员档案"
+      :loading="loading"
     />
-  </ContentWrap>
+    <ContentWrap class="pharmacy-panel">
+      <!-- 搜索 -->
+      <el-form
+        class="-mb-15px"
+        :model="queryParams"
+        ref="queryFormRef"
+        :inline="true"
+        label-width="68px"
+      >
+        <el-form-item label="工号" prop="empNo">
+          <el-input
+            v-model="queryParams.empNo"
+            placeholder="请输入工号"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="姓名" prop="empName">
+          <el-input
+            v-model="queryParams.empName"
+            placeholder="请输入姓名"
+            clearable
+            @keyup.enter="handleQuery"
+            class="!w-180px"
+          />
+        </el-form-item>
+        <el-form-item label="门店" prop="storeId">
+          <el-select
+            v-model="queryParams.storeId"
+            placeholder="请选择门店"
+            clearable
+            class="!w-180px"
+          >
+            <el-option
+              v-for="store in storeList"
+              :key="store.id"
+              :label="store.storeName"
+              :value="store.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="岗位" prop="position">
+          <el-select
+            v-model="queryParams.position"
+            placeholder="请选择岗位"
+            clearable
+            class="!w-180px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_EMPLOYEE_POSITION)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select
+            v-model="queryParams.status"
+            placeholder="请选择状态"
+            clearable
+            class="!w-180px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_EMPLOYEE_STATUS)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" @click="handleQuery">搜索</el-button>
+          <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </ContentWrap>
 
-  <EmployeeForm ref="formRef" @success="getList" />
+    <!-- 列表 -->
+    <ContentWrap class="pharmacy-panel">
+      <el-button
+        type="primary"
+        :icon="Plus"
+        plain
+        @click="openForm('create')"
+        v-hasPermi="['pharmacy:base:employee:create']"
+      >
+        新增
+      </el-button>
+      <el-button
+        type="success"
+        :icon="Download"
+        plain
+        @click="handleExport"
+        v-hasPermi="['pharmacy:base:employee:export']"
+        class="ml-10px"
+      >
+        导出
+      </el-button>
+
+      <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
+        <el-table-column label="员工编号" align="center" prop="id" width="100" />
+        <el-table-column label="工号" align="center" prop="empNo" width="120" />
+        <el-table-column label="姓名" align="center" prop="empName" width="100" />
+        <el-table-column label="所属门店" align="center" prop="storeName" width="160" />
+        <el-table-column label="岗位" align="center" prop="position" width="100">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_EMPLOYEE_POSITION" :value="scope.row.position" />
+          </template>
+        </el-table-column>
+        <el-table-column label="在职状态" align="center" prop="status" width="100">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_EMPLOYEE_STATUS" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column label="关联用户" align="center" prop="userNickname" width="120" />
+        <el-table-column label="药师注册证号" align="center" prop="pharmacistNo" width="140" />
+        <el-table-column label="入职日期" align="center" prop="hireDate" width="120" />
+        <el-table-column label="操作" align="center" width="160" fixed="right">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              @click="openForm('update', scope.row.id)"
+              v-hasPermi="['pharmacy:base:employee:update']"
+              >编辑</el-button
+            >
+            <el-button
+              link
+              type="danger"
+              @click="handleDelete(scope.row.id)"
+              v-hasPermi="['pharmacy:base:employee:delete']"
+              >删除</el-button
+            >
+          </template>
+        </el-table-column>
+      </el-table>
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
+
+    <EmployeeForm ref="formRef" @success="getList" />
+  </div>
 </template>
 <script setup lang="ts">
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'

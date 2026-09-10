@@ -1,132 +1,149 @@
 <template>
-  <ContentWrap class="pharmacy-panel">
-    <!-- 搜索工作栏 -->
-    <el-form
-      class="-mb-15px"
-      :model="queryParams"
-      ref="queryFormRef"
-      :inline="true"
-      label-width="80px"
-    >
-      <el-form-item label="门店编码" prop="storeCode">
-        <el-input
-          v-model="queryParams.storeCode"
-          placeholder="请输入门店编码"
-          clearable
-          class="!w-240px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="门店名称" prop="storeName">
-        <el-input
-          v-model="queryParams.storeName"
-          placeholder="请输入门店名称"
-          clearable
-          class="!w-240px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="医保定点" prop="isMedical">
-        <el-select v-model="queryParams.isMedical" placeholder="请选择" clearable class="!w-240px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_YES_NO)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="营业状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-240px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
-        <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
-        <el-button
-          type="primary"
-          plain
-          @click="openForm('create')"
-          v-hasPermi="['pharmacy:base:store:create']"
-        >
-          <Icon icon="ep:plus" class="mr-5px" /> 新增
-        </el-button>
-        <el-button
-          type="success"
-          plain
-          @click="handleExport"
-          :loading="exportLoading"
-          v-hasPermi="['pharmacy:base:store:export']"
-        >
-          <Icon icon="ep:download" class="mr-5px" /> 导出
-        </el-button>
-      </el-form-item>
-    </el-form>
-  </ContentWrap>
-
-  <!-- 列表 -->
-  <ContentWrap class="pharmacy-panel">
-    <el-table v-loading="loading" :data="list">
-      <el-table-column label="门店编号" align="center" prop="id" width="100" />
-      <el-table-column label="门店编码" align="center" prop="storeCode" width="120" />
-      <el-table-column label="门店名称" align="center" prop="storeName" />
-      <el-table-column label="联系电话" align="center" prop="phone" width="140" />
-      <el-table-column label="医保定点" align="center" prop="isMedical" width="100">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_YES_NO" :value="scope.row.isMedical" />
-        </template>
-      </el-table-column>
-      <el-table-column label="证照到期" align="center" prop="licenseExpire" width="120" />
-      <el-table-column label="营业状态" align="center" prop="status" width="100">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column
-        label="创建时间"
-        align="center"
-        prop="createTime"
-        width="180"
-        :formatter="dateFormatter"
-      />
-      <el-table-column label="操作" align="center" width="160">
-        <template #default="scope">
-          <el-button
-            link
-            type="primary"
-            @click="openForm('update', scope.row.id)"
-            v-hasPermi="['pharmacy:base:store:update']"
-          >
-            编辑
-          </el-button>
-          <el-button
-            link
-            type="danger"
-            @click="handleDelete(scope.row.id)"
-            v-hasPermi="['pharmacy:base:store:delete']"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <!-- 分页 -->
-    <Pagination
+  <div class="pharmacy-page pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="门店管理"
+      eyebrow="STORE NETWORK"
+      icon="ep:shop"
+      total-label="门店总数"
       :total="total"
-      v-model:page="queryParams.pageNo"
-      v-model:limit="queryParams.pageSize"
-      @pagination="getList"
+      :current-count="list.length"
+      page-type="门店网络"
+      :loading="loading"
     />
-  </ContentWrap>
+    <ContentWrap class="pharmacy-panel">
+      <!-- 搜索工作栏 -->
+      <el-form
+        class="-mb-15px"
+        :model="queryParams"
+        ref="queryFormRef"
+        :inline="true"
+        label-width="80px"
+      >
+        <el-form-item label="门店编码" prop="storeCode">
+          <el-input
+            v-model="queryParams.storeCode"
+            placeholder="请输入门店编码"
+            clearable
+            class="!w-240px"
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="门店名称" prop="storeName">
+          <el-input
+            v-model="queryParams.storeName"
+            placeholder="请输入门店名称"
+            clearable
+            class="!w-240px"
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="医保定点" prop="isMedical">
+          <el-select
+            v-model="queryParams.isMedical"
+            placeholder="请选择"
+            clearable
+            class="!w-240px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_YES_NO)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="营业状态" prop="status">
+          <el-select v-model="queryParams.status" placeholder="请选择" clearable class="!w-240px">
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
+          <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="openForm('create')"
+            v-hasPermi="['pharmacy:base:store:create']"
+          >
+            <Icon icon="ep:plus" class="mr-5px" /> 新增
+          </el-button>
+          <el-button
+            type="success"
+            plain
+            @click="handleExport"
+            :loading="exportLoading"
+            v-hasPermi="['pharmacy:base:store:export']"
+          >
+            <Icon icon="ep:download" class="mr-5px" /> 导出
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </ContentWrap>
 
-  <!-- 表单弹窗：添加/修改 -->
-  <StoreForm ref="formRef" @success="getList" />
+    <!-- 列表 -->
+    <ContentWrap class="pharmacy-panel">
+      <el-table v-loading="loading" :data="list">
+        <el-table-column label="门店编号" align="center" prop="id" width="100" />
+        <el-table-column label="门店编码" align="center" prop="storeCode" width="120" />
+        <el-table-column label="门店名称" align="center" prop="storeName" />
+        <el-table-column label="联系电话" align="center" prop="phone" width="140" />
+        <el-table-column label="医保定点" align="center" prop="isMedical" width="100">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_YES_NO" :value="scope.row.isMedical" />
+          </template>
+        </el-table-column>
+        <el-table-column label="证照到期" align="center" prop="licenseExpire" width="120" />
+        <el-table-column label="营业状态" align="center" prop="status" width="100">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column
+          label="创建时间"
+          align="center"
+          prop="createTime"
+          width="180"
+          :formatter="dateFormatter"
+        />
+        <el-table-column label="操作" align="center" width="160">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              @click="openForm('update', scope.row.id)"
+              v-hasPermi="['pharmacy:base:store:update']"
+            >
+              编辑
+            </el-button>
+            <el-button
+              link
+              type="danger"
+              @click="handleDelete(scope.row.id)"
+              v-hasPermi="['pharmacy:base:store:delete']"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <!-- 分页 -->
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
+
+    <!-- 表单弹窗：添加/修改 -->
+    <StoreForm ref="formRef" @success="getList" />
+  </div>
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'

@@ -1,139 +1,156 @@
 <template>
-  <ContentWrap class="pharmacy-panel">
-    <!-- 搜索工作栏 -->
-    <el-form
-      class="-mb-15px"
-      :model="queryParams"
-      ref="queryFormRef"
-      :inline="true"
-      label-width="80px"
-    >
-      <el-form-item label="分类编码" prop="catCode">
-        <el-input
-          v-model="queryParams.catCode"
-          placeholder="请输入分类编码"
-          clearable
-          class="!w-240px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="分类名" prop="catName">
-        <el-input
-          v-model="queryParams.catName"
-          placeholder="请输入分类名"
-          clearable
-          class="!w-240px"
-          @keyup.enter="handleQuery"
-        />
-      </el-form-item>
-      <el-form-item label="分类类型" prop="catType">
-        <el-select
-          v-model="queryParams.catType"
-          placeholder="请选择分类类型"
-          clearable
-          class="!w-240px"
-        >
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_CATEGORY_TYPE)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="状态" prop="status">
-        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable class="!w-240px">
-          <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
-            :key="dict.value"
-            :label="dict.label"
-            :value="dict.value"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
-        <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
-        <el-button
-          type="primary"
-          plain
-          @click="openForm('create')"
-          v-hasPermi="['pharmacy:base:category:create']"
-        >
-          <Icon icon="ep:plus" class="mr-5px" /> 新增
-        </el-button>
-        <el-button
-          type="success"
-          plain
-          @click="handleExport"
-          :loading="exportLoading"
-          v-hasPermi="['pharmacy:base:category:export']"
-        >
-          <Icon icon="ep:download" class="mr-5px" /> 导出
-        </el-button>
-      </el-form-item>
-    </el-form>
-  </ContentWrap>
-
-  <!-- 列表 -->
-  <ContentWrap class="pharmacy-panel">
-    <el-table
-      v-loading="loading"
-      :data="list"
-      row-key="id"
-      default-expand-all
-      :tree-props="{ children: 'children' }"
-    >
-      <el-table-column label="分类编码" align="center" prop="catCode" />
-      <el-table-column label="分类名" align="center" prop="catName" />
-      <el-table-column label="上级分类" align="center" prop="parentId">
-        <template #default="scope">
-          {{ parentMap[scope.row.parentId]?.catName ?? '顶级分类' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="分类类型" align="center" prop="catType">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_CATEGORY_TYPE" :value="scope.row.catType" />
-        </template>
-      </el-table-column>
-      <el-table-column label="排序" align="center" prop="sort" width="80" />
-      <el-table-column label="状态" align="center" prop="status">
-        <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" align="center" width="160">
-        <template #default="scope">
-          <el-button
-            link
-            type="primary"
-            @click="openForm('update', scope.row.id)"
-            v-hasPermi="['pharmacy:base:category:update']"
-          >
-            编辑
-          </el-button>
-          <el-button
-            link
-            type="danger"
-            @click="handleDelete(scope.row.id)"
-            v-hasPermi="['pharmacy:base:category:delete']"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <!-- 分页 -->
-    <Pagination
+  <div class="pharmacy-page pharmacy-modern-page">
+    <PharmacyPageHeader
+      title="药品分类"
+      eyebrow="CATEGORY TREE"
+      icon="ep:folder-opened"
+      total-label="分类总数"
       :total="total"
-      v-model:page="queryParams.pageNo"
-      v-model:limit="queryParams.pageSize"
-      @pagination="getList"
+      :current-count="list.length"
+      page-type="树形档案"
+      :loading="loading"
     />
-  </ContentWrap>
+    <ContentWrap class="pharmacy-panel">
+      <!-- 搜索工作栏 -->
+      <el-form
+        class="-mb-15px"
+        :model="queryParams"
+        ref="queryFormRef"
+        :inline="true"
+        label-width="80px"
+      >
+        <el-form-item label="分类编码" prop="catCode">
+          <el-input
+            v-model="queryParams.catCode"
+            placeholder="请输入分类编码"
+            clearable
+            class="!w-240px"
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="分类名" prop="catName">
+          <el-input
+            v-model="queryParams.catName"
+            placeholder="请输入分类名"
+            clearable
+            class="!w-240px"
+            @keyup.enter="handleQuery"
+          />
+        </el-form-item>
+        <el-form-item label="分类类型" prop="catType">
+          <el-select
+            v-model="queryParams.catType"
+            placeholder="请选择分类类型"
+            clearable
+            class="!w-240px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_CATEGORY_TYPE)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态" prop="status">
+          <el-select
+            v-model="queryParams.status"
+            placeholder="请选择状态"
+            clearable
+            class="!w-240px"
+          >
+            <el-option
+              v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_STATUS)"
+              :key="dict.value"
+              :label="dict.label"
+              :value="dict.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
+          <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="openForm('create')"
+            v-hasPermi="['pharmacy:base:category:create']"
+          >
+            <Icon icon="ep:plus" class="mr-5px" /> 新增
+          </el-button>
+          <el-button
+            type="success"
+            plain
+            @click="handleExport"
+            :loading="exportLoading"
+            v-hasPermi="['pharmacy:base:category:export']"
+          >
+            <Icon icon="ep:download" class="mr-5px" /> 导出
+          </el-button>
+        </el-form-item>
+      </el-form>
+    </ContentWrap>
 
-  <!-- 表单弹窗：添加/修改 -->
-  <CategoryForm ref="formRef" @success="handleFormSuccess" />
+    <!-- 列表 -->
+    <ContentWrap class="pharmacy-panel">
+      <el-table
+        v-loading="loading"
+        :data="list"
+        row-key="id"
+        default-expand-all
+        :tree-props="{ children: 'children' }"
+      >
+        <el-table-column label="分类名称" align="left" prop="catName" min-width="180" />
+        <el-table-column label="分类编码" align="left" prop="catCode" min-width="140" />
+        <el-table-column label="上级分类" align="center" prop="parentId">
+          <template #default="scope">
+            {{ parentMap[scope.row.parentId]?.catName ?? '顶级分类' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="分类类型" align="center" prop="catType">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_CATEGORY_TYPE" :value="scope.row.catType" />
+          </template>
+        </el-table-column>
+        <el-table-column label="排序" align="center" prop="sort" width="80" />
+        <el-table-column label="状态" align="center" prop="status">
+          <template #default="scope">
+            <dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="scope.row.status" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" align="center" width="160">
+          <template #default="scope">
+            <el-button
+              link
+              type="primary"
+              @click="openForm('update', scope.row.id)"
+              v-hasPermi="['pharmacy:base:category:update']"
+            >
+              编辑
+            </el-button>
+            <el-button
+              link
+              type="danger"
+              @click="handleDelete(scope.row.id)"
+              v-hasPermi="['pharmacy:base:category:delete']"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <!-- 分页 -->
+      <Pagination
+        :total="total"
+        v-model:page="queryParams.pageNo"
+        v-model:limit="queryParams.pageSize"
+        @pagination="getList"
+      />
+    </ContentWrap>
+
+    <!-- 表单弹窗：添加/修改 -->
+    <CategoryForm ref="formRef" @success="handleFormSuccess" />
+  </div>
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
