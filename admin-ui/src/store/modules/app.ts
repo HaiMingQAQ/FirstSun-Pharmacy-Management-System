@@ -75,27 +75,27 @@ export const useAppStore = defineStore('app', {
       isDark: wsCache.get(CACHE_KEY.IS_DARK) || false, // 是否是暗黑模式
       currentSize: wsCache.get('default') || 'default', // 组件尺寸
       theme: wsCache.get(CACHE_KEY.THEME) || {
-        // 主题色
-        elColorPrimary: '#409eff',
+        // 主题色：FirstSun 药店品牌主色 #176B5B
+        elColorPrimary: '#176b5b',
         // 左侧菜单边框颜色
         leftMenuBorderColor: 'inherit',
-        // 左侧菜单背景颜色
-        leftMenuBgColor: '#001529',
-        // 左侧菜单浅色背景颜色
-        leftMenuBgLightColor: '#0f2438',
-        // 左侧菜单选中背景颜色
+        // 左侧菜单背景颜色：深品牌绿 #0E4A3F（深绿侧边栏 + 浅色工作区）
+        leftMenuBgColor: '#0e4a3f',
+        // 左侧菜单浅色背景颜色：同色系稍深，用于分组/分层
+        leftMenuBgLightColor: '#0d3d33',
+        // 左侧菜单选中背景颜色：品牌主色 #176B5B（不使用渐变/发光）
         leftMenuBgActiveColor: 'var(--el-color-primary)',
         // 左侧菜单收起选中背景颜色
         leftMenuCollapseBgActiveColor: 'var(--el-color-primary)',
         // 左侧菜单字体颜色
-        leftMenuTextColor: '#bfcbd9',
+        leftMenuTextColor: '#cfe9e1',
         // 左侧菜单选中字体颜色
         leftMenuTextActiveColor: '#fff',
         // logo字体颜色
         logoTitleTextColor: '#fff',
         // logo边框颜色
         logoBorderColor: 'inherit',
-        // 头部背景颜色
+        // 头部背景颜色：浅色工作区
         topHeaderBgColor: '#fff',
         // 头部字体颜色
         topHeaderTextColor: 'inherit',

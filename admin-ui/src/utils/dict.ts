@@ -443,5 +443,17 @@ export enum DICT_TYPE {
   IM_RTC_CALL_END_REASON = 'im_rtc_call_end_reason', // IM 通话结束原因：1=通话结束 / 2=已拒绝 / 3=已取消 / 4=无人接听 / 5=对方正忙 / 9=通话异常
   IM_RTC_PARTICIPANT_ROLE = 'im_rtc_participant_role', // IM 通话参与角色：1=发起人 / 2=被邀请者 / 3=主动加入者
   IM_RTC_PARTICIPANT_STATUS = 'im_rtc_participant_status', // IM 通话参与状态：10=邀请中 / 20=已加入 / 30=已拒绝 / 40=未应答 / 50=已离开
-  IM_CHANNEL_MATERIAL_TYPE = 'im_channel_material_type' // IM 频道素材内容类型：1=富文本 / 2=外链
+  IM_CHANNEL_MATERIAL_TYPE = 'im_channel_material_type', // IM 频道素材内容类型：1=富文本 / 2=外链
+
+  // ========== Pharmacy - 药店业务模块（A 成员维护） ==========
+  PHARMACY_STATUS = 'pharmacy_status', // 药店通用启停状态：1=启用 / 0=停用
+  PHARMACY_CATEGORY_TYPE = 'pharmacy_category_type', // 药品分类类型：0药品/1保健品/2医疗器械/3中药饮片/4日化/5其他
+  PHARMACY_YES_NO = 'pharmacy_yes_no', // 药店通用是否：0=否 / 1=是
+  PHARMACY_EMPLOYEE_STATUS = 'pharmacy_employee_status', // 员工在职状态：1=在职 / 0=离职 / 2=休假
+  PHARMACY_EMPLOYEE_POSITION = 'pharmacy_employee_position', // 员工岗位：1店长/2药师/3收银员/4库管员/5采购/6财务/9系统管理员
+  PHARMACY_DRUG_TYPE = 'pharmacy_drug_type', // 药品类型：0处方/1OTC甲/2OTC乙/3特管/4饮片/5保健/6器械/7日化/8其他
+  PHARMACY_INSURANCE_TYPE = 'pharmacy_insurance_type', // 医保类别：0自费/1甲类/2乙类
+  PHARMACY_STORAGE_COND = 'pharmacy_storage_cond', // 储存条件：0常温/1阴凉/2冷藏/3冷冻
+  PHARMACY_DRUG_APPROVE_STATUS = 'pharmacy_drug_approve_status', // 药品审核状态：0待审/1通过/2驳回
+  PHARMACY_BARCODE_TYPE = 'pharmacy_barcode_type' // 条码类型：0商品条码/1店内码/2追溯码
 }
