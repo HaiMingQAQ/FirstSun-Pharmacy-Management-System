@@ -9,7 +9,7 @@
 -- 1. 目录：药店 POS 管理
 INSERT IGNORE INTO `system_menu`
 (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
-VALUES (61000, '药店POS管理', '', 1, 1000, 0, '/pharmacy', 'ep:money', NULL, NULL, 0, b'1', b'1', b'1', 'admin', NOW(), 'admin', NOW(), b'0');
+VALUES (61000, '药店POS管理', '', 1, 1000, 0, '/pharmacy-pos', 'ep:money', NULL, NULL, 0, b'1', b'1', b'1', 'admin', NOW(), 'admin', NOW(), b'0');
 
 -- 2. 收银台
 INSERT IGNORE INTO `system_menu`

@@ -87,7 +87,7 @@
       </el-table>
 
       <div class="mt-15px">
-        <el-button type="warning" plain @click="router.push(`/pharmacy/pos/returnList?orderId=${detail.order.id}`)">
+        <el-button type="warning" plain @click="router.push(`/pharmacy-pos/pos/returnList?orderId=${detail.order.id}`)">
           创建退货
         </el-button>
       </div>

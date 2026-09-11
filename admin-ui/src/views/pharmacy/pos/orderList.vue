@@ -51,7 +51,7 @@
       <el-form-item>
         <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
         <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
-        <el-button type="primary" plain @click="router.push('/pharmacy/pos/index')">
+        <el-button type="primary" plain @click="router.push('/pharmacy-pos/pos/index')">
           <Icon icon="ep:plus" class="mr-5px" /> 去收银
         </el-button>
       </el-form-item>
@@ -86,7 +86,7 @@
             link
             type="warning"
             :disabled="![1, 3].includes(scope.row.status)"
-            @click="router.push(`/pharmacy/pos/returnList?orderId=${scope.row.id}`)"
+            @click="router.push(`/pharmacy-pos/pos/returnList?orderId=${scope.row.id}`)"
           >
             退货
           </el-button>
@@ -175,7 +175,7 @@ const resetQuery = () => {
 }
 
 const handleDetail = (id: number) => {
-  router.push(`/pharmacy/pos/orderDetail?id=${id}`)
+  router.push(`/pharmacy-pos/pos/orderDetail?id=${id}`)
 }
 
 onMounted(() => {
