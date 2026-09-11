@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 -- FirstSun 药店测试租户与团队共享开发账号。
 -- 登录信息：租户 FirstSun，用户名 0407，密码 123456。
 
