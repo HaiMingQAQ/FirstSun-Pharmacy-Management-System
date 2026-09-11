@@ -16,7 +16,12 @@
 | 6 | `20260909_f_pharmacy_menu_path_fix.sql` | 修复 22010「基础资料」二级目录 path 前导 `/` 导致前端动态路由 404 |
 | 7 | `20260909_g_pharmacy_role_menu_tenant_fix.sql` | 修复 system_role_menu 33 条关系 tenant_id=0 → 1，幂等校验含 tenant_id |
 | 8 | `20260909_h_pharmacy_barcode_menu_icon_fix.sql` | 修复药品条码菜单使用不存在的 `ep:barcode` 导致图标空白 |
-| 9 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 团队共享账号，并绑定演示门店、员工和超级管理员角色 |
+| 9 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并仅绑定药店套餐权限 |
+| 10 | `20260908_d_pos_menu.sql` | D 模块 POS 管理菜单与按钮权限 |
+| 11 | `20260908_d_pos_menu_bind_role.sql` | 将 POS 菜单绑定至超级管理员角色 |
+| 12 | `20260909_d_pos_tables_fix.sql` | POS 销售与退货明细表兼容性修正 |
+| 13 | `fix_pos_menu_name.sql` | 修正 POS 菜单中文名称 |
+| 14 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
 
 ## 统一执行方法
 
@@ -87,5 +92,5 @@ docker exec firstsun-pharmacy-redis redis-cli FLUSHDB
 ## 角色
 
 - 超管角色（role_id=1，tenant_id=1）已绑定所有上述菜单，便于联调验证。
-- 团队共享开发账号为租户 `FirstSun`、用户名 `407`、密码 `123456`，并已绑定演示门店和员工身份。
+- 团队共享开发账号为租户 `FirstSun`、用户名 `0407`、密码 `123456`，并已绑定演示门店和员工身份。
 - 其他角色需手动分配对应权限。

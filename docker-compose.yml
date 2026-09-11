@@ -31,7 +31,12 @@ services:
       - ./sql/migrations/20260909_f_pharmacy_menu_path_fix.sql:/docker-entrypoint-initdb.d/08-pharmacy-menu-path-fix.sql:ro
       - ./sql/migrations/20260909_g_pharmacy_role_menu_tenant_fix.sql:/docker-entrypoint-initdb.d/09-pharmacy-role-menu-fix.sql:ro
       - ./sql/migrations/20260909_h_pharmacy_barcode_menu_icon_fix.sql:/docker-entrypoint-initdb.d/10-pharmacy-barcode-icon-fix.sql:ro
-      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/11-firstsun-shared-account.sql:ro
+      - ./sql/migrations/20260908_d_pos_menu.sql:/docker-entrypoint-initdb.d/11-pos-menu.sql:ro
+      - ./sql/migrations/20260908_d_pos_menu_bind_role.sql:/docker-entrypoint-initdb.d/12-pos-menu-role.sql:ro
+      - ./sql/migrations/20260909_d_pos_tables_fix.sql:/docker-entrypoint-initdb.d/13-pos-tables-fix.sql:ro
+      - ./sql/migrations/fix_pos_menu_name.sql:/docker-entrypoint-initdb.d/14-pos-menu-name-fix.sql:ro
+      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/15-firstsun-shared-account.sql:ro
+      - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/16-pos-menu-path-fix.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s

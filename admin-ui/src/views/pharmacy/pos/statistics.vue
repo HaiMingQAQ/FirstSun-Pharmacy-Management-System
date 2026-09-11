@@ -15,7 +15,14 @@
     <!-- 查询栏 -->
     <el-form class="-mb-15px" :inline="true" label-width="80px">
       <el-form-item label="门店">
-        <el-input-number v-model="queryParams.storeId" :min="1" :controls="false" class="!w-140px" />
+        <el-select v-model="queryParams.storeId" placeholder="请选择门店" class="!w-220px">
+          <el-option
+            v-for="store in storeOptions"
+            :key="store.id"
+            :label="store.storeName"
+            :value="store.id"
+          />
+        </el-select>
       </el-form-item>
       <el-form-item label="统计区间">
         <el-date-picker
@@ -85,6 +92,7 @@
 
 <script lang="ts" setup>
 import type { EChartsOption } from 'echarts'
+import * as StoreApi from '@/api/pharmacy/base/store'
 import { SalesStatisticsApi } from '@/api/pharmacy/pos/statistics'
 
 /** POS 销售统计 */
@@ -92,8 +100,9 @@ defineOptions({ name: 'PharmacyPosStatistics' })
 
 const loading = ref(false)
 const rows = ref<any[]>([])
+const storeOptions = ref<StoreApi.StoreSimpleVO[]>([])
 const dateRange = ref<any[]>([getDefaultStart(), getDefaultEnd()])
-const queryParams = reactive({ storeId: 1 })
+const queryParams = reactive<{ storeId?: number }>({})
 
 function getDefaultStart() {
   const d = new Date()
@@ -144,6 +153,10 @@ const echartsOption = computed<EChartsOption>(() => ({
 }))
 
 const loadData = async () => {
+  if (!queryParams.storeId || dateRange.value.length !== 2) {
+    rows.value = []
+    return
+  }
   loading.value = true
   try {
     rows.value = await SalesStatisticsApi.getDailyStatistics(
@@ -163,7 +176,9 @@ const resetQuery = () => {
   loadData()
 }
 
-onMounted(() => {
+onMounted(async () => {
+  storeOptions.value = await StoreApi.getSimpleStoreList()
+  queryParams.storeId = storeOptions.value[0]?.id
   loadData()
 })
 </script>
