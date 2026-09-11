@@ -455,5 +455,13 @@ export enum DICT_TYPE {
   PHARMACY_INSURANCE_TYPE = 'pharmacy_insurance_type', // 医保类别：0自费/1甲类/2乙类
   PHARMACY_STORAGE_COND = 'pharmacy_storage_cond', // 储存条件：0常温/1阴凉/2冷藏/3冷冻
   PHARMACY_DRUG_APPROVE_STATUS = 'pharmacy_drug_approve_status', // 药品审核状态：0待审/1通过/2驳回
-  PHARMACY_BARCODE_TYPE = 'pharmacy_barcode_type' // 条码类型：0商品条码/1店内码/2追溯码
+  PHARMACY_BARCODE_TYPE = 'pharmacy_barcode_type', // 条码类型：0商品条码/1店内码/2追溯码
+
+  // ========== Pharmacy - 会员管理模块（F 成员维护） ==========
+  PHARMACY_MEMBER_STATUS = 'pharmacy_member_status', // 会员状态：1=启用 / 0=禁用
+  PHARMACY_MEMBER_LEVEL_STATUS = 'pharmacy_member_level_status', // 会员等级状态：1=启用 / 0=禁用
+  PHARMACY_MEMBER_POINT_BIZ_TYPE = 'pharmacy_member_point_biz_type', // 积分业务类型：1注册赠送/2消费获得/3消费抵扣/4管理员调整/5签到/6退款冲回
+  PHARMACY_WX_ORDER_STATUS = 'pharmacy_wx_order_status', // 小程序订单状态：0待支付/1待拣货/2拣货中/3待自提/4完成/-1取消
+  PHARMACY_WX_ORDER_TYPE = 'pharmacy_wx_order_type', // 小程序订单类型：0到店自提/1同城配送
+  PHARMACY_WX_PAY_STATUS = 'pharmacy_wx_pay_status' // 小程序支付状态：0待支付/1已支付/2已退款
 }

@@ -57,4 +57,31 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_BARCODE_DRUG_NOT_EXISTS = new ErrorCode(1_030_005_002, "关联的药品不存在");
     ErrorCode PHARMACY_BARCODE_DEFAULT_DUPLICATE = new ErrorCode(1_030_005_003, "该药品已存在默认条码，同一药品只能有一个默认条码");
 
+    // ========== 会员用户 1-030-006-000 ==========
+    ErrorCode PHARMACY_MEMBER_USER_NOT_EXISTS = new ErrorCode(1_030_006_000, "会员用户不存在");
+    ErrorCode PHARMACY_MEMBER_USER_MOBILE_DUPLICATE = new ErrorCode(1_030_006_001, "手机号已被其他会员使用");
+
+    // ========== 会员等级 1-030-007-000 ==========
+    ErrorCode PHARMACY_MEMBER_LEVEL_NOT_EXISTS = new ErrorCode(1_030_007_000, "会员等级不存在");
+    ErrorCode PHARMACY_MEMBER_LEVEL_DUPLICATE = new ErrorCode(1_030_007_001, "该等级值已存在，同一等级值只能有一个等级");
+    ErrorCode PHARMACY_MEMBER_LEVEL_HAS_USER = new ErrorCode(1_030_007_002, "该等级下存在会员，无法删除");
+    ErrorCode PHARMACY_MEMBER_LEVEL_NOT_ENABLE = new ErrorCode(1_030_007_003, "等级({})未启用，不允许选择");
+
+    // ========== 会员积分记录 1-030-008-000 ==========
+    ErrorCode PHARMACY_MEMBER_POINT_RECORD_NOT_EXISTS = new ErrorCode(1_030_008_000, "会员积分记录不存在");
+
+    // ========== 会员收件地址 1-030-009-000 ==========
+    ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_EXISTS = new ErrorCode(1_030_009_000, "会员收件地址不存在");
+
+    // ========== 小程序购物车 1-030-010-000 ==========
+    ErrorCode PHARMACY_WX_CART_NOT_EXISTS = new ErrorCode(1_030_010_000, "购物车记录不存在");
+    ErrorCode PHARMACY_WX_CART_ITEM_DUPLICATE = new ErrorCode(1_030_010_001, "该商品已在购物车中，同一门店同一商品只能有一条记录");
+
+    // ========== 小程序订单 1-030-011-000 ==========
+    ErrorCode PHARMACY_WX_ORDER_NOT_EXISTS = new ErrorCode(1_030_011_000, "小程序订单不存在");
+    ErrorCode PHARMACY_WX_ORDER_NO_DUPLICATE = new ErrorCode(1_030_011_001, "订单号已存在");
+
+    // ========== 小程序订单明细 1-030-012-000 ==========
+    ErrorCode PHARMACY_WX_ORDER_LINE_NOT_EXISTS = new ErrorCode(1_030_012_000, "小程序订单明细不存在");
+
 }
