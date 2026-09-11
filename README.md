@@ -32,15 +32,37 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-本地开发测试账号
+## 本地开发测试账号
+
 完成数据库初始化后，可使用以下账号登录：
-项目	      内容
-租户      FirstSun
-用户名    0407
-密码      123456
+
+| 项目 | 内容 |
+| --- | --- |
+| 租户 | `FirstSun` |
+| 用户名 | `0407` |
+| 密码 | `123456` |
+
+> 该账号仅用于本地 Docker 开发和团队联调，请勿用于生产环境。
+
+网址：
+
+   ```text
+   http://localhost/
+   ```
+
+后端接口地址：
+
+```text
+http://localhost:48080
+```
+
+数据库连接串：
+
+```text
+jdbc:mysql://localhost:3307/firstsun_pharmacy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+```
 
 
-该账号仅用于本地 Docker 开发和团队联调，禁止用于公网或生产环境。
 
 ## 项目结构
 
@@ -149,33 +171,6 @@ git merge origin/main
 | 后端 | `firstsun-pharmacy-backend` | `48080 -> 48080` |
 | 管理后台 | `firstsun-pharmacy-admin-ui` | `80 -> 80` |
 
-4. 访问管理后台：
-
-   ```text
-   http://localhost/
-   ```
-
-   团队共享开发账号：
-
-   | 租户 | 用户名 | 密码 |
-   | --- | --- | --- |
-   | `FirstSun` | `0407` | `123456` |
-
-   该账号仅用于本地开发和联调，拥有开发所需权限，并已绑定 FirstSun 演示门店和员工身份。
-
-后端接口地址：
-
-```text
-http://localhost:48080
-```
-
-数据库连接串：
-
-```text
-jdbc:mysql://localhost:3307/firstsun_pharmacy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-```
-
-数据库账号使用 `.env` 中配置的普通应用账号。默认配置为 `pharmacy` / `pharmacy123`，业务代码中不要使用 root 账号。
 
 ## 日常命令
 
@@ -202,14 +197,7 @@ pnpm dev
 http://localhost:5173/
 ```
 
-## 重建数据库
 
-只有在初始化 SQL 更新，或者需要清空本地测试数据时，才执行：
-
-```powershell
-docker compose down -v
-docker compose up -d --build
-```
 
 > `-v` 会删除 Docker 数据卷，数据库里的所有本地数据都会清空。执行前必须确认没有需要保留的数据。
 
