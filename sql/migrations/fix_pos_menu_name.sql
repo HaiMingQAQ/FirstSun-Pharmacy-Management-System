@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 -- 修正 POS 菜单 name（之前经 PowerShell 管道执行时中文被双重编码）
 -- 执行方式：docker cp 本文件进容器后 source（避免宿主管道编码转换）
 UPDATE `system_menu` SET `name` = '药店POS管理' WHERE `id` = 61000;
