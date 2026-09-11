@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.exception.ErrorCode;
  * pharmacy 模块错误码分段：
  * 1-029-xxx-xxx：POS 销售域（D 维护）——销售订单/库存依赖/退货单/班次
  * 1-030-xxx-xxx：基础资料域（A 维护）——药品分类/门店/员工/药品档案/药品条码
+ * 1-031-xxx-xxx：采购域（B 维护）——供应商/供应商证照/采购订单/收货单
  */
 public interface ErrorCodeConstants {
 
@@ -87,5 +88,54 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_BARCODE_DUPLICATE = new ErrorCode(1_030_005_001, "条码已存在");
     ErrorCode PHARMACY_BARCODE_DRUG_NOT_EXISTS = new ErrorCode(1_030_005_002, "关联的药品不存在");
     ErrorCode PHARMACY_BARCODE_DEFAULT_DUPLICATE = new ErrorCode(1_030_005_003, "该药品已存在默认条码，同一药品只能有一个默认条码");
+
+    // ========== 供应商 1-031-001-000（B 维护）==========
+    ErrorCode PURCHASE_SUPPLIER_NOT_EXISTS = new ErrorCode(1_031_001_000, "供应商不存在");
+    ErrorCode PURCHASE_SUPPLIER_CODE_DUPLICATE = new ErrorCode(1_031_001_001, "供应商编码已存在");
+    ErrorCode PURCHASE_SUPPLIER_CREDIT_CODE_DUPLICATE = new ErrorCode(1_031_001_002, "统一社会信用代码已被其他供应商使用");
+    ErrorCode PURCHASE_SUPPLIER_DISCOUNT_INVALID = new ErrorCode(1_031_001_003, "默认折扣率非法：取值必须在 0 到 1 之间");
+    ErrorCode PURCHASE_SUPPLIER_NOT_ENABLE = new ErrorCode(1_031_001_004, "供应商({})已停用，不允许选择");
+    ErrorCode PURCHASE_SUPPLIER_NOT_APPROVED = new ErrorCode(1_031_001_005, "供应商({})首营审核未通过，不允许采购");
+    ErrorCode PURCHASE_SUPPLIER_HAS_ORDER = new ErrorCode(1_031_001_006, "该供应商已被采购订单引用，无法删除");
+    ErrorCode PURCHASE_SUPPLIER_APPROVE_DUP = new ErrorCode(1_031_001_007, "供应商已审核，不能重复审核");
+    ErrorCode PURCHASE_SUPPLIER_APPROVE_STATUS_INVALID = new ErrorCode(1_031_001_008, "审核状态非法：只能为 1(通过) 或 2(驳回)");
+    ErrorCode PURCHASE_SUPPLIER_AUDITOR_NOT_EMPLOYEE = new ErrorCode(1_031_001_009, "当前登录用户未绑定药店员工，无法审核供应商");
+
+    // ========== 供应商证照 1-031-002-000（B 维护）==========
+    ErrorCode PURCHASE_LICENSE_NOT_EXISTS = new ErrorCode(1_031_002_000, "供应商证照不存在");
+    ErrorCode PURCHASE_LICENSE_SUPPLIER_NOT_EXISTS = new ErrorCode(1_031_002_001, "所属供应商不存在");
+    ErrorCode PURCHASE_LICENSE_NO_DUPLICATE = new ErrorCode(1_031_002_002, "该供应商下同一类型的证照号已存在");
+    ErrorCode PURCHASE_LICENSE_DATE_INVALID = new ErrorCode(1_031_002_003, "证照日期非法：到期日必须不早于发证日期");
+    ErrorCode PURCHASE_LICENSE_EXPIRED = new ErrorCode(1_031_002_004, "证照({})已过期，不允许用于采购收货");
+    ErrorCode PURCHASE_LICENSE_OPERATE_MISSING = new ErrorCode(1_031_002_005, "供应商({})未登记有效的经营许可证或 GSP 证，不允许采购收货");
+
+    // ========== 采购订单 1-031-003-000（B 维护）==========
+    ErrorCode PURCHASE_ORDER_NOT_EXISTS = new ErrorCode(1_031_003_000, "采购订单不存在");
+    ErrorCode PURCHASE_ORDER_NO_DUPLICATE = new ErrorCode(1_031_003_001, "采购订单号已存在");
+    ErrorCode PURCHASE_ORDER_LINE_EMPTY = new ErrorCode(1_031_003_002, "采购订单明细不能为空");
+    ErrorCode PURCHASE_ORDER_STATUS_INVALID = new ErrorCode(1_031_003_003, "采购订单状态不允许该操作");
+    ErrorCode PURCHASE_ORDER_DRUG_INVALID = new ErrorCode(1_031_003_004, "采购订单中的药品不存在或不可采购");
+    ErrorCode PURCHASE_ORDER_AMOUNT_INVALID = new ErrorCode(1_031_003_005, "采购订单金额计算不合法");
+    ErrorCode PURCHASE_ORDER_AUDITOR_NOT_EMPLOYEE = new ErrorCode(1_031_003_006, "当前登录用户未绑定药店员工，无法审批采购订单");
+    ErrorCode PURCHASE_ORDER_HAS_RECEIPT = new ErrorCode(1_031_003_007, "采购订单已存在收货记录，无法删除或取消");
+    ErrorCode PURCHASE_ORDER_QTY_INVALID = new ErrorCode(1_031_003_008, "采购数量必须大于 0");
+    ErrorCode PURCHASE_ORDER_DISCOUNT_INVALID = new ErrorCode(1_031_003_009, "折扣率非法：取值必须在 0 到 1 之间");
+    ErrorCode PURCHASE_ORDER_APPROVE_DUP = new ErrorCode(1_031_003_010, "采购订单已审批，不能重复审批");
+
+    // ========== 采购收货 1-031-004-000（B 维护）==========
+    ErrorCode PURCHASE_RECEIPT_NOT_EXISTS = new ErrorCode(1_031_004_000, "采购收货单不存在");
+    ErrorCode PURCHASE_RECEIPT_NO_DUPLICATE = new ErrorCode(1_031_004_001, "收货单号已存在");
+    ErrorCode PURCHASE_RECEIPT_LINE_EMPTY = new ErrorCode(1_031_004_002, "收货明细不能为空");
+    ErrorCode PURCHASE_RECEIPT_STATUS_INVALID = new ErrorCode(1_031_004_003, "收货单状态不允许该操作");
+    ErrorCode PURCHASE_RECEIPT_QTY_EXCEED = new ErrorCode(1_031_004_004, "收货数量超过采购订单剩余可收数量");
+    ErrorCode PURCHASE_RECEIPT_EXPIRY_INVALID = new ErrorCode(1_031_004_005, "有效期非法：有效期必须不早于生产日期且不能早于今天");
+    ErrorCode PURCHASE_RECEIPT_BATCH_NO_REQUIRED = new ErrorCode(1_031_004_006, "批号必须填写");
+    ErrorCode PURCHASE_RECEIPT_POST_DUP = new ErrorCode(1_031_004_007, "收货单已入账，不能重复入账");
+    ErrorCode PURCHASE_RECEIPT_ORDER_NOT_RECEIVABLE = new ErrorCode(1_031_004_008, "采购订单未审批、已取消或已完成，不能收货");
+    ErrorCode PURCHASE_RECEIPT_FREE_NOT_MANAGER = new ErrorCode(1_031_004_009, "无单收货仅限店长操作");
+    ErrorCode PURCHASE_RECEIPT_ORDER_LINE_MISMATCH = new ErrorCode(1_031_004_010, "收货明细与采购订单行不匹配");
+    ErrorCode PURCHASE_RECEIPT_DRUG_INVALID = new ErrorCode(1_031_004_011, "收货明细中的药品不存在");
+    ErrorCode PURCHASE_RECEIPT_RECEIVER_NOT_EMPLOYEE = new ErrorCode(1_031_004_012, "当前登录用户未绑定药店员工，无法收货");
+    ErrorCode PURCHASE_RECEIPT_LOCATION_REQUIRED = new ErrorCode(1_031_004_013, "入账前必须填写入库货位");
 
 }
