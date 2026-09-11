@@ -57,4 +57,46 @@ public interface DictTypeConstants {
      */
     String PHARMACY_BARCODE_TYPE = "pharmacy_barcode_type";
 
+    // ==================== 采购域（B 维护） ====================
+
+    /**
+     * 供应商首营审核状态（0待审/1通过/2驳回）
+     */
+    String PHARMACY_SUPPLIER_APPROVE_STATUS = "pharmacy_supplier_approve_status";
+
+    /**
+     * 供应商证照类型（0经营许可证/1生产许可证/2GSP证/3营业执照/4其他）
+     */
+    String PHARMACY_LICENSE_TYPE = "pharmacy_license_type";
+
+    /**
+     * 供应商证照状态（1有效/0过期）
+     */
+    String PHARMACY_LICENSE_STATUS = "pharmacy_license_status";
+
+    /**
+     * 采购订单状态（0草稿/1提交/2审批/3发出/4部分到货/5完成/-1取消）
+     */
+    String PHARMACY_PO_STATUS = "pharmacy_po_status";
+
+    /**
+     * 采购收货单状态（0待提交/1已提交/2已入账/3已作废）
+     */
+    String PHARMACY_RECEIPT_STATUS = "pharmacy_receipt_status";
+
+    /**
+     * 收货差异标记（0无/1数量差异/2价格差异）
+     */
+    String PHARMACY_RECEIPT_DIFF_TYPE = "pharmacy_receipt_diff_type";
+
+    /**
+     * 收货单质检结果（0未检/1合格/2有异常）
+     */
+    String PHARMACY_QUALITY_STATUS = "pharmacy_quality_status";
+
+    /**
+     * 收货明细质检标记（0待检/1通过/2异常拒收）
+     */
+    String PHARMACY_QUALITY_FLAG = "pharmacy_quality_flag";
+
 }
