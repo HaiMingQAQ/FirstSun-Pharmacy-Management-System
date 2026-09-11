@@ -18,6 +18,30 @@
 
 后端基于 RuoYi-Vue-Pro 官方 `master-jdk17` 分支。成员本机的 JDK 安装路径可以不同，但 `java -version` 和 `mvn -version` 必须显示 Java 17 或更高版本；也可以完全使用 Docker 构建运行。
 
+## 团队开发环境同步
+
+拉取最新代码后执行：
+
+```powershell
+git pull
+docker compose up -d --build
+```
+如果本次更新包含数据库初始化脚本，并且本地测试数据不需要保留：
+```powershell
+docker compose down -v
+docker compose up -d --build
+```
+
+本地开发测试账号
+完成数据库初始化后，可使用以下账号登录：
+项目	      内容
+租户      FirstSun
+用户名    0407
+密码      123456
+
+
+该账号仅用于本地 Docker 开发和团队联调，禁止用于公网或生产环境。
+
 ## 项目结构
 
 ```text
