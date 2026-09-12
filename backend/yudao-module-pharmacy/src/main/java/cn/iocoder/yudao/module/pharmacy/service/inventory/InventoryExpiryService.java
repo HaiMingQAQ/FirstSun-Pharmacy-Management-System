@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.pharmacy.service.inventory;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryHandleReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryQuery;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryVO;
@@ -40,6 +41,14 @@ public class InventoryExpiryService {
         LocalDate today = LocalDate.now();
         int affected = mapper.refreshDaily(scope, today, actor());
         return new RefreshResult(today, affected);
+    }
+
+    /** Called by a TenantJob. It deliberately bypasses employee scope and only uses current tenant context. */
+    @Transactional(rollbackFor = Exception.class)
+    public int refreshForTenant(LocalDate alertDate) {
+        Long tenantId = TenantContextHolder.getTenantId();
+        if (tenantId == null || tenantId <= 0) throw invalidParamException("缺少有效租户上下文");
+        return mapper.refreshDailyForTenant(tenantId, alertDate, "expiry-job");
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -49,6 +49,25 @@
             updater = VALUES(updater), update_time = CURRENT_TIMESTAMP, deleted = b'0'
     </insert>
 
+    <!-- Quartz/TenantJob path: refresh every store in current tenant without employee scope. -->
+    <insert id="refreshDailyForTenant">
+        INSERT INTO ph_inv_expiry_alert
+            (tenant_id, store_id, batch_id, drug_id, alert_level, expire_days, handle_type,
+             alert_date, creator, updater)
+        SELECT b.tenant_id, b.store_id, b.id, b.drug_id,
+               CASE WHEN DATEDIFF(b.expiry_date, #{alertDate}) &lt;= 30 THEN 1
+                    WHEN DATEDIFF(b.expiry_date, #{alertDate}) &lt;= 60 THEN 2 ELSE 3 END,
+               DATEDIFF(b.expiry_date, #{alertDate}), 0, #{alertDate}, #{actor}, #{actor}
+        FROM ph_inv_batch b
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id
+                           AND w.store_id = b.store_id AND w.deleted = b'0'
+        WHERE b.tenant_id = #{tenantId} AND b.deleted = b'0' AND b.qty_total &gt; 0
+          AND b.expiry_date &lt;= DATE_ADD(#{alertDate}, INTERVAL 90 DAY)
+        ON DUPLICATE KEY UPDATE
+            expire_days = VALUES(expire_days), alert_level = VALUES(alert_level),
+            updater = VALUES(updater), update_time = CURRENT_TIMESTAMP, deleted = b'0'
+    </insert>
+
     <select id="selectHandleType" resultType="java.lang.Integer">
         SELECT handle_type FROM ph_inv_expiry_alert
         WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}

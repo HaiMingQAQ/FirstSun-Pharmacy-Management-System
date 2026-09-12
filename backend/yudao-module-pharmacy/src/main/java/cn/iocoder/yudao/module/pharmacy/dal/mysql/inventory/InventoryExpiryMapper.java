@@ -16,6 +16,8 @@ public interface InventoryExpiryMapper {
                                                 @Param("q") InventoryExpiryQuery query);
     int refreshDaily(@Param("scope") Scope scope, @Param("alertDate") LocalDate alertDate,
                      @Param("actor") String actor);
+    int refreshDailyForTenant(@Param("tenantId") long tenantId, @Param("alertDate") LocalDate alertDate,
+                              @Param("actor") String actor);
     Integer selectHandleType(@Param("scope") Scope scope, @Param("id") long id);
     int updateHandle(@Param("scope") Scope scope, @Param("id") long id,
                      @Param("handleType") int handleType, @Param("operator") long operator);
