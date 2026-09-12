@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryPreviewMapper">
+    <!-- LEFT JOIN retains broken same-tenant ownership and zero-location batches for validation.
+         Never silently drop a broken location and call the remaining stock consistent. -->
+    <select id="selectSnapshot" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryPreviewMapper$Row">
+        SELECT b.id AS batch_id, b.expiry_date, b.quality_status,
+               b.qty_total, b.qty_avail, b.qty_frozen, b.qty_sold,
+               s.id AS stock_id, s.location_id, s.qty AS quantity, s.qty_frozen AS frozen,
+               l.status AS location_status,
+               CASE WHEN l.id IS NOT NULL AND s.drug_id = b.drug_id THEN 1 ELSE 0 END AS valid_location
+        FROM ph_inv_batch b
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id
+                           AND w.store_id = b.store_id AND w.deleted = b'0'
+        LEFT JOIN ph_inv_location_stock s ON s.batch_id = b.id AND s.tenant_id = b.tenant_id AND s.deleted = b'0'
+        LEFT JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = b.tenant_id
+                               AND l.warehouse_id = b.warehouse_id AND l.deleted = b'0'
+        WHERE b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+          AND b.warehouse_id = #{warehouseId} AND b.drug_id = #{drugId} AND b.deleted = b'0'
+        ORDER BY b.id, s.id
+        LIMIT 10001
+    </select>
+</mapper>

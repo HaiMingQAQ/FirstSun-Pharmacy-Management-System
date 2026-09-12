@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryCatalogUpdateMapper">
+    <select id="lockWarehouse" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Warehouse">
+        SELECT id, store_id, wh_code, wh_name, temp_zone, is_default, status FROM ph_warehouse
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+        FOR UPDATE
+    </select>
+    <select id="lockLocation" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Location">
+        SELECT l.id, l.warehouse_id, l.location_code, l.location_type, l.max_capacity, l.status
+        FROM ph_location l JOIN ph_warehouse w ON w.id = l.warehouse_id AND w.tenant_id = l.tenant_id
+        WHERE l.id = #{id} AND l.warehouse_id = #{warehouseId} AND l.tenant_id = #{scope.tenantId}
+          AND w.store_id = #{scope.storeId} AND l.deleted = b'0' AND w.deleted = b'0'
+        FOR UPDATE
+    </select>
+    <select id="hasWarehouseStock" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM ph_inv_batch b
+            WHERE b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+              AND b.warehouse_id = #{id} AND b.deleted = b'0'
+              AND (b.qty_total != 0 OR b.qty_avail != 0 OR b.qty_frozen != 0))
+        OR EXISTS(SELECT 1 FROM ph_inv_location_stock s
+            LEFT JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id
+            LEFT JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+            WHERE s.tenant_id = #{scope.tenantId} AND (l.warehouse_id = #{id} OR b.warehouse_id = #{id}) AND s.deleted = b'0'
+              AND (s.qty != 0 OR s.qty_frozen != 0))
+    </select>
+    <!-- Conservative warehouse-wide work gate, including store-wide stocktakes. Expired locks
+         remain active until their owner releases them; C must not infer expiration as release. -->
+    <select id="hasOpenWork" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM ph_inv_stocktake t
+            WHERE t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId} AND t.deleted = b'0'
+              AND (t.warehouse_id IS NULL OR t.warehouse_id = #{id}) AND t.status != 3)
+        OR EXISTS(SELECT 1 FROM ph_inv_lock k
+            LEFT JOIN ph_location l ON l.id = k.location_id AND l.tenant_id = k.tenant_id
+            LEFT JOIN ph_inv_batch b ON b.id = k.batch_id AND b.tenant_id = k.tenant_id
+            WHERE k.tenant_id = #{scope.tenantId} AND k.store_id = #{scope.storeId} AND k.deleted = b'0'
+              AND k.status NOT IN (1, 2) AND (l.warehouse_id = #{id} OR b.warehouse_id = #{id}))
+        OR EXISTS(SELECT 1 FROM ph_inv_damage d
+            JOIN ph_inv_damage_line dl ON dl.damage_id = d.id AND dl.tenant_id = d.tenant_id
+            LEFT JOIN ph_location l ON l.id = dl.location_id AND l.tenant_id = dl.tenant_id
+            LEFT JOIN ph_inv_batch b ON b.id = dl.batch_id AND b.tenant_id = dl.tenant_id
+            WHERE d.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId}
+              AND d.deleted = b'0' AND dl.deleted = b'0' AND d.status NOT IN (3, 4)
+              AND (l.warehouse_id = #{id} OR b.warehouse_id = #{id}))
+    </select>
+    <select id="locationUsage" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryCatalogUpdateMapper$Usage">
+        SELECT COALESCE(SUM(s.qty), 0) AS quantity,
+               COALESCE(SUM(CASE WHEN s.qty &lt; 0 OR s.qty_frozen &lt; 0 OR s.qty_frozen &gt; s.qty
+                        OR b.id IS NULL THEN 1 ELSE 0 END), 0) AS invalid_rows
+        FROM ph_inv_location_stock s
+        LEFT JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+            AND b.drug_id = s.drug_id AND b.warehouse_id = #{warehouseId}
+            AND b.store_id = #{scope.storeId} AND b.deleted = b'0'
+        WHERE s.tenant_id = #{scope.tenantId} AND s.location_id = #{id} AND s.deleted = b'0'
+    </select>
+    <update id="updateWarehouse">
+        UPDATE ph_warehouse SET wh_code = #{q.value.whCode}, wh_name = #{q.value.whName},
+            temp_zone = #{q.value.tempZone}, status = #{q.value.status}, updater = #{actor}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{q.id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+    </update>
+    <update id="updateLocation">
+        UPDATE ph_location SET location_code = #{q.value.locationCode}, location_type = #{q.value.locationType},
+            max_capacity = #{q.value.maxCapacity,jdbcType=BIGINT}, status = #{q.value.status},
+            updater = #{actor}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{q.id} AND warehouse_id = #{q.warehouseId} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </update>
+</mapper>

@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryReadMapper">
+    <sql id="warehouseWhere">
+        FROM ph_warehouse w
+        WHERE w.tenant_id = #{scope.tenantId} AND w.store_id = #{scope.storeId} AND w.deleted = 0
+        <if test="q.warehouseId != null">AND w.id = #{q.warehouseId}</if>
+        <if test="q.code != null and q.code != ''">AND LOCATE(#{q.code}, w.wh_code) &gt; 0</if>
+        <if test="q.name != null and q.name != ''">AND LOCATE(#{q.name}, w.wh_name) &gt; 0</if>
+        <if test="q.status != null">AND w.status = #{q.status}</if>
+    </sql>
+    <select id="countWarehouses" resultType="long">
+        SELECT COUNT(*) <include refid="warehouseWhere"/>
+    </select>
+    <select id="selectWarehouses" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Warehouse">
+        SELECT w.id, w.store_id, w.wh_code, w.wh_name, w.temp_zone, w.is_default, w.status
+        <include refid="warehouseWhere"/>
+        ORDER BY w.id LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+    <select id="selectWarehouse" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Warehouse">
+        SELECT id, store_id, wh_code, wh_name, temp_zone, is_default, status
+        FROM ph_warehouse
+        WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = 0 AND id = #{id}
+    </select>
+
+    <sql id="locationWhere">
+        FROM ph_location l
+        JOIN ph_warehouse w ON w.id = l.warehouse_id AND w.tenant_id = l.tenant_id
+        WHERE l.tenant_id = #{scope.tenantId} AND w.tenant_id = #{scope.tenantId}
+          AND w.store_id = #{scope.storeId} AND l.deleted = 0 AND w.deleted = 0
+        <if test="q.warehouseId != null">AND w.id = #{q.warehouseId}</if>
+        <if test="q.locationId != null">AND l.id = #{q.locationId}</if>
+        <if test="q.code != null and q.code != ''">AND LOCATE(#{q.code}, l.location_code) &gt; 0</if>
+        <if test="q.status != null">AND l.status = #{q.status}</if>
+    </sql>
+    <select id="countLocations" resultType="long">
+        SELECT COUNT(*) <include refid="locationWhere"/>
+    </select>
+    <select id="selectLocations" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Location">
+        SELECT l.id, l.warehouse_id, w.wh_name AS warehouse_name, l.location_code,
+               l.location_type, l.max_capacity, l.status
+        <include refid="locationWhere"/>
+        ORDER BY l.id LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+
+    <sql id="batchFilters">
+        <if test="q.qualityStatus != null">AND b.quality_status = #{q.qualityStatus}</if>
+        <if test="q.expiryFrom != null">AND b.expiry_date &gt;= #{q.expiryFrom}</if>
+        <if test="q.expiryTo != null">AND b.expiry_date &lt;= #{q.expiryTo}</if>
+    </sql>
+    <sql id="batchWhere">
+        FROM ph_inv_batch b
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id AND w.store_id = b.store_id
+        WHERE b.tenant_id = #{scope.tenantId} AND w.tenant_id = #{scope.tenantId}
+          AND b.store_id = #{scope.storeId} AND w.store_id = #{scope.storeId}
+          AND b.deleted = 0 AND w.deleted = 0
+        <if test="q.warehouseId != null">AND b.warehouse_id = #{q.warehouseId}</if>
+        <if test="q.drugId != null">AND b.drug_id = #{q.drugId}</if>
+        <if test="q.batchId != null">AND b.id = #{q.batchId}</if>
+        <if test="q.batchNo != null and q.batchNo != ''">AND b.batch_no = #{q.batchNo}</if>
+        <include refid="batchFilters"/>
+        <if test="q.locationId != null">
+            AND EXISTS (SELECT 1 FROM ph_inv_location_stock sx
+                JOIN ph_location lx ON lx.id = sx.location_id AND lx.tenant_id = sx.tenant_id
+                WHERE sx.batch_id = b.id AND sx.tenant_id = b.tenant_id AND sx.drug_id = b.drug_id
+                  AND sx.location_id = #{q.locationId} AND lx.warehouse_id = b.warehouse_id
+                  AND sx.deleted = 0 AND lx.deleted = 0)
+        </if>
+    </sql>
+    <select id="countBatches" resultType="long">
+        SELECT COUNT(*) <include refid="batchWhere"/>
+    </select>
+    <select id="selectBatches" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Batch">
+        SELECT b.id, b.warehouse_id, w.wh_name AS warehouse_name, b.drug_id, b.batch_no,
+               b.manufacture_date, b.expiry_date, b.qty_total, b.qty_avail, b.qty_frozen, b.qty_sold, b.quality_status
+        <include refid="batchWhere"/>
+        ORDER BY b.expiry_date, b.id LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+
+    <sql id="stockWhere">
+        FROM ph_inv_location_stock s
+        JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id AND b.drug_id = s.drug_id
+        JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id AND l.warehouse_id = b.warehouse_id
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id AND w.store_id = b.store_id
+        WHERE s.tenant_id = #{scope.tenantId} AND b.tenant_id = #{scope.tenantId}
+          AND l.tenant_id = #{scope.tenantId} AND w.tenant_id = #{scope.tenantId}
+          AND b.store_id = #{scope.storeId} AND w.store_id = #{scope.storeId}
+          AND s.deleted = 0 AND b.deleted = 0 AND l.deleted = 0 AND w.deleted = 0
+        <if test="q.warehouseId != null">AND b.warehouse_id = #{q.warehouseId}</if>
+        <if test="q.drugId != null">AND s.drug_id = #{q.drugId}</if>
+        <if test="q.batchId != null">AND s.batch_id = #{q.batchId}</if>
+        <if test="q.locationId != null">AND s.location_id = #{q.locationId}</if>
+        <if test="q.batchNo != null and q.batchNo != ''">AND b.batch_no = #{q.batchNo}</if>
+        <include refid="batchFilters"/>
+    </sql>
+    <select id="countLocationStock" resultType="long">
+        SELECT COUNT(*) <include refid="stockWhere"/>
+    </select>
+    <select id="selectLocationStock" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$LocationStock">
+        SELECT s.id, s.batch_id, b.batch_no, b.warehouse_id, s.location_id, l.location_code,
+               s.drug_id, s.qty, s.qty_frozen, s.qty - s.qty_frozen AS qty_avail
+        <include refid="stockWhere"/>
+        ORDER BY s.batch_id, s.location_id LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+
+    <sql id="flowWhere">
+        FROM ph_inv_flow f
+        WHERE f.tenant_id = #{scope.tenantId} AND f.store_id = #{scope.storeId} AND f.deleted = 0
+        <if test="q.flowId != null">AND f.id = #{q.flowId}</if>
+        <if test="q.flowType != null">AND f.flow_type = #{q.flowType}</if>
+        <if test="q.bizType != null">AND f.biz_type = #{q.bizType}</if>
+        <if test="q.flowFrom != null">AND f.flow_time &gt;= #{q.flowFrom}</if>
+        <if test="q.flowBefore != null">AND f.flow_time &lt; #{q.flowBefore}</if>
+        <if test="q.warehouseId != null">
+            AND EXISTS (SELECT 1 FROM ph_inv_batch fb
+                JOIN ph_warehouse fw ON fw.id = fb.warehouse_id AND fw.tenant_id = fb.tenant_id
+                                     AND fw.store_id = fb.store_id
+                WHERE fb.id = f.batch_id AND fb.tenant_id = f.tenant_id AND fb.store_id = f.store_id
+                  AND fb.warehouse_id = #{q.warehouseId})
+        </if>
+        <if test="q.drugId != null">AND f.drug_id = #{q.drugId}</if>
+        <if test="q.batchId != null">AND f.batch_id = #{q.batchId}</if>
+        <if test="q.locationId != null">AND f.location_id = #{q.locationId}</if>
+        <if test="q.batchNo != null and q.batchNo != ''">AND f.batch_no = #{q.batchNo}</if>
+        <if test="q.bizNo != null and q.bizNo != ''">AND f.biz_no = #{q.bizNo}</if>
+    </sql>
+    <select id="countFlows" resultType="long">
+        SELECT COUNT(*) <include refid="flowWhere"/>
+    </select>
+    <select id="selectFlows" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO$Flow">
+        SELECT f.id, f.batch_id, f.batch_no, f.drug_id, f.location_id, f.flow_type,
+               f.in_qty, f.out_qty, f.frozen_delta, f.balance_qty, f.biz_type, f.biz_no, f.biz_line_id, f.flow_time
+        <include refid="flowWhere"/>
+        ORDER BY f.id DESC LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+</mapper>
