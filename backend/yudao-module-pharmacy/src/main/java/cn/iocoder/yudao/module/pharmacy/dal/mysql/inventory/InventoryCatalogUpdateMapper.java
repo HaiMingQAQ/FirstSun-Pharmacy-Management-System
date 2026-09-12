@@ -13,12 +13,18 @@ public interface InventoryCatalogUpdateMapper {
     InventoryReadVO.Location lockLocation(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId,
                                          @Param("id") long id);
     boolean hasWarehouseStock(@Param("scope") Scope scope, @Param("id") long id);
+    boolean hasWarehouseReferences(@Param("scope") Scope scope, @Param("id") long id);
     boolean hasOpenWork(@Param("scope") Scope scope, @Param("id") long id);
     Usage locationUsage(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId, @Param("id") long id);
+    boolean hasLocationReferences(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId,
+                                  @Param("id") long id);
     int updateWarehouse(@Param("scope") Scope scope, @Param("q") InventoryCatalogUpdateReqVO.Warehouse request,
                         @Param("actor") String actor);
     int updateLocation(@Param("scope") Scope scope, @Param("q") InventoryCatalogUpdateReqVO.Location request,
                        @Param("actor") String actor);
+    int deleteWarehouse(@Param("scope") Scope scope, @Param("id") long id, @Param("actor") String actor);
+    int deleteLocation(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId,
+                       @Param("id") long id, @Param("actor") String actor);
 
     @Data
     class Usage {

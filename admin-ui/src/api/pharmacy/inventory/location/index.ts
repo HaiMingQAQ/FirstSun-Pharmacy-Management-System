@@ -49,3 +49,6 @@ export interface LocationUpdate {
 
 export const updateLocation = (data: LocationUpdate): Promise<boolean> =>
   request.put({ url: '/pharmacy/inventory/location/update', data })
+
+export const deleteLocation = (warehouseId: number, id: number): Promise<boolean> =>
+  request.delete({ url: '/pharmacy/inventory/location/delete', params: { warehouseId, id } })

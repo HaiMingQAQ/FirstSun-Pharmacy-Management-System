@@ -48,3 +48,6 @@ export interface WarehouseUpdate {
 
 export const updateWarehouse = (data: WarehouseUpdate): Promise<boolean> =>
   request.put({ url: '/pharmacy/inventory/warehouse/update', data })
+
+export const deleteWarehouse = (id: number): Promise<boolean> =>
+  request.delete({ url: '/pharmacy/inventory/warehouse/delete', params: { id } })

@@ -8,8 +8,10 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryC
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -17,6 +19,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @Tag(name = "管理后台 - 库存基础资料")
 @RestController
 @RequestMapping("/pharmacy/inventory")
+@Validated
 @RequiredArgsConstructor
 public class InventoryCatalogController {
     private final InventoryCatalogService service;
@@ -35,6 +38,23 @@ public class InventoryCatalogController {
     @PreAuthorize("@ss.hasPermission('pharmacy:inventory-location:update')")
     public CommonResult<Boolean> updateLocation(@Valid @RequestBody InventoryCatalogUpdateReqVO.Location request) {
         updates.updateLocation(request);
+        return success(true);
+    }
+
+    @DeleteMapping("/warehouse/delete")
+    @Operation(summary = "删除本门店空仓库（仅已停用且无任何引用）")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-warehouse:delete')")
+    public CommonResult<Boolean> deleteWarehouse(@RequestParam("id") @Positive long id) {
+        updates.deleteWarehouse(id);
+        return success(true);
+    }
+
+    @DeleteMapping("/location/delete")
+    @Operation(summary = "删除本门店空货位（仅已停用且无任何引用）")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-location:delete')")
+    public CommonResult<Boolean> deleteLocation(@RequestParam("warehouseId") @Positive long warehouseId,
+                                                @RequestParam("id") @Positive long id) {
+        updates.deleteLocation(warehouseId, id);
         return success(true);
     }
 

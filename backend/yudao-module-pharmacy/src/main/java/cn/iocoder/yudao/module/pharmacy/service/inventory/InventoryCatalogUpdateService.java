@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryR
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryCatalogUpdateMapper;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -90,6 +91,46 @@ public class InventoryCatalogUpdateService {
         } catch (DuplicateKeyException ex) {
             throw invalidParamException("货位编码已被使用（含已删除记录）");
         }
+    }
+
+    /**
+     * Logically delete an empty, already disabled warehouse. Historical inventory or
+     * document references also block deletion so audit joins never become orphaned.
+     */
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
+    public void deleteWarehouse(@NotNull @Positive Long id) {
+        requireCompatibleTransaction();
+        var scope = access.requireScope(null);
+        var current = mapper.lockWarehouse(scope, id);
+        if (current == null) throw exception(NOT_FOUND);
+        if (!Objects.equals(current.getIsDefault(), 0)) {
+            throw invalidParamException("默认仓不能删除，请先完成默认仓切换协调");
+        }
+        if (!Objects.equals(current.getStatus(), 0)) {
+            throw invalidParamException("请先停用仓库后再删除");
+        }
+        if (mapper.hasWarehouseReferences(scope, id) || mapper.hasOpenWork(scope, id)) {
+            throw invalidParamException("仓库存在库存、历史业务引用或未完成作业，不能删除");
+        }
+        requireUpdated(mapper.deleteWarehouse(scope, id, actor()));
+    }
+
+    /** Logically delete an empty, already disabled location while preserving audit history. */
+    @Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)
+    public void deleteLocation(@NotNull @Positive Long warehouseId, @NotNull @Positive Long id) {
+        requireCompatibleTransaction();
+        var scope = access.requireScope(null);
+        var warehouse = mapper.lockWarehouse(scope, warehouseId);
+        if (warehouse == null) throw exception(NOT_FOUND);
+        var current = mapper.lockLocation(scope, warehouseId, id);
+        if (current == null) throw exception(NOT_FOUND);
+        if (!Objects.equals(current.getStatus(), 0)) {
+            throw invalidParamException("请先停用货位后再删除");
+        }
+        if (mapper.hasLocationReferences(scope, warehouseId, id)) {
+            throw invalidParamException("货位存在库存或历史业务引用，不能删除");
+        }
+        requireUpdated(mapper.deleteLocation(scope, warehouseId, id, actor()));
     }
 
     private static boolean matches(InventoryReadVO.Warehouse row, InventoryCatalogUpdateReqVO.WarehouseFields fields) {

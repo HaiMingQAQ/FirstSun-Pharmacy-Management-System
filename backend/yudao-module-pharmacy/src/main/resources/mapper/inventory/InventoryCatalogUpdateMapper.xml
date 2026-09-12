@@ -24,6 +24,20 @@
             WHERE s.tenant_id = #{scope.tenantId} AND (l.warehouse_id = #{id} OR b.warehouse_id = #{id}) AND s.deleted = b'0'
               AND (s.qty != 0 OR s.qty_frozen != 0))
     </select>
+    <!-- A catalog row is deletable only when no current or historical C/B/D record
+         can still resolve it. This deliberately includes soft-deleted rows. -->
+    <select id="hasWarehouseReferences" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM ph_location l
+            WHERE l.tenant_id = #{scope.tenantId} AND l.warehouse_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_po_order o
+            WHERE o.tenant_id = #{scope.tenantId} AND o.warehouse_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_po_receipt r
+            WHERE r.tenant_id = #{scope.tenantId} AND r.warehouse_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_batch b
+            WHERE b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId} AND b.warehouse_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_stocktake t
+            WHERE t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId} AND t.warehouse_id = #{id})
+    </select>
     <!-- Conservative warehouse-wide work gate, including store-wide stocktakes. Expired locks
          remain active until their owner releases them; C must not infer expiration as release. -->
     <select id="hasOpenWork" resultType="boolean">
@@ -53,6 +67,31 @@
             AND b.store_id = #{scope.storeId} AND b.deleted = b'0'
         WHERE s.tenant_id = #{scope.tenantId} AND s.location_id = #{id} AND s.deleted = b'0'
     </select>
+    <select id="hasLocationReferences" resultType="boolean">
+        SELECT EXISTS(SELECT 1 FROM ph_inv_location_stock s
+            WHERE s.tenant_id = #{scope.tenantId} AND s.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_flow f
+            WHERE f.tenant_id = #{scope.tenantId} AND f.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_lock k
+            WHERE k.tenant_id = #{scope.tenantId} AND k.store_id = #{scope.storeId} AND k.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_stocktake_line sl
+            JOIN ph_inv_stocktake t ON t.id = sl.stocktake_id AND t.tenant_id = sl.tenant_id
+            WHERE sl.tenant_id = #{scope.tenantId} AND sl.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_inv_damage_line dl
+            JOIN ph_inv_damage d ON d.id = dl.damage_id AND d.tenant_id = dl.tenant_id
+            WHERE dl.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId} AND dl.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_po_receipt_line rl
+            JOIN ph_po_receipt r ON r.id = rl.receipt_id AND r.tenant_id = rl.tenant_id
+            WHERE rl.tenant_id = #{scope.tenantId} AND r.store_id = #{scope.storeId} AND rl.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_sale_order_line sol
+            JOIN ph_sale_order so ON so.id = sol.order_id AND so.tenant_id = sol.tenant_id
+            WHERE sol.tenant_id = #{scope.tenantId} AND so.store_id = #{scope.storeId} AND sol.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_sale_return_line srl
+            JOIN ph_sale_return sr ON sr.id = srl.return_id AND sr.tenant_id = srl.tenant_id
+            WHERE srl.tenant_id = #{scope.tenantId} AND sr.store_id = #{scope.storeId} AND srl.location_id = #{id})
+        OR EXISTS(SELECT 1 FROM ph_drug d
+            WHERE d.tenant_id = #{scope.tenantId} AND d.default_location_id = #{id})
+    </select>
     <update id="updateWarehouse">
         UPDATE ph_warehouse SET wh_code = #{q.value.whCode}, wh_name = #{q.value.whName},
             temp_zone = #{q.value.tempZone}, status = #{q.value.status}, updater = #{actor}, update_time = CURRENT_TIMESTAMP
@@ -63,5 +102,13 @@
             max_capacity = #{q.value.maxCapacity,jdbcType=BIGINT}, status = #{q.value.status},
             updater = #{actor}, update_time = CURRENT_TIMESTAMP
         WHERE id = #{q.id} AND warehouse_id = #{q.warehouseId} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </update>
+    <update id="deleteWarehouse">
+        UPDATE ph_warehouse SET deleted = b'1', updater = #{actor}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+    </update>
+    <update id="deleteLocation">
+        UPDATE ph_location SET deleted = b'1', updater = #{actor}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND warehouse_id = #{warehouseId} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
     </update>
 </mapper>

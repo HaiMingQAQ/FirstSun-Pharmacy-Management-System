@@ -45,6 +45,8 @@ class InventoryCatalogUpdateTest {
         when(mapper.locationUsage(scope, 3, 4)).thenReturn(usage);
         when(mapper.updateWarehouse(any(), any(), any())).thenReturn(1);
         when(mapper.updateLocation(any(), any(), any())).thenReturn(1);
+        when(mapper.deleteWarehouse(any(), anyLong(), any())).thenReturn(1);
+        when(mapper.deleteLocation(any(), anyLong(), anyLong(), any())).thenReturn(1);
         var login = new LoginUser(); login.setId(11L);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(login, null, List.of()));
     }
@@ -180,6 +182,49 @@ class InventoryCatalogUpdateTest {
         var request = warehouseRequest(); request.getValue().setWhName("new");
         when(mapper.updateWarehouse(scope, request, "11")).thenReturn(0);
         assertThrows(IllegalStateException.class, () -> service.updateWarehouse(request));
+    }
+
+    @Test void warehouseDeleteRequiresDisabledUnusedNonDefaultRow() {
+        warehouse.setStatus(1);
+        assertThrows(ServiceException.class, () -> service.deleteWarehouse(3L));
+        verify(mapper, never()).hasWarehouseReferences(any(), anyLong());
+        warehouse.setStatus(0);
+        warehouse.setIsDefault(1);
+        assertThrows(ServiceException.class, () -> service.deleteWarehouse(3L));
+        verify(mapper, never()).deleteWarehouse(any(), anyLong(), any());
+        warehouse.setIsDefault(0);
+        when(mapper.hasWarehouseReferences(scope, 3L)).thenReturn(true);
+        assertThrows(ServiceException.class, () -> service.deleteWarehouse(3L));
+        verify(mapper, never()).deleteWarehouse(any(), anyLong(), any());
+    }
+
+    @Test void emptyDisabledWarehouseDeleteUsesStoreScopedLockAndActor() {
+        warehouse.setStatus(0);
+        when(mapper.hasWarehouseReferences(scope, 3L)).thenReturn(false);
+        when(mapper.hasOpenWork(scope, 3L)).thenReturn(false);
+        service.deleteWarehouse(3L);
+        var order = inOrder(mapper);
+        order.verify(mapper).lockWarehouse(scope, 3L);
+        order.verify(mapper).hasWarehouseReferences(scope, 3L);
+        order.verify(mapper).hasOpenWork(scope, 3L);
+        order.verify(mapper).deleteWarehouse(scope, 3L, "11");
+    }
+
+    @Test void locationDeleteRequiresDisabledUnreferencedRowAndLocksParentFirst() {
+        location.setStatus(1);
+        assertThrows(ServiceException.class, () -> service.deleteLocation(3L, 4L));
+        verify(mapper, never()).hasLocationReferences(any(), anyLong(), anyLong());
+        location.setStatus(0);
+        when(mapper.hasLocationReferences(scope, 3L, 4L)).thenReturn(true);
+        assertThrows(ServiceException.class, () -> service.deleteLocation(3L, 4L));
+        verify(mapper, never()).deleteLocation(any(), anyLong(), anyLong(), any());
+        when(mapper.hasLocationReferences(scope, 3L, 4L)).thenReturn(false);
+        service.deleteLocation(3L, 4L);
+        var order = inOrder(mapper);
+        order.verify(mapper).lockWarehouse(scope, 3L);
+        order.verify(mapper).lockLocation(scope, 3L, 4L);
+        order.verify(mapper).hasLocationReferences(scope, 3L, 4L);
+        order.verify(mapper).deleteLocation(scope, 3L, 4L, "11");
     }
     @Test void allXmlStatementsResolveTheirActualBoundParameters() throws Exception {
         var configuration = new Configuration();

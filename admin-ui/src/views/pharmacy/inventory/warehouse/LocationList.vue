@@ -38,9 +38,13 @@
           ><template #default="{ row }"
             ><dict-tag :type="DICT_TYPE.PHARMACY_STATUS" :value="row.status" /></template
         ></el-table-column>
-        <el-table-column v-if="canUpdate" label="操作" width="80" fixed="right">
+        <el-table-column v-if="canUpdate || canDelete" label="操作" width="130" fixed="right">
           <template #default="{ row }"
-            ><el-button link type="primary" @click="editForm?.open(row)">编辑</el-button></template
+            ><el-button v-if="canUpdate" link type="primary" @click="editForm?.open(row)"
+              >编辑</el-button
+            ><el-button v-if="canDelete" link type="danger" @click="handleDelete(row)"
+              >删除</el-button
+            ></template
           >
         </el-table-column>
       </el-table>
@@ -58,11 +62,13 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import LocationEditForm from './LocationEditForm.vue'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { checkPermi } from '@/utils/permission'
 import {
   getLocationPage,
+  deleteLocation,
   LOCATION_TYPES,
   type LocationQuery,
   type LocationVO
@@ -71,6 +77,7 @@ import type { WarehouseVO } from '@/api/pharmacy/inventory/warehouse'
 
 const visible = ref(false)
 const canUpdate = computed(() => checkPermi(['pharmacy:inventory-location:update']))
+const canDelete = computed(() => checkPermi(['pharmacy:inventory-location:delete']))
 const editForm = ref<InstanceType<typeof LocationEditForm>>()
 const warehouseName = ref('')
 const loading = ref(false)
@@ -108,6 +115,24 @@ const reset = () => {
   query.code = ''
   query.status = undefined
   return search()
+}
+const handleDelete = async (row: LocationVO) => {
+  if (loading.value || !canDelete.value) return
+  const confirmed = await ElMessageBox.confirm(
+    `确认删除货位“${row.locationCode}”？仅已停用且没有库存或历史业务引用的货位可删除。`,
+    '确认删除',
+    { type: 'warning' }
+  )
+    .then(() => true)
+    .catch(() => false)
+  if (!confirmed) return
+  try {
+    await deleteLocation(query.warehouseId, row.id)
+    ElMessage.success('货位删除成功')
+    await getList()
+  } catch {
+    // The shared request interceptor displays the server reason.
+  }
 }
 const close = () => {
   sequence++

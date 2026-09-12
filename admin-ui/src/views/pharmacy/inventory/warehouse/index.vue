@@ -83,13 +83,14 @@
             canCreateLocation ||
             canQueryLocation ||
             canUpdate ||
+            canDelete ||
             canLedger ||
             canHealth ||
             canStocktake ||
             canDamage
           "
           label="操作"
-          width="300"
+          width="360"
           fixed="right"
         >
           <template #default="{ row }">
@@ -107,6 +108,9 @@
             >
             <el-button v-if="canUpdate" link type="primary" @click="editForm?.open(row)"
               >编辑</el-button
+            >
+            <el-button v-if="canDelete" link type="danger" @click="handleDelete(row)"
+              >删除</el-button
             >
             <el-dropdown
               v-if="canQueryLocation || canCreateLocation"
@@ -152,6 +156,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PharmacyPageHeader from '@/components/Pharmacy/PharmacyPageHeader.vue'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { checkPermi } from '@/utils/permission'
@@ -165,6 +170,7 @@ import InventoryStocktake from './InventoryStocktake.vue'
 import InventoryDamage from './InventoryDamage.vue'
 import {
   getWarehousePage,
+  deleteWarehouse,
   type WarehouseQuery,
   type WarehouseVO
 } from '@/api/pharmacy/inventory/warehouse'
@@ -181,6 +187,7 @@ const canQuery = computed(() => checkPermi(['pharmacy:inventory-warehouse:query'
 const canCreate = computed(() => checkPermi(['pharmacy:inventory-warehouse:create']))
 const createForm = ref<InstanceType<typeof WarehouseCreateForm>>()
 const canUpdate = computed(() => checkPermi(['pharmacy:inventory-warehouse:update']))
+const canDelete = computed(() => checkPermi(['pharmacy:inventory-warehouse:delete']))
 const editForm = ref<InstanceType<typeof WarehouseEditForm>>()
 const canLedger = computed(() =>
   checkPermi(['pharmacy:inventory-batch:query', 'pharmacy:inventory-flow:query'])
@@ -219,6 +226,25 @@ const getList = async () => {
     failed.value = true
   } finally {
     loading.value = false
+  }
+}
+
+const handleDelete = async (row: WarehouseVO) => {
+  if (loading.value || !canDelete.value) return
+  const confirmed = await ElMessageBox.confirm(
+    `确认删除仓库“${row.whName}”？仅已停用且没有货位、库存、历史业务引用的仓库可删除。`,
+    '确认删除',
+    { type: 'warning' }
+  )
+    .then(() => true)
+    .catch(() => false)
+  if (!confirmed) return
+  try {
+    await deleteWarehouse(row.id)
+    ElMessage.success('仓库删除成功')
+    await getList()
+  } catch {
+    // The shared request interceptor displays the server reason.
   }
 }
 
