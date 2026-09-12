@@ -77,3 +77,6 @@ export const getReconciliationPage = (
   params: ReconciliationQuery
 ): Promise<{ list: ReconciliationVO[]; total: number }> =>
   request.get({ url: '/pharmacy/inventory/reconciliation/page', params })
+
+export const exportReconciliation = (params: ReconciliationQuery) =>
+  request.download({ url: '/pharmacy/inventory/reconciliation/export-excel', params })

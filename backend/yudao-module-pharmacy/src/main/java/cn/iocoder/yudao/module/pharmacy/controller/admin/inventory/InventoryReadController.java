@@ -14,6 +14,12 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryE
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationQuery;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationVO;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
+import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -139,5 +145,15 @@ public class InventoryReadController {
     public CommonResult<PageResult<InventoryReconciliationVO.Row>> reconciliation(
             @Valid InventoryReconciliationQuery query) {
         return success(reconciliationService.page(query));
+    }
+
+    @GetMapping("/reconciliation/export-excel")
+    @Operation(summary = "导出本门店库存三账核对")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-reconciliation:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportReconciliation(HttpServletResponse response,
+                                     @Valid InventoryReconciliationQuery query) throws IOException {
+        List<InventoryReconciliationVO.Row> rows = reconciliationService.export(query);
+        ExcelUtils.write(response, "库存三账核对.xls", "核对结果", InventoryReconciliationVO.Row.class, rows);
     }
 }

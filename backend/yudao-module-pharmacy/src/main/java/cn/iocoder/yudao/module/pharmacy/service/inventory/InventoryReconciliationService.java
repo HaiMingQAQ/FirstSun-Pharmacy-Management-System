@@ -25,9 +25,21 @@ public class InventoryReconciliationService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public PageResult<InventoryReconciliationVO.Row> page(@Valid InventoryReconciliationQuery query) {
         var scope = access.requireScope(null);
-        List<InventoryReconciliationVO.Row> rows = mapper.selectRows(scope, query).stream()
-                .map(InventoryReconciliationService::project).toList();
+        List<InventoryReconciliationVO.Row> rows = list(scope, query);
         return new PageResult<>(rows, mapper.countRows(scope, query));
+    }
+
+    /** Export uses the same authenticated store scope and repeatable-read projection as page query. */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public List<InventoryReconciliationVO.Row> export(@Valid InventoryReconciliationQuery query) {
+        query.setPageSize(cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE);
+        return list(access.requireScope(null), query);
+    }
+
+    private List<InventoryReconciliationVO.Row> list(InventoryReadAccess.Scope scope,
+                                                     InventoryReconciliationQuery query) {
+        return mapper.selectRows(scope, query).stream()
+                .map(InventoryReconciliationService::project).toList();
     }
 
     private static InventoryReconciliationVO.Row project(InventoryReconciliationMapper.Row source) {

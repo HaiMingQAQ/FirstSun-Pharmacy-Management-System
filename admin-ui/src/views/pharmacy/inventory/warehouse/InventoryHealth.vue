@@ -87,7 +87,10 @@
         <el-form :model="reconciliationQuery" inline @submit.prevent="search">
           <el-checkbox v-model="reconciliationQuery.onlyDifference">只看异常</el-checkbox>
           <el-form-item
-            ><el-button :loading="loading" @click="search">核对</el-button></el-form-item
+            ><el-button :loading="loading" @click="search">核对</el-button>
+            <el-button v-if="canExport" :loading="exporting" @click="exportRows"
+              >导出</el-button
+            ></el-form-item
           >
         </el-form>
         <el-alert
@@ -134,6 +137,7 @@ import { ElMessage } from 'element-plus'
 import { checkPermi } from '@/utils/permission'
 import {
   EXPIRY_HANDLE_TYPES,
+  exportReconciliation,
   getExpiryPage,
   getReconciliationPage,
   handleExpiry,
@@ -162,8 +166,10 @@ const canExpiry = computed(() => checkPermi(['pharmacy:inventory-expiry:query'])
 const canRefresh = computed(() => checkPermi(['pharmacy:inventory-expiry:refresh']))
 const canHandle = computed(() => checkPermi(['pharmacy:inventory-expiry:handle']))
 const canReconciliation = computed(() => checkPermi(['pharmacy:inventory-reconciliation:query']))
+const canExport = computed(() => checkPermi(['pharmacy:inventory-reconciliation:export']))
 const expiryQuery = reactive<ExpiryQuery>({ pageNo: 1, pageSize: 10 })
 const reconciliationQuery = reactive<ReconciliationQuery>({ pageNo: 1, pageSize: 10 })
+const exporting = ref(false)
 let sequence = 0
 
 const load = async () => {
@@ -202,6 +208,16 @@ const search = () => {
   if (tab.value === 'expiry') expiryQuery.pageNo = 1
   else reconciliationQuery.pageNo = 1
   return load()
+}
+const exportRows = async () => {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    await exportReconciliation({ ...reconciliationQuery, warehouseId: warehouseId.value })
+    ElMessage.success('三账核对已导出')
+  } finally {
+    exporting.value = false
+  }
 }
 const refresh = async () => {
   if (refreshing.value) return

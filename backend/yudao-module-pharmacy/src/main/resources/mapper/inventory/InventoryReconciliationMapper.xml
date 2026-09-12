@@ -64,6 +64,8 @@
                fl.last_flow_id
         <include refid="reconcileFrom"/>
         ORDER BY b.id
-        LIMIT #{q.pageSize} OFFSET #{q.offset}
+        <if test="q.pageSize != -1">
+            LIMIT #{q.pageSize} OFFSET #{q.offset}
+        </if>
     </select>
 </mapper>
