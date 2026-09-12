@@ -6,7 +6,14 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryR
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReadVO;
 import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryReadService;
 import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryPreviewService;
+import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryExpiryService;
+import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryReconciliationService;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryPreviewReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryHandleReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryQuery;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationQuery;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -15,7 +22,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -29,6 +38,8 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class InventoryReadController {
     private final InventoryReadService service;
     private final InventoryPreviewService previewService;
+    private final InventoryExpiryService expiryService;
+    private final InventoryReconciliationService reconciliationService;
 
     @GetMapping("/batch/get")
     @Operation(summary = "本门店批次详情")
@@ -98,5 +109,35 @@ public class InventoryReadController {
     @PreAuthorize("@ss.hasPermission('pharmacy:inventory-flow:query')")
     public CommonResult<PageResult<InventoryReadVO.Flow>> flows(@Valid InventoryReadQuery query) {
         return success(service.flows(query));
+    }
+
+    @GetMapping("/expiry/page")
+    @Operation(summary = "本门店效期预警分页")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-expiry:query')")
+    public CommonResult<PageResult<InventoryExpiryVO.Alert>> expiry(@Valid InventoryExpiryQuery query) {
+        return success(expiryService.page(query));
+    }
+
+    @PostMapping("/expiry/refresh")
+    @Operation(summary = "刷新本门店每日效期预警")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-expiry:refresh')")
+    public CommonResult<InventoryExpiryService.RefreshResult> refreshExpiry() {
+        return success(expiryService.refresh());
+    }
+
+    @PostMapping("/expiry/handle")
+    @Operation(summary = "处理效期预警")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-expiry:handle')")
+    public CommonResult<Boolean> handleExpiry(@Valid @RequestBody InventoryExpiryHandleReqVO request) {
+        expiryService.handle(request);
+        return success(true);
+    }
+
+    @GetMapping("/reconciliation/page")
+    @Operation(summary = "本门店库存三账核对")
+    @PreAuthorize("@ss.hasPermission('pharmacy:inventory-reconciliation:query')")
+    public CommonResult<PageResult<InventoryReconciliationVO.Row>> reconciliation(
+            @Valid InventoryReconciliationQuery query) {
+        return success(reconciliationService.page(query));
     }
 }

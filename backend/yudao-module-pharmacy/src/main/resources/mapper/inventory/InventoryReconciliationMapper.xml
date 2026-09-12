@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryReconciliationMapper">
+    <sql id="batchScope">
+        b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId} AND b.deleted = b'0'
+        <if test="q.warehouseId != null">AND b.warehouse_id = #{q.warehouseId}</if>
+        <if test="q.drugId != null">AND b.drug_id = #{q.drugId}</if>
+    </sql>
+    <sql id="differenceWhere">
+        <if test="q.onlyDifference != null and q.onlyDifference">
+            AND (COALESCE(loc.location_total, 0) &lt;&gt; b.qty_total
+              OR COALESCE(loc.location_frozen, 0) &lt;&gt; b.qty_frozen
+              OR COALESCE(loc.invalid_location_rows, 0) &gt; 0
+              OR COALESCE(fl.flow_net, 0) &lt;&gt; b.qty_total
+              OR COALESCE(lk.active_lock_qty, 0) &lt;&gt; b.qty_frozen
+              OR COALESCE(fl.opening_flow_count, 0) = 0)
+        </if>
+    </sql>
+    <sql id="reconcileFrom">
+        FROM ph_inv_batch b
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id
+                           AND w.store_id = b.store_id AND w.deleted = b'0'
+        LEFT JOIN (
+            SELECT s.tenant_id, s.batch_id, SUM(s.qty) AS location_total,
+                   SUM(s.qty_frozen) AS location_frozen,
+                   SUM(CASE WHEN l.id IS NULL OR l.warehouse_id &lt;&gt; b2.warehouse_id
+                                  OR s.drug_id &lt;&gt; b2.drug_id THEN 1 ELSE 0 END) AS invalid_location_rows
+            FROM ph_inv_location_stock s
+            JOIN ph_inv_batch b2 ON b2.id = s.batch_id AND b2.tenant_id = s.tenant_id
+            LEFT JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id
+                                   AND l.deleted = b'0'
+            WHERE s.tenant_id = #{scope.tenantId} AND s.deleted = b'0'
+            GROUP BY s.tenant_id, s.batch_id
+        ) loc ON loc.tenant_id = b.tenant_id AND loc.batch_id = b.id
+        LEFT JOIN (
+            SELECT f.tenant_id, f.batch_id, SUM(f.in_qty - f.out_qty) AS flow_net,
+                   SUM(CASE WHEN f.flow_type = 70 THEN 1 ELSE 0 END) AS opening_flow_count,
+                   MAX(f.id) AS last_flow_id
+            FROM ph_inv_flow f
+            WHERE f.tenant_id = #{scope.tenantId} AND f.deleted = b'0'
+            GROUP BY f.tenant_id, f.batch_id
+        ) fl ON fl.tenant_id = b.tenant_id AND fl.batch_id = b.id
+        LEFT JOIN (
+            SELECT l.tenant_id, l.batch_id, SUM(l.qty) AS active_lock_qty
+            FROM ph_inv_lock l
+            WHERE l.tenant_id = #{scope.tenantId} AND l.status = 0 AND l.deleted = b'0'
+            GROUP BY l.tenant_id, l.batch_id
+        ) lk ON lk.tenant_id = b.tenant_id AND lk.batch_id = b.id
+        WHERE <include refid="batchScope"/>
+          <include refid="differenceWhere"/>
+    </sql>
+    <select id="countRows" resultType="long">
+        SELECT COUNT(*) <include refid="reconcileFrom"/>
+    </select>
+    <select id="selectRows" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryReconciliationMapper$Row">
+        SELECT b.id AS batch_id, b.warehouse_id, b.drug_id, b.batch_no,
+               b.qty_total AS batch_total, b.qty_avail AS batch_avail, b.qty_frozen AS batch_frozen,
+               COALESCE(loc.location_total, 0) AS location_total,
+               COALESCE(loc.location_frozen, 0) AS location_frozen,
+               COALESCE(loc.invalid_location_rows, 0) AS invalid_location_rows,
+               COALESCE(fl.flow_net, 0) AS flow_net,
+               COALESCE(fl.opening_flow_count, 0) AS opening_flow_count,
+               COALESCE(lk.active_lock_qty, 0) AS active_lock_qty,
+               fl.last_flow_id
+        <include refid="reconcileFrom"/>
+        ORDER BY b.id
+        LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+</mapper>

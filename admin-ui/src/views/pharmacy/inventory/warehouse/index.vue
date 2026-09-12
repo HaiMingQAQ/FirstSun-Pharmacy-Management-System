@@ -79,14 +79,17 @@
           </template>
         </el-table-column>
         <el-table-column
-          v-if="canCreateLocation || canQueryLocation || canUpdate || canLedger"
+          v-if="canCreateLocation || canQueryLocation || canUpdate || canLedger || canHealth"
           label="操作"
-          width="220"
+          width="300"
           fixed="right"
         >
           <template #default="{ row }">
             <el-button v-if="canLedger" link type="primary" @click="ledger?.open(row)"
               >台账</el-button
+            >
+            <el-button v-if="canHealth" link type="primary" @click="health?.open(row)"
+              >健康</el-button
             >
             <el-button v-if="canUpdate" link type="primary" @click="editForm?.open(row)"
               >编辑</el-button
@@ -127,6 +130,7 @@
     <InventoryLedger ref="ledger" />
     <LocationCreateForm ref="locationForm" />
     <LocationList ref="locationList" />
+    <InventoryHealth ref="health" />
   </div>
 </template>
 
@@ -140,6 +144,7 @@ import WarehouseEditForm from './WarehouseEditForm.vue'
 import InventoryLedger from './InventoryLedger.vue'
 import LocationCreateForm from './LocationCreateForm.vue'
 import LocationList from './LocationList.vue'
+import InventoryHealth from './InventoryHealth.vue'
 import {
   getWarehousePage,
   type WarehouseQuery,
@@ -167,6 +172,10 @@ const canCreateLocation = computed(() => checkPermi(['pharmacy:inventory-locatio
 const locationForm = ref<InstanceType<typeof LocationCreateForm>>()
 const canQueryLocation = computed(() => checkPermi(['pharmacy:inventory-location:query']))
 const locationList = ref<InstanceType<typeof LocationList>>()
+const canHealth = computed(() =>
+  checkPermi(['pharmacy:inventory-expiry:query', 'pharmacy:inventory-reconciliation:query'])
+)
+const health = ref<InstanceType<typeof InventoryHealth>>()
 
 const getList = async () => {
   if (loading.value || !canQuery.value) return

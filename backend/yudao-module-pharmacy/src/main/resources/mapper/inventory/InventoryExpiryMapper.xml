@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryExpiryMapper">
+    <sql id="alertWhere">
+        FROM ph_inv_expiry_alert a
+        JOIN ph_inv_batch b ON b.id = a.batch_id AND b.tenant_id = a.tenant_id
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id
+                           AND w.store_id = b.store_id
+        WHERE a.tenant_id = #{scope.tenantId} AND a.store_id = #{scope.storeId}
+          AND b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+          AND w.tenant_id = #{scope.tenantId} AND w.store_id = #{scope.storeId}
+          AND a.deleted = b'0' AND b.deleted = b'0' AND w.deleted = b'0'
+        <if test="q.warehouseId != null">AND b.warehouse_id = #{q.warehouseId}</if>
+        <if test="q.drugId != null">AND a.drug_id = #{q.drugId}</if>
+        <if test="q.batchId != null">AND a.batch_id = #{q.batchId}</if>
+        <if test="q.alertLevel != null">AND a.alert_level = #{q.alertLevel}</if>
+        <if test="q.handleType != null">AND a.handle_type = #{q.handleType}</if>
+        <if test="q.alertDate != null">AND a.alert_date = #{q.alertDate}</if>
+    </sql>
+    <select id="countAlerts" resultType="long">
+        SELECT COUNT(*) <include refid="alertWhere"/>
+    </select>
+    <select id="selectAlerts" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryVO$Alert">
+        SELECT a.id, a.batch_id, a.drug_id, b.warehouse_id, b.batch_no, b.expiry_date,
+               b.qty_total, b.qty_avail, b.qty_frozen, a.alert_level, a.expire_days,
+               a.handle_type, a.handle_by, a.handle_at, a.alert_date
+        <include refid="alertWhere"/>
+        ORDER BY a.alert_level, b.expiry_date, a.id
+        LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+
+    <!-- One row per batch/day. ON DUPLICATE KEY makes scheduled/manual refresh idempotent. -->
+    <insert id="refreshDaily">
+        INSERT INTO ph_inv_expiry_alert
+            (tenant_id, store_id, batch_id, drug_id, alert_level, expire_days, handle_type,
+             alert_date, creator, updater)
+        SELECT b.tenant_id, b.store_id, b.id, b.drug_id,
+               CASE WHEN DATEDIFF(b.expiry_date, #{alertDate}) &lt;= 30 THEN 1
+                    WHEN DATEDIFF(b.expiry_date, #{alertDate}) &lt;= 60 THEN 2 ELSE 3 END,
+               DATEDIFF(b.expiry_date, #{alertDate}), 0, #{alertDate}, #{actor}, #{actor}
+        FROM ph_inv_batch b
+        JOIN ph_warehouse w ON w.id = b.warehouse_id AND w.tenant_id = b.tenant_id
+                           AND w.store_id = b.store_id AND w.deleted = b'0'
+        WHERE b.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+          AND b.deleted = b'0' AND b.qty_total &gt; 0
+          AND b.expiry_date &lt;= DATE_ADD(#{alertDate}, INTERVAL 90 DAY)
+        ON DUPLICATE KEY UPDATE
+            expire_days = VALUES(expire_days), alert_level = VALUES(alert_level),
+            updater = VALUES(updater), update_time = CURRENT_TIMESTAMP, deleted = b'0'
+    </insert>
+
+    <select id="selectHandleType" resultType="java.lang.Integer">
+        SELECT handle_type FROM ph_inv_expiry_alert
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0'
+    </select>
+
+    <update id="updateHandle">
+        UPDATE ph_inv_expiry_alert
+        SET handle_type = #{handleType}, handle_by = #{operator}, handle_at = CURRENT_TIMESTAMP,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND handle_type = 0
+    </update>
+</mapper>
