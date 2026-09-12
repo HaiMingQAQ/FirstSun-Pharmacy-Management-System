@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryE
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationQuery;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryExpiryMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryReconciliationMapper;
+import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper;
 import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryReadAccess.Scope;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.session.Configuration;
@@ -68,5 +69,26 @@ class InventoryHealthMapperTest {
         assertTrue(sql.contains("opening_flow_count"));
         assertTrue(sql.contains("<>"));
         assertTrue(sql.contains("LIMIT ? OFFSET ?"));
+    }
+
+    @Test
+    void stocktakeXmlBindsSnapshotAndAdjustmentStatements() throws Exception {
+        var config = configuration("mapper/inventory/InventoryStocktakeMapper.xml");
+        var scope = new Scope(1, 7);
+        var query = Map.of("warehouseId", 3L, "status", 1, "pageSize", 10, "offset", 0);
+        var page = config.getMappedStatement(InventoryStocktakeMapper.class.getName() + ".selectPage")
+                .getBoundSql(Map.of("scope", scope, "q", query));
+        assertTrue(page.getSql().contains("ph_inv_stocktake"));
+        assertTrue(page.getSql().contains("tenant_id"));
+        assertTrue(page.getSql().contains("LIMIT ? OFFSET ?"));
+        var adjustment = config.getMappedStatement(InventoryStocktakeMapper.class.getName() + ".selectAdjustmentLines")
+                .getBoundSql(Map.of("scope", scope, "id", 12L));
+        assertTrue(adjustment.getSql().contains("ph_inv_stocktake_line"));
+        assertTrue(adjustment.getSql().contains("ph_inv_batch"));
+        assertTrue(adjustment.getSql().contains("tenant_id"));
+        var location = config.getMappedStatement(InventoryStocktakeMapper.class.getName() + ".lockLocation")
+                .getBoundSql(Map.of("scope", scope, "warehouseId", 3L, "id", 8L));
+        assertTrue(location.getSql().contains("ph_warehouse"));
+        assertTrue(location.getSql().contains("store_id"));
     }
 }
