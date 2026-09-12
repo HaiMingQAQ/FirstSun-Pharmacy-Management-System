@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.pharmacy.inventory;
 
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryExpiryQuery;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryReconciliationQuery;
+import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryExpiryMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryReconciliationMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper;
@@ -90,5 +91,23 @@ class InventoryHealthMapperTest {
                 .getBoundSql(Map.of("scope", scope, "warehouseId", 3L, "id", 8L));
         assertTrue(location.getSql().contains("ph_warehouse"));
         assertTrue(location.getSql().contains("store_id"));
+    }
+
+    @Test
+    void damageXmlBindsPageAndExecuteStatements() throws Exception {
+        var config = configuration("mapper/inventory/InventoryDamageMapper.xml");
+        var scope = new Scope(1, 7);
+        var query = Map.of("warehouseId", 3L, "status", 1, "damageType", 0,
+                "pageSize", 10, "offset", 0);
+        var page = config.getMappedStatement(InventoryDamageMapper.class.getName() + ".selectPage")
+                .getBoundSql(Map.of("scope", scope, "q", query));
+        assertTrue(page.getSql().contains("ph_inv_damage"));
+        assertTrue(page.getSql().contains("ph_inv_batch"));
+        assertTrue(page.getSql().contains("LIMIT ? OFFSET ?"));
+        var execute = config.getMappedStatement(InventoryDamageMapper.class.getName() + ".selectExecuteLines")
+                .getBoundSql(Map.of("scope", scope, "id", 12L));
+        assertTrue(execute.getSql().contains("damage_no"));
+        assertTrue(execute.getSql().contains("ph_inv_damage_line"));
+        assertTrue(execute.getSql().contains("tenant_id"));
     }
 }

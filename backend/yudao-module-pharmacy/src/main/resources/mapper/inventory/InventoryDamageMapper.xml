@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper">
+    <sql id="damageWhere">
+        FROM ph_inv_damage d
+        WHERE d.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId} AND d.deleted = b'0'
+        <if test="q.status != null">AND d.status = #{q.status}</if>
+        <if test="q.damageType != null">AND d.damage_type = #{q.damageType}</if>
+        <if test="q.warehouseId != null">
+            AND EXISTS (SELECT 1 FROM ph_inv_damage_line dl
+                        JOIN ph_inv_batch b ON b.id = dl.batch_id AND b.tenant_id = dl.tenant_id
+                        WHERE dl.damage_id = d.id AND dl.tenant_id = d.tenant_id AND dl.deleted = b'0'
+                          AND b.store_id = #{scope.storeId} AND b.warehouse_id = #{q.warehouseId}
+                          AND b.deleted = b'0')
+        </if>
+    </sql>
+    <select id="count" resultType="long">SELECT COUNT(*) <include refid="damageWhere"/></select>
+    <select id="selectPage" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryDamageVO$Summary">
+        SELECT d.id, d.damage_no, d.store_id, d.damage_type, d.reason, d.total_qty, d.total_amount,
+               d.status, d.audit_by, d.audit_at, d.execute_by, d.execute_at, d.review_by, d.create_time
+        <include refid="damageWhere"/>
+        ORDER BY d.id DESC LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+    <select id="selectSummary" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryDamageVO$Summary">
+        SELECT id, damage_no, store_id, damage_type, reason, total_qty, total_amount, status,
+               audit_by, audit_at, execute_by, execute_at, review_by, create_time
+        FROM ph_inv_damage
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+    </select>
+    <select id="selectLines" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryDamageVO$Line">
+        SELECT l.id, l.damage_id, l.batch_id, l.location_id, l.drug_id, l.batch_no,
+               l.qty, l.cost_price, l.amount, l.dispose_type
+        FROM ph_inv_damage_line l
+        JOIN ph_inv_damage d ON d.id = l.damage_id AND d.tenant_id = l.tenant_id
+        WHERE l.damage_id = #{id} AND l.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId}
+          AND l.deleted = b'0' AND d.deleted = b'0'
+        ORDER BY l.id
+    </select>
+    <select id="lockHeader" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper$Header">
+        SELECT id, damage_no, store_id, damage_type, status, audit_by, review_by
+        FROM ph_inv_damage
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' FOR UPDATE
+    </select>
+    <select id="countLines" resultType="int">
+        SELECT COUNT(*) FROM ph_inv_damage_line
+        WHERE damage_id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </select>
+    <insert id="insertHeader" useGeneratedKeys="true" keyProperty="key.id" keyColumn="id">
+        INSERT INTO ph_inv_damage
+            (tenant_id, damage_no, store_id, damage_type, reason, status, total_qty, total_amount,
+             destroy_method, destroy_company, creator, updater)
+        VALUES (#{scope.tenantId}, #{damageNo}, #{scope.storeId}, #{q.damageType}, #{q.reason}, 0, 0, 0,
+                #{q.destroyMethod}, #{q.destroyCompany}, #{operator}, #{operator})
+    </insert>
+    <insert id="insertLine">
+        INSERT INTO ph_inv_damage_line
+            (tenant_id, damage_id, batch_id, drug_id, batch_no, qty, cost_price, amount,
+             dispose_type, location_id, creator, updater)
+        VALUES (#{scope.tenantId}, #{damageId}, #{line.batchId}, #{batch.drugId}, #{batch.batchNo}, #{line.qty},
+                #{batch.costPrice}, #{amount}, #{line.disposeType}, #{line.locationId}, #{operator}, #{operator})
+    </insert>
+    <update id="updateTotals">
+        UPDATE ph_inv_damage d
+        SET total_qty = (SELECT COALESCE(SUM(l.qty), 0) FROM ph_inv_damage_line l
+                         WHERE l.damage_id = d.id AND l.tenant_id = d.tenant_id AND l.deleted = b'0'),
+            total_amount = (SELECT COALESCE(SUM(l.amount), 0) FROM ph_inv_damage_line l
+                            WHERE l.damage_id = d.id AND l.tenant_id = d.tenant_id AND l.deleted = b'0'),
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE d.id = #{id} AND d.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId}
+          AND d.deleted = b'0'
+    </update>
+    <select id="lockBatch" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper$BatchLock">
+        SELECT id, store_id, warehouse_id, drug_id, batch_no, qty_total, qty_avail, qty_frozen, cost_price
+        FROM ph_inv_batch
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' FOR UPDATE
+    </select>
+    <select id="lockStock" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper$StockLock">
+        SELECT s.id, s.batch_id, s.location_id, s.qty, s.qty_frozen
+        FROM ph_inv_location_stock s
+        JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+                           AND b.store_id = #{scope.storeId} AND b.deleted = b'0'
+        JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id
+                           AND l.warehouse_id = b.warehouse_id AND l.deleted = b'0'
+        WHERE s.batch_id = #{batchId} AND s.location_id = #{locationId}
+          AND s.tenant_id = #{scope.tenantId} AND s.deleted = b'0' FOR UPDATE
+    </select>
+    <select id="selectExecuteLines" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryDamageMapper$ExecuteLine">
+        SELECT l.id, l.damage_id, l.batch_id, l.location_id, l.drug_id, l.batch_no, d.damage_no, l.qty, l.cost_price
+        FROM ph_inv_damage_line l
+        JOIN ph_inv_damage d ON d.id = l.damage_id AND d.tenant_id = l.tenant_id
+        WHERE l.damage_id = #{id} AND l.tenant_id = #{scope.tenantId} AND d.store_id = #{scope.storeId}
+          AND l.deleted = b'0' AND d.deleted = b'0'
+        ORDER BY l.batch_id, l.location_id, l.id
+    </select>
+    <update id="updateStatus">
+        UPDATE ph_inv_damage
+        SET status = #{to}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = #{from}
+    </update>
+    <update id="approve">
+        UPDATE ph_inv_damage
+        SET status = 2, audit_by = #{operator}, audit_at = CURRENT_TIMESTAMP,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 1
+    </update>
+    <update id="reject">
+        UPDATE ph_inv_damage
+        SET status = 4, audit_by = #{operator}, audit_at = CURRENT_TIMESTAMP,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 1
+    </update>
+    <update id="review">
+        UPDATE ph_inv_damage
+        SET review_by = #{operator}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 2 AND review_by IS NULL
+    </update>
+    <update id="updateStock">
+        UPDATE ph_inv_location_stock
+        SET qty = qty - #{qty}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </update>
+    <update id="updateBatch">
+        UPDATE ph_inv_batch
+        SET qty_total = qty_total - #{qty}, qty_avail = qty_avail - #{qty}, version = version + 1,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0'
+    </update>
+    <insert id="insertFlow">
+        INSERT INTO ph_inv_flow
+            (tenant_id, store_id, batch_id, drug_id, batch_no, flow_type, in_qty, out_qty,
+             balance_qty, biz_type, biz_no, flow_time, operator, creator, updater, location_id,
+             biz_line_id, frozen_delta, unit_cost)
+        VALUES (#{scope.tenantId}, #{scope.storeId}, #{line.batchId}, #{line.drugId}, #{line.batchNo}, 50,
+                0, #{line.qty}, #{balance}, 5, #{line.damageNo}, #{flowTime}, #{operator}, #{operator}, #{operator},
+                #{line.locationId}, #{line.id}, 0, #{line.costPrice})
+    </insert>
+    <update id="execute">
+        UPDATE ph_inv_damage
+        SET status = 3, execute_by = #{operator}, execute_at = CURRENT_TIMESTAMP,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 2
+    </update>
+    <update id="cancelDraft">
+        UPDATE ph_inv_damage
+        SET status = 4, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 0
+    </update>
+</mapper>

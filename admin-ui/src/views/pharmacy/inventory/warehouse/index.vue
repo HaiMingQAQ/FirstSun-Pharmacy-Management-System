@@ -85,7 +85,8 @@
             canUpdate ||
             canLedger ||
             canHealth ||
-            canStocktake
+            canStocktake ||
+            canDamage
           "
           label="操作"
           width="300"
@@ -100,6 +101,9 @@
             >
             <el-button v-if="canStocktake" link type="primary" @click="stocktake?.open(row)"
               >盘点</el-button
+            >
+            <el-button v-if="canDamage" link type="primary" @click="damage?.open(row)"
+              >报损</el-button
             >
             <el-button v-if="canUpdate" link type="primary" @click="editForm?.open(row)"
               >编辑</el-button
@@ -142,6 +146,7 @@
     <LocationList ref="locationList" />
     <InventoryHealth ref="health" />
     <InventoryStocktake ref="stocktake" />
+    <InventoryDamage ref="damage" />
   </div>
 </template>
 
@@ -157,6 +162,7 @@ import LocationCreateForm from './LocationCreateForm.vue'
 import LocationList from './LocationList.vue'
 import InventoryHealth from './InventoryHealth.vue'
 import InventoryStocktake from './InventoryStocktake.vue'
+import InventoryDamage from './InventoryDamage.vue'
 import {
   getWarehousePage,
   type WarehouseQuery,
@@ -192,6 +198,10 @@ const canStocktake = computed(() =>
   checkPermi(['pharmacy:inventory-stocktake:query', 'pharmacy:inventory-stocktake:create'])
 )
 const stocktake = ref<InstanceType<typeof InventoryStocktake>>()
+const canDamage = computed(() =>
+  checkPermi(['pharmacy:inventory-damage:query', 'pharmacy:inventory-damage:create'])
+)
+const damage = ref<InstanceType<typeof InventoryDamage>>()
 
 const getList = async () => {
   if (loading.value || !canQuery.value) return
