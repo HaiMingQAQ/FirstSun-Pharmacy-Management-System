@@ -52,11 +52,11 @@
 
       <!-- 菜单 -->
       <view class="menu">
-        <view class="menu__item" @tap="notImplemented('我的订单')">
+        <view class="menu__item" @tap="goPage('/pages/pharmacy/order')">
           <text class="menu__label">我的订单</text>
           <text class="menu__arrow">›</text>
         </view>
-        <view class="menu__item" @tap="notImplemented('收货地址')">
+        <view class="menu__item" @tap="goPage('/pages/pharmacy/address')">
           <text class="menu__label">收货地址</text>
           <text class="menu__arrow">›</text>
         </view>
@@ -133,10 +133,9 @@
     });
   };
 
-  const notImplemented = (name) => {
-    uni.showToast({
-      title: `${name}将在后续步骤提供`,
-      icon: 'none',
+  const goPage = (url) => {
+    uni.navigateTo({
+      url,
     });
   };
 

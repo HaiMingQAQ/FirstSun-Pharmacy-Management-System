@@ -80,6 +80,43 @@
 			}
 		},
 		{
+			"path": "pages/pharmacy/order",
+			"style": {
+				"navigationBarTitleText": "我的订单",
+				"enablePullDownRefresh": true
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "我的订单",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/order-detail",
+			"style": {
+				"navigationBarTitleText": "订单详情"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "订单详情",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/address",
+			"style": {
+				"navigationBarTitleText": "收货地址"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "收货地址",
+				"group": "药店"
+			}
+		},
+		{
 			"path": "pages/index/index",
 			"aliasPath": "/",
 			"style": {

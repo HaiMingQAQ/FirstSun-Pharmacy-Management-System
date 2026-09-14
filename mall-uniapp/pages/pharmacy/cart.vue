@@ -178,15 +178,28 @@
   };
 
   const submitDeliveryOrder = async (storeId) => {
-    const { code, data } = await AddressApi.getDefaultAddress();
-    if (code !== 0 || !data) {
+    const { code, data } = await AddressApi.getAddressList();
+    if (code !== 0 || !data || data.length === 0) {
       uni.showToast({
-        title: '请先在会员中心添加默认收货地址',
+        title: '请先在会员中心添加收货地址',
         icon: 'none',
       });
       return;
     }
-    await submitOrder(storeId, 1, data.id);
+    // 只有一个地址时直接使用，多个地址由用户选择
+    if (data.length === 1) {
+      await submitOrder(storeId, 1, data[0].id);
+      return;
+    }
+    uni.showActionSheet({
+      itemList: data.slice(0, 6).map((item) => `${item.name} ${item.mobile}`),
+      success: async (res) => {
+        const picked = data[res.tapIndex];
+        if (picked) {
+          await submitOrder(storeId, 1, picked.id);
+        }
+      },
+    });
   };
 
   const goLogin = () => {
