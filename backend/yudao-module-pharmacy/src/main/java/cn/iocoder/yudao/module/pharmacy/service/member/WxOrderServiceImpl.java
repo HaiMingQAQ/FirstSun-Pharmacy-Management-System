@@ -2,17 +2,26 @@ package cn.iocoder.yudao.module.pharmacy.service.member;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
+import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
+import cn.iocoder.yudao.module.pharmacy.api.payment.dto.PayOrderDTO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.order.WxOrderPageReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.order.WxOrderSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderDO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.member.WxOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.enums.WxOrderStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -33,6 +42,18 @@ public class WxOrderServiceImpl implements WxOrderService {
     @Resource
     private WxOrderMapper wxOrderMapper;
 
+    /** C 的库存门面：选批/扣减/回补（C 未实现时抛 UnsupportedOperationException） */
+    @Resource
+    private InventoryFacade inventoryFacade;
+
+    /** E 的支付门面：创建支付单/查询状态（E 未实现时抛 UnsupportedOperationException） */
+    @Resource
+    private PaymentFacade paymentFacade;
+
+    /** 订单明细服务：查询订单下的药品与数量，用于构建扣减/回补项 */
+    @Resource
+    private WxOrderLineService wxOrderLineService;
+
     @Override
     public Long createWxOrder(WxOrderSaveReqVO createReqVO) {
         // 校验订单号唯一
@@ -42,6 +63,15 @@ public class WxOrderServiceImpl implements WxOrderService {
         // 写入
         WxOrderDO wxOrder = BeanUtils.toBean(createReqVO, WxOrderDO.class);
         wxOrderMapper.insert(wxOrder);
+        // 对接 E：待支付订单创建渠道支付单（金额元→分，业务单号=订单号）。
+        // E 支付服务未实现时降级为不创建支付单，不阻塞下单流程。
+        if (Objects.equals(wxOrder.getPayStatus(), 0)) {
+            String payNo = createChannelPayOrder(wxOrder);
+            if (payNo != null) {
+                wxOrder.setPayNo(payNo);
+                wxOrderMapper.updateById(wxOrder);
+            }
+        }
         return wxOrder.getId();
     }
 
@@ -125,6 +155,9 @@ public class WxOrderServiceImpl implements WxOrderService {
         if (!Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.WAIT_PAY.getStatus())) {
             throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
         }
+        // 对接 C：支付成功即扣减库存（锁定），核销时不重复扣库。
+        // 选批由 C 内部按效期最早优先完成，DeductItem 仅传药品与数量。
+        deductStock(wxOrder);
         // 条件更新，防止并发重复支付
         WxOrderDO updateObj = new WxOrderDO();
         updateObj.setPayStatus(PAY_STATUS_PAID);
@@ -167,11 +200,10 @@ public class WxOrderServiceImpl implements WxOrderService {
             // 并发下已被其他请求取消，视为幂等成功
             return;
         }
-        // 已支付（待拣货）的订单此前可能已扣库存，取消需回补库存（调用 C 的库存服务）。
+        // 已支付（待拣货）的订单此前已扣库存，取消需回补库存（调用 C 的库存服务）。
         // 通过状态幂等保证不重复释放：只有本次成功从「待拣货」翻转为「取消」时才释放。
-        // TODO 待 C 提供库存回补接口后接入，例如 inventoryApi.releaseStock(orderNo)
         if (Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.WAIT_PICK.getStatus())) {
-            releaseStockIfNeeded(wxOrder);
+            returnBackStock(wxOrder);
         }
     }
 
@@ -232,6 +264,9 @@ public class WxOrderServiceImpl implements WxOrderService {
             // 并发下已被其他请求核销，视为幂等成功
             return;
         }
+        // 对接 D：核销即自提完成，触发线上订单转销售。
+        // 扣库已在支付时由 C 完成，转销售不重复扣库（约定：不能在支付与核销各扣一次）。
+        transferToSale(wxOrder);
     }
 
     @Override
@@ -262,12 +297,107 @@ public class WxOrderServiceImpl implements WxOrderService {
     }
 
     /**
-     * 取消已支付订单时释放库存。
+     * 对接 C：支付成功时扣减库存。
      *
-     * 当前 C 的库存回补接口尚未建立，仅预留调用点；通过取消幂等保证不重复释放。
+     * 从订单明细构建扣减项（仅药品+数量，批次由 C 内部按效期最早优先选批）。
+     * C 库存服务未实现时抛 {@link UnsupportedOperationException}，转换为
+     * {@link ErrorCodeConstants#INV_SERVICE_UNAVAILABLE}，使支付事务整体回滚，不静默放行。
      */
-    private void releaseStockIfNeeded(WxOrderDO wxOrder) {
-        // TODO 待 C 提供库存服务后接入：inventoryApi.releaseStock(wxOrder.getOrderNo())
+    private void deductStock(WxOrderDO wxOrder) {
+        List<WxOrderLineDO> lines = wxOrderLineService.getWxOrderLineListByWxOrderId(wxOrder.getId());
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        List<DeductItem> items = new ArrayList<>(lines.size());
+        for (WxOrderLineDO line : lines) {
+            DeductItem item = new DeductItem();
+            item.setDrugId(line.getDrugId());
+            item.setQty(line.getQty());
+            // batchId / locationId 由 C 选批后回填，扣减契约仅传药品+数量
+            items.add(item);
+        }
+        try {
+            inventoryFacade.deduct(wxOrder.getStoreId(), items);
+        } catch (UnsupportedOperationException ex) {
+            throw exception(INV_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * 对接 C：取消已支付订单时回补库存（原批次退回）。
+     *
+     * 仅当订单明细已回填批次（拣货后）时才可精确回补；否则按契约由 C 处理。
+     * 通过取消幂等保证不重复释放库存。
+     */
+    private void returnBackStock(WxOrderDO wxOrder) {
+        List<WxOrderLineDO> lines = wxOrderLineService.getWxOrderLineListByWxOrderId(wxOrder.getId());
+        if (lines == null || lines.isEmpty()) {
+            return;
+        }
+        List<ReturnBackItem> items = new ArrayList<>(lines.size());
+        for (WxOrderLineDO line : lines) {
+            ReturnBackItem item = new ReturnBackItem();
+            item.setDrugId(line.getDrugId());
+            item.setQty(line.getQty());
+            item.setBatchId(line.getBatchId());
+            item.setLocationId(line.getLocationId());
+            items.add(item);
+        }
+        try {
+            inventoryFacade.returnBack(wxOrder.getStoreId(), items);
+        } catch (UnsupportedOperationException ex) {
+            throw exception(INV_SERVICE_UNAVAILABLE);
+        }
+    }
+
+    /**
+     * 金额转换：元 → 分（药店订单金额为 DECIMAL 元，支付接口为整数分）。
+     */
+    private Integer yuanToFen(BigDecimal yuan) {
+        if (yuan == null) {
+            return 0;
+        }
+        return yuan.multiply(BigDecimal.valueOf(100)).setScale(0, RoundingMode.HALF_UP).intValue();
+    }
+
+    /**
+     * 金额转换：分 → 元。
+     */
+    private BigDecimal fenToYuan(Integer fen) {
+        if (fen == null) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(fen).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 对接 E：创建渠道支付单。
+     *
+     * 业务单号用订单号（orderNo），金额用应付金额元转分。
+     * E 支付服务未实现时降级返回 null（不阻塞下单），支付回调时仍可走 payWxOrder 手工标记。
+     */
+    private String createChannelPayOrder(WxOrderDO wxOrder) {
+        PayOrderDTO req = new PayOrderDTO();
+        req.setBizNo(wxOrder.getOrderNo());
+        req.setPriceFen(yuanToFen(wxOrder.getPayableAmount()));
+        req.setMemberId(wxOrder.getMemberId());
+        req.setSubject("药店线上订单");
+        try {
+            return paymentFacade.createPayOrder(req);
+        } catch (UnsupportedOperationException ex) {
+            // E 支付服务未就绪，降级：不创建支付单，后续支付回调仍可手工标记已支付
+            return null;
+        }
+    }
+
+    /**
+     * 对接 D：线上订单转销售（核销即自提完成时触发）。
+     *
+     * 约定：扣库已在支付时由 C 完成，转销售不得重复扣库；失败需补偿。
+     * D 尚未提供跨模块转销售接口，先预留调用点，待 D 提供后接入。
+     */
+    private void transferToSale(WxOrderDO wxOrder) {
+        // TODO 待 D 提供线上订单转销售接口后接入，例如 saleFacade.createFromWxOrder(orderNo)
     }
 
 }
