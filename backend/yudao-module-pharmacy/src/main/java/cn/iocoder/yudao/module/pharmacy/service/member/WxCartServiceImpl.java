@@ -38,6 +38,8 @@ public class WxCartServiceImpl implements WxCartService {
     public Long createWxCart(WxCartSaveReqVO createReqVO) {
         // 校验同门店同药品不重复
         validateCartUnique(createReqVO.getMemberId(), createReqVO.getDrugId(), createReqVO.getStoreId(), null);
+        // 清理历史残留行，避免唯一键冲突
+        wxCartMapper.deleteByKeyPhysical(createReqVO.getMemberId(), createReqVO.getStoreId(), createReqVO.getDrugId());
         // 写入
         WxCartDO wxCart = BeanUtils.toBean(createReqVO, WxCartDO.class);
         wxCartMapper.insert(wxCart);
@@ -59,8 +61,8 @@ public class WxCartServiceImpl implements WxCartService {
     public void deleteWxCart(Long id) {
         // 校验存在
         validateWxCartExists(id);
-        // 删除
-        wxCartMapper.deleteById(id);
+        // 删除（购物车为临时数据，物理删除，避免唯一键残留冲突）
+        wxCartMapper.deleteByIdPhysical(id);
     }
 
     @Override
@@ -103,6 +105,8 @@ public class WxCartServiceImpl implements WxCartService {
             wxCartMapper.updateById(existing);
             return existing.getId();
         }
+        // 清理同一会员+门店+商品的历史残留行（含逻辑删除），避免唯一键 uk_member_drug 冲突
+        wxCartMapper.deleteByKeyPhysical(memberId, storeId, drugId);
         // 新建购物车记录
         WxCartDO wxCart = new WxCartDO();
         wxCart.setMemberId(memberId);
@@ -146,11 +150,8 @@ public class WxCartServiceImpl implements WxCartService {
 
     @Override
     public void clearCart(Long memberId) {
-        List<WxCartDO> list = wxCartMapper.selectListByMemberId(memberId);
-        if (list.isEmpty()) {
-            return;
-        }
-        wxCartMapper.deleteBatchIds(list.stream().map(WxCartDO::getId).collect(java.util.stream.Collectors.toList()));
+        // 物理清空，避免唯一键 uk_member_drug 残留冲突
+        wxCartMapper.deleteByMemberIdPhysical(memberId);
     }
 
     @Override
