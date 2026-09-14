@@ -9,7 +9,9 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-# mode=docker 读取 .env.docker（VITE_BASE_URL=http://localhost:48080）
+ARG VITE_BASE_URL=http://localhost:48080
+ENV VITE_BASE_URL=$VITE_BASE_URL
+# mode=docker 读取 .env.docker；ENV 优先级高于 .env 文件，可由 compose args 覆盖后端地址
 RUN pnpm exec vite build --mode docker
 
 FROM nginx:1.27-alpine

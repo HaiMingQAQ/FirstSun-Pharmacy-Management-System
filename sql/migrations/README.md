@@ -27,6 +27,8 @@
 | 17 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
 | 18 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
 | 19 | `20260914_l_pharmacy_demo_data.sql` | 为 FirstSun 租户写入覆盖基础资料、采购、库存、POS 与会员页面的关联演示数据 |
+| 20 | `20260914_m_pharmacy_rx_pay_menu.sql` | E 模块处方登记/审核/台账、支付单/退款单查询菜单与按钮权限 |
+| 21 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
 
 ## 统一执行方法
 
@@ -53,7 +55,9 @@ $scripts = @(
   "20260911_f_pharmacy_member_menu.sql",
   "20260910_i_firstsun_shared_account.sql",
   "20260911_j_pos_menu_path_fix.sql",
-  "20260914_l_pharmacy_demo_data.sql"
+  "20260914_l_pharmacy_demo_data.sql",
+  "20260914_m_pharmacy_rx_pay_menu.sql",
+  "20260914_n_pay_app_init.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
