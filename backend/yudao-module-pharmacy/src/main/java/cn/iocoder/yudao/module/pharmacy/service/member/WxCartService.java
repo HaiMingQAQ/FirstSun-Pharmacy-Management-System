@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.cart.WxCartPa
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.cart.WxCartSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxCartDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 /**

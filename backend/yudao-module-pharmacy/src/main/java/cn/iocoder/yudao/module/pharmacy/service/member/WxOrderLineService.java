@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.orderline.WxO
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.orderline.WxOrderLineSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderLineDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 

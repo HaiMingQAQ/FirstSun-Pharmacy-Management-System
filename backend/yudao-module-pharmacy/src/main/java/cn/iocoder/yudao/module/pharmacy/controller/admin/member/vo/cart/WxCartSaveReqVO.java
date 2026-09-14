@@ -3,8 +3,8 @@ package cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.cart;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
 @Schema(description = "管理后台 - 小程序购物车创建/修改 Request VO")

@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.address.Membe
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.address.MemberAddressSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.MemberAddressDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 
