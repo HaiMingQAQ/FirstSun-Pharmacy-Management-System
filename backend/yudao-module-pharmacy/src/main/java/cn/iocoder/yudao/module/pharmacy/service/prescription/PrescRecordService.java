@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.pharmacy.service.prescription;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordPageReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordReviewReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.prescription.PhPrescRecordDO;
@@ -34,15 +35,15 @@ public interface PrescRecordService {
     void invalidatePrescRecord(Long id);
 
     /**
-     * 获得处方分页（台账）
+     * 获得处方分页（台账，含门店/审方药师关联名称）
      */
-    PageResult<PhPrescRecordDO> getPrescRecordPage(PrescRecordPageReqVO pageReqVO);
+    PageResult<PrescRecordRespVO> getPrescRecordPage(PrescRecordPageReqVO pageReqVO);
 
     /**
-     * 获得处方详情
+     * 获得处方详情（含门店/审方药师关联名称）
      *
      * @param id 处方编号
      * @return 处方记录
      */
-    PhPrescRecordDO getPrescRecord(Long id);
+    PrescRecordRespVO getPrescRecord(Long id);
 }

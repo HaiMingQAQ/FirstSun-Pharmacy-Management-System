@@ -30,7 +30,9 @@
           </el-col>
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="门店" prop="storeId">
-              <el-input-number v-model="formData.storeId" :min="1" :controls="false" class="!w-full" placeholder="门店编号" />
+              <el-select v-model="formData.storeId" placeholder="请选择门店" class="!w-full" filterable>
+                <el-option v-for="s in storeOptions" :key="s.id" :label="`${s.storeName}(${s.storeCode})`" :value="s.id" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12" :md="8">
@@ -91,9 +93,11 @@
         <!-- 药品明细 -->
         <el-divider content-position="left">药品明细</el-divider>
         <el-table :data="formData.items" border>
-          <el-table-column label="药品ID" width="120">
+          <el-table-column label="药品" min-width="200">
             <template #default="{ row }">
-              <el-input-number v-model="row.drugId" :min="1" :controls="false" class="!w-full" placeholder="药品ID" />
+              <el-select v-model="row.drugId" placeholder="从药品档案选择" class="!w-full" filterable @change="(id: number) => onDrugChange(row, id)">
+                <el-option v-for="d in drugOptions" :key="d.id" :label="d.genericName + (d.tradeName ? '(' + d.tradeName + ')' : '')" :value="d.id" />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="药品名称快照" min-width="140">
@@ -159,6 +163,8 @@
 
 <script lang="ts" setup>
 import { PrescRecordApi } from '@/api/pharmacy/prescription/prescRecord'
+import { getSimpleStoreList } from '@/api/pharmacy/base/store'
+import { getSimpleDrugList } from '@/api/pharmacy/base/drug'
 import { UploadImg, UploadImgs } from '@/components/UploadFile'
 
 /** 处方登记（E 维护） */
@@ -174,6 +180,22 @@ const SOURCE_OPTIONS = [
   { value: 1, label: '电子处方平台' },
   { value: 2, label: '复诊续方' }
 ]
+
+// 门店与药品档案选项（保证处方数据与基础档案关联）
+const storeOptions = ref<{ id: number; storeCode: string; storeName: string }[]>([])
+const drugOptions = ref<any[]>([])
+const loadBaseOptions = async () => {
+  storeOptions.value = await getSimpleStoreList()
+  drugOptions.value = await getSimpleDrugList()
+}
+// 选择药品后自动带出名称/规格快照（后端亦兜底）
+const onDrugChange = (row: PrescItemRow, id: number) => {
+  const drug = drugOptions.value.find((d) => d.id === id)
+  if (drug) {
+    row.drugName = drug.genericName + (drug.tradeName ? '(' + drug.tradeName + ')' : '')
+    row.specification = drug.specification
+  }
+}
 
 interface PrescItemRow {
   drugId?: number
@@ -245,8 +267,9 @@ const submitForm = async () => {
   }
 }
 
-// 默认添加一行药品
+// 默认添加一行药品，并加载门店/药品档案
 onMounted(() => {
   addItem()
+  loadBaseOptions()
 })
 </script>
