@@ -96,7 +96,7 @@
       </el-table-column>
       <el-table-column label="下单时间" align="center" prop="createTime" width="170">
         <template #default="scope">
-          {{ formatDateTime(scope.row.createTime) }}
+          {{ formatDate(scope.row.createTime) }}
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="220" fixed="right">
@@ -144,7 +144,7 @@
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
-import { formatDateTime } from '@/utils/formatTime'
+import { formatDate } from '@/utils/formatTime'
 import * as OrderApi from '@/api/pharmacy/member/order'
 import OrderDetail from './OrderDetail.vue'
 

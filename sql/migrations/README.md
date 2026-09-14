@@ -20,10 +20,13 @@
 | 10 | `20260908_d_pos_menu_bind_role.sql` | 将 POS 菜单绑定至超级管理员角色 |
 | 11 | `20260909_d_pos_tables_fix.sql` | POS 销售与退货明细表兼容性修正 |
 | 12 | `fix_pos_menu_name.sql` | 修正 POS 菜单中文名称 |
-| 13 | `20260914_k_pharmacy_inventory_menu.sql` | C 模块库存管理菜单与全部库存按钮权限 |
-| 14 | `20260911_f_pharmacy_member_menu.sql` | F 模块会员管理菜单、按钮权限与字典 |
-| 15 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
-| 16 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
+| 13 | `20260912_b_purchase_supplier_menu.sql` | B 模块采购管理、供应商与供应商证照菜单及字典 |
+| 14 | `20260913_b_purchase_order_receipt_menu.sql` | B 模块采购订单、采购收货菜单及字典 |
+| 15 | `20260914_k_pharmacy_inventory_menu.sql` | C 模块库存管理菜单与全部库存按钮权限 |
+| 16 | `20260911_f_pharmacy_member_menu.sql` | F 模块会员管理菜单、按钮权限与字典 |
+| 17 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
+| 18 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
+| 19 | `20260914_l_pharmacy_demo_data.sql` | 为 FirstSun 租户写入覆盖基础资料、采购、库存、POS 与会员页面的关联演示数据 |
 
 ## 统一执行方法
 
@@ -44,10 +47,13 @@ $scripts = @(
   "20260908_d_pos_menu_bind_role.sql",
   "20260909_d_pos_tables_fix.sql",
   "fix_pos_menu_name.sql",
+  "20260912_b_purchase_supplier_menu.sql",
+  "20260913_b_purchase_order_receipt_menu.sql",
   "20260914_k_pharmacy_inventory_menu.sql",
   "20260911_f_pharmacy_member_menu.sql",
   "20260910_i_firstsun_shared_account.sql",
-  "20260911_j_pos_menu_path_fix.sql"
+  "20260911_j_pos_menu_path_fix.sql",
+  "20260914_l_pharmacy_demo_data.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
