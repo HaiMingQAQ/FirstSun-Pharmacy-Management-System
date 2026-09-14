@@ -57,4 +57,35 @@ public interface MemberUserService {
      */
     MemberUserDO getMemberUserByMobile(String mobile);
 
+    // ========== 小程序端（app）相关 ==========
+
+    /**
+     * 校验原始密码与加密密码是否匹配
+     *
+     * @param rawPassword     原始密码
+     * @param encodedPassword 加密后的密码
+     */
+    boolean isPasswordMatch(String rawPassword, String encodedPassword);
+
+    /**
+     * 更新会员最后登录信息（登录 IP + 登录时间）
+     */
+    void updateMemberUserLogin(Long id, String loginIp);
+
+    /**
+     * 获取手机号对应的会员，不存在则自动注册（小程序首次登录）
+     *
+     * @param mobile 手机号
+     * @param ip     注册 IP
+     * @return 会员信息
+     */
+    MemberUserDO createMemberUserIfAbsent(String mobile, String ip);
+
+    /**
+     * 更新会员个人资料（小程序个人中心）
+     *
+     * 仅允许修改昵称、头像、性别，不允许修改手机号、积分、等级等敏感字段。
+     */
+    void updateMemberUserProfile(Long id, String nickname, String avatar, Integer sex);
+
 }
