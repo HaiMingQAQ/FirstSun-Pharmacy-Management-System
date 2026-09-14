@@ -181,4 +181,28 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_RECEIPT_RECEIVER_NOT_EMPLOYEE = new ErrorCode(1_031_004_012, "当前登录用户未绑定药店员工，无法收货");
     ErrorCode PURCHASE_RECEIPT_LOCATION_REQUIRED = new ErrorCode(1_031_004_013, "入账前必须填写入库货位");
 
+
+    // ========== 处方记录 1-032-001-000（E 维护）==========
+    ErrorCode PRESC_NOT_EXISTS = new ErrorCode(1_032_001_000, "处方记录不存在");
+    ErrorCode PRESC_NO_DUPLICATE = new ErrorCode(1_032_001_001, "处方号已存在");
+    ErrorCode PRESC_PATIENT_REQUIRED = new ErrorCode(1_032_001_002, "患者姓名不能为空");
+    ErrorCode PRESC_ITEMS_REQUIRED = new ErrorCode(1_032_001_003, "处方药品明细不能为空");
+    ErrorCode PRESC_STATUS_INVALID = new ErrorCode(1_032_001_004, "处方状态不允许该操作");
+    ErrorCode PRESC_SOURCE_INVALID = new ErrorCode(1_032_001_005, "处方来源非法：只能为 0(纸质拍照)/1(电子处方平台)/2(复诊续方)");
+    ErrorCode PRESC_IMAGES_EXCEED = new ErrorCode(1_032_001_006, "处方影像最多上传 5 张");
+
+    // ========== 审方 1-032-002-000（E 维护）==========
+    ErrorCode PRESC_REVIEW_ALREADY = new ErrorCode(1_032_002_000, "处方已审核，不能重复审核");
+    ErrorCode PRESC_REVIEW_STATUS_INVALID = new ErrorCode(1_032_002_001, "审核结果非法：只能为 1(通过) 或 2(驳回)");
+    ErrorCode PRESC_REVIEW_OPINION_REQUIRED = new ErrorCode(1_032_002_002, "驳回处方必须填写审方意见");
+    ErrorCode PRESC_REVIEW_AUDITOR_NOT_EMPLOYEE = new ErrorCode(1_032_002_003, "当前登录用户未绑定药店员工，无法审方");
+    ErrorCode PRESC_REVIEW_DBL_REQUIRED = new ErrorCode(1_032_002_004, "特管处方必须选择双人复核人");
+    ErrorCode PRESC_REVIEW_LIMIT_OPINION_REQUIRED = new ErrorCode(1_032_002_005, "超量处方必须填写超量复核意见");
+
+    // ========== 统一支付适配 1-033-001-000（E 维护）==========
+    ErrorCode PAY_APP_NOT_FOUND = new ErrorCode(1_033_001_000, "支付应用未配置，无法发起支付");
+    ErrorCode PAY_ORDER_CREATE_FAIL = new ErrorCode(1_033_001_001, "支付单创建失败");
+    ErrorCode PAY_REFUND_CREATE_FAIL = new ErrorCode(1_033_001_002, "退款单创建失败");
+    ErrorCode PAY_STATUS_UNKNOWN = new ErrorCode(1_033_001_003, "支付单状态未知");
+
 }
