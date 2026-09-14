@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper">
+    <sql id="scopeHeader">
+        FROM ph_inv_stocktake t
+        WHERE t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId} AND t.deleted = b'0'
+        <if test="q.warehouseId != null">AND t.warehouse_id = #{q.warehouseId}</if>
+        <if test="q.status != null">AND t.status = #{q.status}</if>
+    </sql>
+    <select id="count" resultType="long">SELECT COUNT(*) <include refid="scopeHeader"/></select>
+    <select id="selectPage" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryStocktakeVO$Summary">
+        SELECT t.id, t.stocktake_no, t.warehouse_id, t.stocktake_type, t.blind_flag, t.freeze_flag,
+               t.total_item, t.done_item, t.status, t.initiator_id, t.audit_by, t.audit_at,
+               t.adjusted_at, t.create_time
+        <include refid="scopeHeader"/>
+        ORDER BY t.id DESC LIMIT #{q.pageSize} OFFSET #{q.offset}
+    </select>
+    <select id="selectSummary" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryStocktakeVO$Summary">
+        SELECT t.id, t.stocktake_no, t.warehouse_id, t.stocktake_type, t.blind_flag, t.freeze_flag,
+               t.total_item, t.done_item, t.status, t.initiator_id, t.audit_by, t.audit_at,
+               t.adjusted_at, t.create_time
+        FROM ph_inv_stocktake t
+        WHERE t.id = #{id} AND t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId}
+          AND t.deleted = b'0'
+    </select>
+    <select id="selectLines" resultType="cn.iocoder.yudao.module.pharmacy.controller.admin.inventory.vo.InventoryStocktakeVO$Line">
+        SELECT l.id, l.stocktake_id, l.batch_id, l.location_id, l.drug_id, b.batch_no,
+               l.book_qty, l.real_qty, l.diff_qty, l.diff_flag, l.scanned_flag
+        FROM ph_inv_stocktake_line l
+        JOIN ph_inv_stocktake t ON t.id = l.stocktake_id AND t.tenant_id = l.tenant_id
+        JOIN ph_inv_batch b ON b.id = l.batch_id AND b.tenant_id = l.tenant_id
+        WHERE l.stocktake_id = #{id} AND l.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId}
+          AND l.deleted = b'0' AND t.deleted = b'0'
+        ORDER BY l.id
+    </select>
+    <select id="lockHeader" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$Header">
+        SELECT id, stocktake_no, warehouse_id, status, blind_flag, freeze_flag, store_id
+        FROM ph_inv_stocktake
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' FOR UPDATE
+    </select>
+    <select id="countLines" resultType="int">
+        SELECT COUNT(*) FROM ph_inv_stocktake_line
+        WHERE stocktake_id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </select>
+    <select id="countUnrecorded" resultType="int">
+        SELECT COUNT(*) FROM ph_inv_stocktake_line
+        WHERE stocktake_id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0' AND real_qty IS NULL
+    </select>
+    <insert id="insertHeader" useGeneratedKeys="true" keyProperty="key.id" keyColumn="id">
+        INSERT INTO ph_inv_stocktake
+            (tenant_id, store_id, stocktake_no, warehouse_id, stocktake_type, blind_flag, freeze_flag,
+             scope, total_item, done_item, status, initiator_id, creator, updater)
+        VALUES (#{scope.tenantId}, #{scope.storeId}, #{stocktakeNo}, #{q.warehouseId}, #{q.stocktakeType},
+                #{q.blindFlag}, #{q.freezeFlag}, #{q.scope}, 0, 0, 0, #{operator}, #{operator}, #{operator})
+    </insert>
+    <insert id="insertSnapshotLines">
+        INSERT INTO ph_inv_stocktake_line
+            (tenant_id, stocktake_id, batch_id, drug_id, book_qty, real_qty, diff_qty, diff_flag,
+             scanned_flag, creator, updater, location_id)
+        SELECT s.tenant_id, #{stocktakeId}, s.batch_id, s.drug_id, s.qty, NULL, 0, 0, 0,
+               #{operator}, #{operator}, s.location_id
+        FROM ph_inv_location_stock s
+        JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id AND b.drug_id = s.drug_id
+        JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id
+                           AND l.warehouse_id = b.warehouse_id
+        WHERE s.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+          AND b.warehouse_id = #{warehouseId} AND s.deleted = b'0' AND b.deleted = b'0'
+          AND l.deleted = b'0'
+    </insert>
+    <update id="updateTotalItem">
+        UPDATE ph_inv_stocktake t
+        SET total_item = (SELECT COUNT(*) FROM ph_inv_stocktake_line l
+                          WHERE l.stocktake_id = t.id AND l.tenant_id = t.tenant_id AND l.deleted = b'0'),
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE t.id = #{id} AND t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId}
+          AND t.deleted = b'0'
+    </update>
+    <update id="updateStatus">
+        UPDATE ph_inv_stocktake
+        SET status = #{to}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = #{from}
+    </update>
+    <update id="updateRecord">
+        UPDATE ph_inv_stocktake_line
+        SET real_qty = #{realQty}, diff_qty = #{diffQty}, diff_flag = #{diffFlag}, scanned_flag = 1,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{lineId} AND stocktake_id = #{stocktakeId} AND tenant_id = #{scope.tenantId}
+          AND deleted = b'0'
+    </update>
+    <update id="updateDoneItem">
+        UPDATE ph_inv_stocktake t
+        SET done_item = #{done},
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE t.id = #{id} AND t.tenant_id = #{scope.tenantId} AND t.store_id = #{scope.storeId}
+          AND t.deleted = b'0'
+    </update>
+    <select id="countRecorded" resultType="int">
+        SELECT COUNT(*) FROM ph_inv_stocktake_line
+        WHERE stocktake_id = #{id} AND tenant_id = #{scope.tenantId}
+          AND deleted = b'0' AND real_qty IS NOT NULL
+    </select>
+    <select id="selectAdjustmentLines" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$AdjustmentLine">
+        SELECT l.id, l.stocktake_id, l.batch_id, l.location_id, l.drug_id, b.batch_no,
+               l.book_qty, l.real_qty, l.diff_qty, l.diff_flag, b.expiry_date,
+               b.cost_price, b.warehouse_id
+        FROM ph_inv_stocktake_line l
+        JOIN ph_inv_stocktake t ON t.id = l.stocktake_id AND t.tenant_id = l.tenant_id
+        JOIN ph_inv_batch b ON b.id = l.batch_id AND b.tenant_id = l.tenant_id
+                           AND b.store_id = t.store_id
+        WHERE l.stocktake_id = #{id} AND l.tenant_id = #{scope.tenantId}
+          AND t.store_id = #{scope.storeId} AND l.deleted = b'0' AND t.deleted = b'0'
+        ORDER BY b.warehouse_id, l.batch_id, l.location_id, l.id
+    </select>
+    <select id="lockWarehouse" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$WarehouseLock">
+        SELECT id, status, store_id FROM ph_warehouse
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' FOR UPDATE
+    </select>
+    <select id="lockBatch" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$BatchLock">
+        SELECT id, warehouse_id, store_id, drug_id, qty_total, qty_avail, qty_frozen, version, cost_price
+        FROM ph_inv_batch
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' FOR UPDATE
+    </select>
+    <select id="lockStock" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$StockLock">
+        SELECT s.id, s.batch_id, s.location_id, s.drug_id, s.qty, s.qty_frozen
+        FROM ph_inv_location_stock s
+        JOIN ph_inv_batch b ON b.id = s.batch_id AND b.tenant_id = s.tenant_id
+        JOIN ph_location l ON l.id = s.location_id AND l.tenant_id = s.tenant_id
+                           AND l.warehouse_id = b.warehouse_id
+        WHERE s.batch_id = #{batchId} AND s.location_id = #{locationId}
+          AND s.tenant_id = #{scope.tenantId} AND b.store_id = #{scope.storeId}
+          AND s.deleted = b'0' AND b.deleted = b'0' AND l.deleted = b'0' FOR UPDATE
+    </select>
+    <select id="lockLocation" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryStocktakeMapper$LocationLock">
+        SELECT l.id, l.status, l.max_capacity, COALESCE(SUM(s.qty), 0) AS used_qty
+        FROM ph_location l
+        JOIN ph_warehouse w ON w.id = l.warehouse_id AND w.tenant_id = l.tenant_id
+        LEFT JOIN ph_inv_location_stock s ON s.location_id = l.id AND s.tenant_id = l.tenant_id
+                                          AND s.deleted = b'0'
+        WHERE l.id = #{id} AND l.warehouse_id = #{warehouseId}
+          AND l.tenant_id = #{scope.tenantId} AND w.store_id = #{scope.storeId}
+          AND l.deleted = b'0' AND w.deleted = b'0'
+        GROUP BY l.id, l.status, l.max_capacity
+        FOR UPDATE
+    </select>
+    <update id="updateBatch">
+        UPDATE ph_inv_batch
+        SET qty_total = qty_total + #{delta}, qty_avail = qty_avail + #{delta}, version = version + 1,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0'
+    </update>
+    <update id="updateStock">
+        UPDATE ph_inv_location_stock
+        SET qty = qty + #{delta}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0'
+    </update>
+    <insert id="insertStock">
+        INSERT INTO ph_inv_location_stock
+            (tenant_id, batch_id, location_id, drug_id, qty, qty_frozen, creator, updater)
+        VALUES (#{scope.tenantId}, #{line.batchId}, #{line.locationId}, #{line.drugId}, #{line.diffQty}, 0,
+                #{operator}, #{operator})
+    </insert>
+    <insert id="insertFlow">
+        INSERT INTO ph_inv_flow
+            (tenant_id, store_id, batch_id, drug_id, batch_no, flow_type, in_qty, out_qty,
+             balance_qty, biz_type, biz_no, flow_time, operator, creator, updater, location_id, biz_line_id,
+             frozen_delta, unit_cost)
+        SELECT #{scope.tenantId}, #{scope.storeId}, #{line.batchId}, #{line.drugId}, #{line.batchNo}, 40,
+               CASE WHEN #{line.diffQty} &gt; 0 THEN #{line.diffQty} ELSE 0 END,
+               CASE WHEN #{line.diffQty} &lt; 0 THEN -#{line.diffQty} ELSE 0 END,
+               #{balance}, 4, t.stocktake_no, #{flowTime}, #{operator}, #{operator}, #{operator},
+               #{line.locationId}, #{line.id}, 0, #{line.costPrice}
+        FROM ph_inv_stocktake t
+        WHERE t.id = #{line.stocktakeId} AND t.tenant_id = #{scope.tenantId}
+    </insert>
+    <update id="markAdjusted">
+        UPDATE ph_inv_stocktake
+        SET status = 3, audit_by = #{operator}, audit_at = CURRENT_TIMESTAMP,
+            adjusted_at = CURRENT_TIMESTAMP, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 2
+    </update>
+    <update id="cancelDraft">
+        UPDATE ph_inv_stocktake
+        SET deleted = b'1', updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId}
+          AND deleted = b'0' AND status = 0
+    </update>
+</mapper>
