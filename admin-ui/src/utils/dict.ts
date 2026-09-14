@@ -464,4 +464,13 @@ export enum DICT_TYPE {
   PHARMACY_WX_ORDER_STATUS = 'pharmacy_wx_order_status', // 小程序订单状态：0待支付/1待拣货/2拣货中/3待自提/4完成/-1取消
   PHARMACY_WX_ORDER_TYPE = 'pharmacy_wx_order_type', // 小程序订单类型：0到店自提/1同城配送
   PHARMACY_WX_PAY_STATUS = 'pharmacy_wx_pay_status' // 小程序支付状态：0待支付/1已支付/2已退款
+  // ========== Pharmacy - 采购域（B 成员维护） ==========
+  PHARMACY_SUPPLIER_APPROVE_STATUS = 'pharmacy_supplier_approve_status', // 供应商首营审核状态：0待审/1通过/2驳回
+  PHARMACY_LICENSE_TYPE = 'pharmacy_license_type', // 供应商证照类型：0经营许可证/1生产许可证/2GSP证/3营业执照/4其他
+  PHARMACY_LICENSE_STATUS = 'pharmacy_license_status', // 供应商证照状态：1有效/0过期
+  PHARMACY_PO_STATUS = 'pharmacy_po_status', // 采购订单状态：-1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成
+  PHARMACY_RECEIPT_STATUS = 'pharmacy_receipt_status', // 采购收货单状态：0待提交/1已提交/2已入账/3已作废
+  PHARMACY_RECEIPT_DIFF_TYPE = 'pharmacy_receipt_diff_type', // 收货差异标记：0无/1数量差异/2价格差异
+  PHARMACY_QUALITY_STATUS = 'pharmacy_quality_status', // 收货单质检结果：0未检/1合格/2有异常
+  PHARMACY_QUALITY_FLAG = 'pharmacy_quality_flag' // 收货明细质检标记：0待检/1通过/2异常拒收
 }
