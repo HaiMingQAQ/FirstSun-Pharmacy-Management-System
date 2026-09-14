@@ -23,21 +23,21 @@
         <el-descriptions-item label="会员ID">{{ orderData.memberId }}</el-descriptions-item>
         <el-descriptions-item label="门店ID">{{ orderData.storeId }}</el-descriptions-item>
         <el-descriptions-item label="下单时间">
-          {{ formatDateTime(orderData.createTime) }}
+          {{ formatDate(orderData.createTime) }}
         </el-descriptions-item>
         <el-descriptions-item label="支付单号">{{ orderData.payNo || '-' }}</el-descriptions-item>
         <el-descriptions-item label="支付时间">
-          {{ formatDateTime(orderData.paidAt) || '-' }}
+          {{ formatDate(orderData.paidAt) || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="完成时间">
-          {{ formatDateTime(orderData.finishAt) || '-' }}
+          {{ formatDate(orderData.finishAt) || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="核销人">{{ orderData.verifyBy || '-' }}</el-descriptions-item>
         <el-descriptions-item label="核销时间">
-          {{ formatDateTime(orderData.verifyAt) || '-' }}
+          {{ formatDate(orderData.verifyAt) || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="过期时间">
-          {{ formatDateTime(orderData.expireAt) || '-' }}
+          {{ formatDate(orderData.expireAt) || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="取货码">{{ orderData.pickupCode || '-' }}</el-descriptions-item>
       </el-descriptions>
@@ -96,7 +96,7 @@
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
-import { formatDateTime } from '@/utils/formatTime'
+import { formatDate } from '@/utils/formatTime'
 import * as OrderApi from '@/api/pharmacy/member/order'
 
 defineOptions({ name: 'PharmacyMemberOrderDetail' })

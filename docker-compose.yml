@@ -35,8 +35,13 @@ services:
       - ./sql/migrations/20260908_d_pos_menu_bind_role.sql:/docker-entrypoint-initdb.d/12-pos-menu-role.sql:ro
       - ./sql/migrations/20260909_d_pos_tables_fix.sql:/docker-entrypoint-initdb.d/13-pos-tables-fix.sql:ro
       - ./sql/migrations/fix_pos_menu_name.sql:/docker-entrypoint-initdb.d/14-pos-menu-name-fix.sql:ro
-      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/15-firstsun-shared-account.sql:ro
-      - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/16-pos-menu-path-fix.sql:ro
+      - ./sql/migrations/20260912_b_purchase_supplier_menu.sql:/docker-entrypoint-initdb.d/15-purchase-supplier-menu.sql:ro
+      - ./sql/migrations/20260913_b_purchase_order_receipt_menu.sql:/docker-entrypoint-initdb.d/16-purchase-order-receipt-menu.sql:ro
+      - ./sql/migrations/20260914_k_pharmacy_inventory_menu.sql:/docker-entrypoint-initdb.d/17-pharmacy-inventory-menu.sql:ro
+      - ./sql/migrations/20260911_f_pharmacy_member_menu.sql:/docker-entrypoint-initdb.d/18-pharmacy-member-menu.sql:ro
+      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/19-firstsun-shared-account.sql:ro
+      - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/20-pos-menu-path-fix.sql:ro
+      - ./sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/21-pharmacy-demo-data.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s

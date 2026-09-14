@@ -46,13 +46,13 @@
       </el-table-column>
       <el-table-column label="加购时间" align="center" prop="addTime" width="180">
         <template #default="scope">
-          {{ formatDateTime(scope.row.addTime) }}
+          {{ formatDate(scope.row.addTime) }}
         </template>
       </el-table-column>
       <el-table-column label="门店ID" align="center" prop="storeId" width="100" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          {{ formatDateTime(scope.row.createTime) }}
+          {{ formatDate(scope.row.createTime) }}
         </template>
       </el-table-column>
       <el-table-column label="操作" align="center" width="100" fixed="right">
@@ -79,7 +79,7 @@
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE } from '@/utils/dict'
-import { formatDateTime } from '@/utils/formatTime'
+import { formatDate } from '@/utils/formatTime'
 import * as CartApi from '@/api/pharmacy/member/cart'
 
 defineOptions({ name: 'PharmacyMemberCart' })
