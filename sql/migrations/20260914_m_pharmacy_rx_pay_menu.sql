@@ -5,7 +5,7 @@ SET NAMES utf8mb4;
 INSERT INTO `system_menu`
   (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
 VALUES
-  (61200, '处方支付管理', '', 1, 30, 0, 'pharmacy-rx', 'ep:first-aid-kit', NULL, NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
+  (61200, '处方支付管理', '', 1, 30, 0, '/pharmacy-rx', 'ep:first-aid-kit', NULL, NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (61210, '处方登记', '', 2, 10, 61200, 'prescription/create', '', 'pharmacy/prescription/create', 'PharmacyPrescriptionCreate', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (61220, '处方审核', '', 2, 20, 61200, 'prescription/review', '', 'pharmacy/prescription/review', 'PharmacyPrescriptionReview', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (61230, '处方台账', '', 2, 30, 61200, 'prescription/index', '', 'pharmacy/prescription/index', 'PharmacyPrescriptionIndex', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
