@@ -69,7 +69,7 @@
       <el-table-column label="变动后总积分" align="center" prop="totalPoint" width="140" />
       <el-table-column label="创建时间" align="center" prop="createTime" width="180">
         <template #default="scope">
-          {{ formatDateTime(scope.row.createTime) }}
+          {{ formatDate(scope.row.createTime) }}
         </template>
       </el-table-column>
     </el-table>
@@ -85,7 +85,7 @@
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import download from '@/utils/download'
-import { formatDateTime } from '@/utils/formatTime'
+import { formatDate } from '@/utils/formatTime'
 import * as PointRecordApi from '@/api/pharmacy/member/point-record'
 
 defineOptions({ name: 'PharmacyMemberPointRecord' })
