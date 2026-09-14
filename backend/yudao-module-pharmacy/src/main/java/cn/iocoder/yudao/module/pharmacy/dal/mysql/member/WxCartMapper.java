@@ -28,6 +28,13 @@ public interface WxCartMapper extends BaseMapperX<WxCartDO> {
         return selectList(WxCartDO::getMemberId, memberId);
     }
 
+    default List<WxCartDO> selectSelectedListByMemberId(Long memberId) {
+        return selectList(new LambdaQueryWrapperX<WxCartDO>()
+                .eq(WxCartDO::getMemberId, memberId)
+                .eq(WxCartDO::getSelectedFlag, 1)
+                .orderByDesc(WxCartDO::getId));
+    }
+
     default WxCartDO selectByMemberIdAndDrugIdAndStoreId(Long memberId, Long drugId, Long storeId) {
         return selectOne(new LambdaQueryWrapperX<WxCartDO>()
                 .eq(WxCartDO::getMemberId, memberId)

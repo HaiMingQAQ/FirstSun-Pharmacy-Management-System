@@ -88,4 +88,77 @@ public class WxCartController {
                 BeanUtils.toBean(list, WxCartRespVO.class));
     }
 
+    // ========== 业务接口 ==========
+
+    @PostMapping("/add")
+    @Operation(summary = "加购：同门店同药品累加数量")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:create')")
+    public CommonResult<Long> addToCart(
+            @RequestParam("memberId") Long memberId,
+            @RequestParam("drugId") Long drugId,
+            @RequestParam("qty") Integer qty,
+            @RequestParam("storeId") Long storeId) {
+        Long id = wxCartService.addToCart(memberId, drugId, qty, storeId);
+        return success(id);
+    }
+
+    @PutMapping("/update-qty")
+    @Operation(summary = "修改购物车数量")
+    @Parameter(name = "id", description = "购物车编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:update')")
+    public CommonResult<Boolean> updateQty(
+            @RequestParam("id") Long id,
+            @RequestParam("qty") Integer qty) {
+        wxCartService.updateQty(id, qty);
+        return success(true);
+    }
+
+    @PutMapping("/update-selected")
+    @Operation(summary = "勾选/取消勾选购物车")
+    @Parameter(name = "id", description = "购物车编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:update')")
+    public CommonResult<Boolean> updateSelected(
+            @RequestParam("id") Long id,
+            @RequestParam("selectedFlag") Integer selectedFlag) {
+        wxCartService.updateSelected(id, selectedFlag);
+        return success(true);
+    }
+
+    @PutMapping("/batch-update-selected")
+    @Operation(summary = "批量勾选/取消勾选购物车")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:update')")
+    public CommonResult<Boolean> batchUpdateSelected(
+            @RequestBody java.util.List<Long> ids,
+            @RequestParam("selectedFlag") Integer selectedFlag) {
+        wxCartService.batchUpdateSelected(ids, selectedFlag);
+        return success(true);
+    }
+
+    @DeleteMapping("/clear")
+    @Operation(summary = "清空指定会员的购物车")
+    @Parameter(name = "memberId", description = "会员编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:delete')")
+    public CommonResult<Boolean> clearCart(@RequestParam("memberId") Long memberId) {
+        wxCartService.clearCart(memberId);
+        return success(true);
+    }
+
+    @GetMapping("/list-by-member")
+    @Operation(summary = "获取指定会员的购物车列表")
+    @Parameter(name = "memberId", description = "会员编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:query')")
+    public CommonResult<List<WxCartRespVO>> getCartListByMemberId(@RequestParam("memberId") Long memberId) {
+        List<WxCartDO> list = wxCartService.getCartListByMemberId(memberId);
+        return success(BeanUtils.toBean(list, WxCartRespVO.class));
+    }
+
+    @GetMapping("/selected-list-by-member")
+    @Operation(summary = "获取指定会员已勾选的购物车列表")
+    @Parameter(name = "memberId", description = "会员编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:cart:query')")
+    public CommonResult<List<WxCartRespVO>> getSelectedCartListByMemberId(@RequestParam("memberId") Long memberId) {
+        List<WxCartDO> list = wxCartService.getSelectedCartListByMemberId(memberId);
+        return success(BeanUtils.toBean(list, WxCartRespVO.class));
+    }
+
 }
