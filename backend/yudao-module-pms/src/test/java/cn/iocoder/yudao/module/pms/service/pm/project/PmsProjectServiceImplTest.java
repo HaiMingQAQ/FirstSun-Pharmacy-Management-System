@@ -19,10 +19,10 @@ import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemService;
 import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemStatusService;
 import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemWorkLogService;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -57,23 +57,23 @@ public class PmsProjectServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsProjectMapper projectMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsProjectMemberService projectMemberService;
-    @MockBean
+    @MockitoBean
     private PmsProjectGroupService projectGroupService;
-    @MockBean
+    @MockitoBean
     private PmsProjectFavoriteService projectFavoriteService;
-    @MockBean
+    @MockitoBean
     private PmsProjectAnnouncementService projectAnnouncementService;
-    @MockBean
+    @MockitoBean
     private PmsIterationService iterationService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemService workItemService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemStatusService workItemStatusService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemWorkLogService workItemWorkLogService;
-    @MockBean
+    @MockitoBean
     private PermissionApi permissionApi;
 
     @Test

@@ -2,7 +2,7 @@ package cn.iocoder.yudao.module.bpm.service.comment;
 
 import cn.iocoder.yudao.module.bpm.controller.admin.comment.vo.BpmCommentCreateReqVO;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmCommentTypeEnum;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import org.flowable.engine.task.Comment;
 
 import java.util.List;

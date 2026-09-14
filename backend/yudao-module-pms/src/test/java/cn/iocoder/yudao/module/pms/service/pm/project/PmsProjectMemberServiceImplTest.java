@@ -12,10 +12,10 @@ import cn.iocoder.yudao.module.pms.enums.pm.project.PmsProjectStatusEnum;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 
@@ -50,11 +50,11 @@ public class PmsProjectMemberServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsProjectMemberMapper projectMemberMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsProjectService projectService;
-    @MockBean
+    @MockitoBean
     private AdminUserApi adminUserApi;
-    @MockBean
+    @MockitoBean
     private PermissionApi permissionApi;
 
     @Test

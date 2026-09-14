@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.hrm.service.salary.slip;
 import cn.iocoder.yudao.module.hrm.controller.admin.salary.vo.slip.template.HrmSalarySlipTemplateOptionVO;
 import cn.iocoder.yudao.module.hrm.controller.admin.salary.vo.slip.template.HrmSalarySlipTemplateSaveReqVO;
 import cn.iocoder.yudao.module.hrm.dal.dataobject.salary.slip.HrmSalarySlipTemplateDO;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 import java.util.List;
 

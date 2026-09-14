@@ -34,11 +34,11 @@ import cn.iocoder.yudao.module.hrm.service.salary.config.HrmSalaryGroupService;
 import cn.iocoder.yudao.module.hrm.service.salary.config.HrmSalaryOptionService;
 import cn.iocoder.yudao.module.hrm.service.salary.config.HrmSalaryTaxRuleService;
 import cn.iocoder.yudao.module.hrm.service.salary.employee.HrmSalaryEmployeeInfoService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -83,27 +83,27 @@ public class HrmSalaryMonthRecordServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmSalaryMonthRecordMapper monthRecordMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmSalaryOptionService salaryOptionService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryConfigService salaryConfigService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryEmployeeInfoService salaryEmployeeInfoService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryGroupService salaryGroupService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryTaxRuleService salaryTaxRuleService;
-    @MockBean
+    @MockitoBean
     private HrmSalaryMonthEmployeeRecordService monthEmployeeRecordService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeChangeRecordService employeeChangeRecordService;
-    @MockBean
+    @MockitoBean
     private HrmAttendanceStatisticsService attendanceStatisticsService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceMonthEmployeeRecordService insuranceMonthEmployeeRecordService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceMonthRecordService insuranceMonthRecordService;
 
     @Test

@@ -13,10 +13,10 @@ import cn.iocoder.yudao.module.pms.dal.dataobject.pm.workitem.PmsWorkItemWorkLog
 import cn.iocoder.yudao.module.pms.dal.mysql.pm.workitem.PmsWorkItemWorkLogMapper;
 import cn.iocoder.yudao.module.pms.service.pm.iteration.PmsIterationService;
 import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectMemberService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,13 +46,13 @@ public class PmsWorkItemWorkLogServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsWorkItemWorkLogMapper workLogMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsWorkItemService workItemService;
-    @MockBean
+    @MockitoBean
     private PmsProjectMemberService projectMemberService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemActivityService workItemActivityService;
-    @MockBean
+    @MockitoBean
     private PmsIterationService iterationService;
 
     @Test

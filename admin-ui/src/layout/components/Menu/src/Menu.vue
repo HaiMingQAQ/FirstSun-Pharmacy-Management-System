@@ -590,9 +590,24 @@ $prefix-cls: #{$namespace}-menu;
     // 设置子菜单悬停的高亮和背景色
     .#{$elNamespace}-sub-menu__title,
     .#{$elNamespace}-menu-item {
+      height: 44px;
+      margin: 3px 8px;
+      border-radius: 7px;
+      transition:
+        color 0.16s ease,
+        background-color 0.16s ease,
+        transform 0.16s ease;
+
+      .#{$prefix-cls}__icon,
+      svg {
+        width: 19px;
+        height: 19px;
+      }
+
       &:hover {
         color: var(--left-menu-text-active-color) !important;
-        background-color: var(--left-menu-bg-color) !important;
+        background-color: rgb(255 255 255 / 8%) !important;
+        transform: translateX(2px);
       }
     }
 
@@ -608,6 +623,17 @@ $prefix-cls: #{$namespace}-menu;
 
     .#{$elNamespace}-menu-item.is-active {
       position: relative;
+
+      &::before {
+        position: absolute;
+        top: 12px;
+        left: 0;
+        width: 3px;
+        height: 20px;
+        background: #8ee0c7;
+        border-radius: 0 3px 3px 0;
+        content: '';
+      }
     }
 
     // 设置子菜单的背景颜色
@@ -627,6 +653,12 @@ $prefix-cls: #{$namespace}-menu;
     & > .is-active > .#{$elNamespace}-sub-menu__title {
       position: relative;
       background-color: var(--left-menu-collapse-bg-active-color) !important;
+    }
+
+    .#{$elNamespace}-menu-item,
+    .#{$elNamespace}-sub-menu__title {
+      justify-content: center;
+      padding: 0 !important;
     }
   }
 

@@ -31,10 +31,10 @@ import cn.iocoder.yudao.module.pms.service.kb.library.PmsKnowledgeLibraryService
 import cn.iocoder.yudao.module.pms.service.kb.library.PmsKnowledgeLibraryTemplateService;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -77,29 +77,29 @@ public class PmsKnowledgeRecycleServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsKnowledgeRecycleRecordMapper recycleRecordMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeGroupService knowledgeGroupService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeFavoriteService favoriteService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeDocumentLikeService documentLikeService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeViewRecordService viewRecordService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeDocumentShareService documentShareService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeDocumentCommentService documentCommentService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeContentPermissionService contentPermissionService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeDocumentLabelService documentLabelService;
-    @MockBean
+    @MockitoBean
     private PermissionApi permissionApi;
-    @MockBean
+    @MockitoBean
     private AdminUserApi adminUserApi;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeLibraryTemplateService libraryTemplateService;
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeLibraryMemberService memberService;
 
     @Test

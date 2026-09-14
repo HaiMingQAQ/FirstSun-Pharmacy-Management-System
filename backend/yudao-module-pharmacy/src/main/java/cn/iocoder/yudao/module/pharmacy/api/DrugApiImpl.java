@@ -6,7 +6,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.DrugDO;
 import cn.iocoder.yudao.module.pharmacy.service.base.DrugService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.Collection;
 import java.util.List;
 

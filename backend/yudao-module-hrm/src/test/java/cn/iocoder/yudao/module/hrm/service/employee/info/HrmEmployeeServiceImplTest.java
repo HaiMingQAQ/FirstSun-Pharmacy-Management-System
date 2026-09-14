@@ -55,14 +55,14 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import com.mzt.logapi.beans.LogRecord;
 import com.mzt.logapi.service.ILogRecordService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -142,29 +142,29 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmEmployeeChangeRecordMapper employeeChangeRecordMapper;
 
-    @MockBean
+    @MockitoBean
     private AdminUserApi adminUserApi;
-    @MockBean
+    @MockitoBean
     private NotifyMessageSendApi notifyMessageSendApi;
-    @MockBean
+    @MockitoBean
     private ILogRecordService logRecordService;
-    @MockBean
+    @MockitoBean
     private DeptApi deptApi;
-    @MockBean
+    @MockitoBean
     private HrmRecruitChannelService recruitChannelService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeFieldConfigService employeeFieldConfigService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeChangeRecordService changeRecordService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeQuitInfoService quitInfoService;
-    @MockBean
+    @MockitoBean
     private HrmEmployeeSalaryCardService employeeSalaryCardService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceEmployeeInfoService insuranceEmployeeInfoService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceSchemeService insuranceSchemeService;
-    @MockBean
+    @MockitoBean
     private HrmRecruitCandidateService recruitCandidateService;
 
     @BeforeEach

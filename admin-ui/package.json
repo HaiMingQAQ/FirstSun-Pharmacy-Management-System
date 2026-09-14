@@ -150,5 +150,13 @@
   "engines": {
     "node": ">= 20.19.0",
     "pnpm": ">=8.6.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@parcel/watcher",
+      "core-js-pure",
+      "es5-ext"
+    ]
   }
 }

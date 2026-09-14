@@ -14,10 +14,10 @@ import cn.iocoder.yudao.module.fms.dal.dataobject.config.FmsVoucherTemplateCateg
 import cn.iocoder.yudao.module.fms.dal.dataobject.config.FmsVoucherTemplateDO;
 import cn.iocoder.yudao.module.fms.dal.mysql.config.FmsVoucherTemplateCategoryMapper;
 import cn.iocoder.yudao.module.fms.dal.mysql.config.FmsVoucherTemplateMapper;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -41,13 +41,13 @@ public class FmsVoucherTemplateServiceImplTest extends BaseDbUnitTest {
     @Resource
     private FmsVoucherTemplateMapper templateMapper;
 
-    @MockBean
+    @MockitoBean
     private FmsAccountSetService accountSetService;
-    @MockBean
+    @MockitoBean
     private FmsSubjectService subjectService;
-    @MockBean
+    @MockitoBean
     private FmsAuxiliaryItemService auxiliaryItemService;
-    @MockBean
+    @MockitoBean
     private FmsAuxiliaryTypeService auxiliaryTypeService;
 
     @Test

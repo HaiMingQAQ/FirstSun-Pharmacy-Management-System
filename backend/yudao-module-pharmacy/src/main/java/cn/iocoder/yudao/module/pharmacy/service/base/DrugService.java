@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.drug.DrugPageRe
 import cn.iocoder.yudao.module.pharmacy.controller.admin.base.vo.drug.DrugSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.DrugDO;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 

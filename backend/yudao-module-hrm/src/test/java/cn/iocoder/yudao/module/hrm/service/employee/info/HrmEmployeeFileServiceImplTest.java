@@ -6,10 +6,10 @@ import cn.iocoder.yudao.module.hrm.controller.admin.employee.vo.file.HrmEmployee
 import cn.iocoder.yudao.module.hrm.dal.dataobject.employee.info.HrmEmployeeDO;
 import cn.iocoder.yudao.module.hrm.dal.dataobject.employee.info.HrmEmployeeFileDO;
 import cn.iocoder.yudao.module.hrm.dal.mysql.employee.info.HrmEmployeeFileMapper;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.Arrays;
 import java.util.List;
@@ -36,7 +36,7 @@ public class HrmEmployeeFileServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmEmployeeFileMapper employeeFileMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
 
     @Test

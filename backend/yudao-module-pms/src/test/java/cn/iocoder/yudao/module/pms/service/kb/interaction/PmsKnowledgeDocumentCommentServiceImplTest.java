@@ -8,10 +8,10 @@ import cn.iocoder.yudao.module.pms.dal.dataobject.kb.interaction.PmsKnowledgeDoc
 import cn.iocoder.yudao.module.pms.dal.mysql.kb.interaction.PmsKnowledgeDocumentCommentMapper;
 import cn.iocoder.yudao.module.pms.enums.kb.content.PmsKnowledgeDocumentTypeEnum;
 import cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeDocumentService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.util.List;
 
@@ -39,7 +39,7 @@ public class PmsKnowledgeDocumentCommentServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsKnowledgeDocumentCommentMapper commentMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsKnowledgeDocumentService documentService;
 
     @Test

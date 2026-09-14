@@ -4,7 +4,7 @@ import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEvent;
 import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEventListener;
 import cn.iocoder.yudao.module.hrm.service.attendance.record.HrmAttendanceLeaveService;
 import cn.iocoder.yudao.module.hrm.service.attendance.record.HrmAttendanceLeaveServiceImpl;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 /**

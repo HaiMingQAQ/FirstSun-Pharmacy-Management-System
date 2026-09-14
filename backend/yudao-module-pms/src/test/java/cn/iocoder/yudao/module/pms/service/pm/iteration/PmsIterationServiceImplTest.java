@@ -21,11 +21,11 @@ import cn.iocoder.yudao.module.pms.service.pm.project.PmsProjectMemberService;
 import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemActivityService;
 import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemService;
 import cn.iocoder.yudao.module.pms.service.pm.workitem.PmsWorkItemWorkLogService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -58,13 +58,13 @@ public class PmsIterationServiceImplTest extends BaseDbUnitTest {
     @Resource
     private PmsIterationMapper iterationMapper;
 
-    @MockBean
+    @MockitoBean
     private PmsProjectMemberService projectMemberService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemService workItemService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemActivityService workItemActivityService;
-    @MockBean
+    @MockitoBean
     private PmsWorkItemWorkLogService workItemWorkLogService;
 
     @Test

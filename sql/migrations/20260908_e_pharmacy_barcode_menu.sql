@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 -- =============================================================
 -- 迁移脚本：A 成员药店模块-药品条码字典 + 菜单
 -- 文件：20260908_e_pharmacy_barcode_menu.sql
@@ -35,7 +37,7 @@ VALUES
 -- -------------------------------------------------------------
 INSERT INTO `system_menu` (`id`, `name`, `permission`, `type`, `sort`, `parent_id`, `path`, `icon`, `component`, `component_name`, `status`, `visible`, `keep_alive`, `always_show`, `creator`, `create_time`, `updater`, `update_time`, `deleted`)
 VALUES
-  (22050, '药品条码', '', 2, 50, 22010, 'barcode', 'ep:barcode', 'pharmacy/base/barcode/index', 'PharmacyBaseBarcode', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
+  (22050, '药品条码', '', 2, 50, 22010, 'barcode', 'fa:barcode', 'pharmacy/base/barcode/index', 'PharmacyBaseBarcode', 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (22051, '条码查询', 'pharmacy:base:barcode:query',  3, 10, 22050, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (22052, '条码创建', 'pharmacy:base:barcode:create', 3, 20, 22050, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),
   (22053, '条码更新', 'pharmacy:base:barcode:update', 3, 30, 22050, '', '', NULL, NULL, 0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0'),

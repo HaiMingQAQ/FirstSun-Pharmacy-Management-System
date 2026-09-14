@@ -13,8 +13,9 @@
 
     <name>${project.artifactId}</name>
     <description>
-        pharmacy 药店业务模块，由 A 成员维护。
-        主要覆盖基础资料域：门店、员工、药品分类、药品档案、药品条码，以及对外商品/条码查询接口。
+        pharmacy 药店业务模块。
+        基础资料域（A 维护）：门店、员工、药品分类、药品档案、药品条码，对外商品/条码查询接口；
+        POS 销售域（D 维护）：收银开台/交班、销售结算、退货、支付明细、销售统计。
         复用 system 的用户、角色、菜单、权限、字典能力，不重复实现账号体系。
     </description>
 
@@ -30,6 +31,10 @@
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
             <artifactId>yudao-spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -52,6 +57,19 @@
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
             <artifactId>yudao-spring-boot-starter-excel</artifactId>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- mockito-core：BOM 未把 mockito-core 传递进 test classpath，显式补充 -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 

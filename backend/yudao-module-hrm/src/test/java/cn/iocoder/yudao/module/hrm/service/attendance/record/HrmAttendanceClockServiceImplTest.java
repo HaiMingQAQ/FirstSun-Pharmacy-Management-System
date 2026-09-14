@@ -15,10 +15,10 @@ import cn.iocoder.yudao.module.hrm.enums.attendance.record.HrmAttendanceClockBut
 import cn.iocoder.yudao.module.hrm.enums.attendance.record.HrmAttendanceClockSourceEnum;
 import cn.iocoder.yudao.module.hrm.enums.attendance.record.HrmAttendanceClockStatusEnum;
 import cn.iocoder.yudao.module.hrm.service.employee.info.HrmEmployeeService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -51,9 +51,9 @@ public class HrmAttendanceClockServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmAttendanceClockMapper attendanceClockMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
-    @MockBean
+    @MockitoBean
     private HrmAttendanceGroupService attendanceGroupService;
 
     @Test

@@ -10,10 +10,10 @@ import cn.iocoder.yudao.module.hrm.dal.mysql.insurance.employee.HrmInsuranceEmpl
 import cn.iocoder.yudao.module.hrm.enums.employee.info.HrmEmployeeEntryStatusEnum;
 import cn.iocoder.yudao.module.hrm.enums.employee.info.HrmEmployeeStatusEnum;
 import cn.iocoder.yudao.module.hrm.service.employee.info.HrmEmployeeService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -50,9 +50,9 @@ public class HrmInsuranceEmployeeInfoServiceImplTest extends BaseDbUnitTest {
     @Resource
     private HrmInsuranceEmployeeInfoMapper insuranceEmployeeInfoMapper;
 
-    @MockBean
+    @MockitoBean
     private HrmEmployeeService employeeService;
-    @MockBean
+    @MockitoBean
     private HrmInsuranceSchemeService insuranceSchemeService;
 
     @Test
