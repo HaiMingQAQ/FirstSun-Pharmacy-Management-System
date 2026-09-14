@@ -57,4 +57,36 @@ public interface DictTypeConstants {
      */
     String PHARMACY_BARCODE_TYPE = "pharmacy_barcode_type";
 
+    // ========== F 模块：会员与小程序订单 ==========
+
+    /**
+     * 会员状态（0启用/1禁用），与框架 member_user.status 一致
+     */
+    String PHARMACY_MEMBER_STATUS = "pharmacy_member_status";
+
+    /**
+     * 会员等级状态（0启用/1禁用），与框架 member_level.status 一致
+     */
+    String PHARMACY_MEMBER_LEVEL_STATUS = "pharmacy_member_level_status";
+
+    /**
+     * 小程序订单状态（0待支付/1待拣货/2拣货中/3待自提/4完成/-1取消）
+     */
+    String PHARMACY_WX_ORDER_STATUS = "pharmacy_wx_order_status";
+
+    /**
+     * 小程序订单类型（0到店自提/1同城配送）
+     */
+    String PHARMACY_WX_ORDER_TYPE = "pharmacy_wx_order_type";
+
+    /**
+     * 小程序订单支付状态（0待支付/1已支付/2已退款）
+     */
+    String PHARMACY_WX_ORDER_PAY_STATUS = "pharmacy_wx_order_pay_status";
+
+    /**
+     * 会员积分业务类型（1签到/2消费/3退款/4兑换/5调整等）
+     */
+    String PHARMACY_MEMBER_POINT_BIZ_TYPE = "pharmacy_member_point_biz_type";
+
 }

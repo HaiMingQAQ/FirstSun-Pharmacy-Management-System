@@ -88,4 +88,48 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_BARCODE_DRUG_NOT_EXISTS = new ErrorCode(1_030_005_002, "关联的药品不存在");
     ErrorCode PHARMACY_BARCODE_DEFAULT_DUPLICATE = new ErrorCode(1_030_005_003, "该药品已存在默认条码，同一药品只能有一个默认条码");
 
+    // ========== 会员用户 1-030-006-000 ==========
+    ErrorCode PHARMACY_MEMBER_USER_NOT_EXISTS = new ErrorCode(1_030_006_000, "会员用户不存在");
+    ErrorCode PHARMACY_MEMBER_USER_MOBILE_DUPLICATE = new ErrorCode(1_030_006_001, "手机号已被其他会员使用");
+    ErrorCode PHARMACY_MEMBER_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_030_006_002, "账号或密码错误");
+    ErrorCode PHARMACY_MEMBER_USER_DISABLED = new ErrorCode(1_030_006_003, "会员账号已被禁用");
+    ErrorCode PHARMACY_MEMBER_USER_MOBILE_INVALID = new ErrorCode(1_030_006_004, "手机号格式不正确");
+
+    // ========== 会员等级 1-030-007-000 ==========
+    ErrorCode PHARMACY_MEMBER_LEVEL_NOT_EXISTS = new ErrorCode(1_030_007_000, "会员等级不存在");
+    ErrorCode PHARMACY_MEMBER_LEVEL_DUPLICATE = new ErrorCode(1_030_007_001, "该等级值已存在，同一等级值只能有一个等级");
+    ErrorCode PHARMACY_MEMBER_LEVEL_HAS_USER = new ErrorCode(1_030_007_002, "该等级下存在会员，无法删除");
+    ErrorCode PHARMACY_MEMBER_LEVEL_NOT_ENABLE = new ErrorCode(1_030_007_003, "等级({})未启用，不允许选择");
+
+    // ========== 会员积分记录 1-030-008-000 ==========
+    ErrorCode PHARMACY_MEMBER_POINT_RECORD_NOT_EXISTS = new ErrorCode(1_030_008_000, "会员积分记录不存在");
+    ErrorCode PHARMACY_MEMBER_POINT_BIZ_INVALID = new ErrorCode(1_030_008_001, "积分业务参数非法：会员编号与业务编码不能为空");
+
+    // ========== 会员收件地址 1-030-009-000 ==========
+    ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_EXISTS = new ErrorCode(1_030_009_000, "会员收件地址不存在");
+    ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_OWNER = new ErrorCode(1_030_009_001, "无权操作他人收货地址");
+
+    // ========== 小程序购物车 1-030-010-000 ==========
+    ErrorCode PHARMACY_WX_CART_NOT_EXISTS = new ErrorCode(1_030_010_000, "购物车记录不存在");
+    ErrorCode PHARMACY_WX_CART_ITEM_DUPLICATE = new ErrorCode(1_030_010_001, "该商品已在购物车中，同一门店同一商品只能有一条记录");
+    ErrorCode PHARMACY_WX_CART_QTY_INVALID = new ErrorCode(1_030_010_002, "购物车数量必须大于 0");
+    ErrorCode PHARMACY_WX_CART_SELECTED_EMPTY = new ErrorCode(1_030_010_003, "请先勾选要结算的商品");
+    ErrorCode PHARMACY_WX_CART_NOT_OWNER = new ErrorCode(1_030_010_004, "无权操作他人购物车记录");
+
+    // ========== 小程序订单 1-030-011-000 ==========
+    ErrorCode PHARMACY_WX_ORDER_NOT_EXISTS = new ErrorCode(1_030_011_000, "小程序订单不存在");
+    ErrorCode PHARMACY_WX_ORDER_NO_DUPLICATE = new ErrorCode(1_030_011_001, "订单号已存在");
+    ErrorCode PHARMACY_WX_ORDER_STATUS_INVALID = new ErrorCode(1_030_011_002, "订单状态非法");
+    ErrorCode PHARMACY_WX_ORDER_STATUS_FLOW_ERROR = new ErrorCode(1_030_011_003, "订单状态流转非法：当前状态不允许该操作");
+    ErrorCode PHARMACY_WX_ORDER_ALREADY_PAID = new ErrorCode(1_030_011_004, "订单已支付，不能重复支付");
+    ErrorCode PHARMACY_WX_ORDER_PICKUP_CODE_ERROR = new ErrorCode(1_030_011_005, "取货码错误");
+    ErrorCode PHARMACY_WX_ORDER_ALREADY_VERIFIED = new ErrorCode(1_030_011_006, "订单已核销，不能重复核销");
+    ErrorCode PHARMACY_WX_ORDER_NOT_OWNER = new ErrorCode(1_030_011_007, "无权查看他人订单");
+    ErrorCode PHARMACY_WX_ORDER_TYPE_INVALID = new ErrorCode(1_030_011_008, "订单类型非法：只能为 0(到店自提) 或 1(同城配送)");
+    ErrorCode PHARMACY_WX_ORDER_ADDRESS_REQUIRED = new ErrorCode(1_030_011_009, "同城配送必须选择收货地址");
+    ErrorCode PHARMACY_WX_ORDER_PRESC_REQUIRED = new ErrorCode(1_030_011_010, "含处方药，必须关联已审方通过的处方");
+
+    // ========== 小程序订单明细 1-030-012-000 ==========
+    ErrorCode PHARMACY_WX_ORDER_LINE_NOT_EXISTS = new ErrorCode(1_030_012_000, "小程序订单明细不存在");
+
 }

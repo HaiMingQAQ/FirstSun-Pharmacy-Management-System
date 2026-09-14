@@ -27,6 +27,21 @@ const AuthUtil = {
       },
     });
   },
+  // 手机号快捷登录（不存在则自动注册）
+  loginOrRegister: (mobile) => {
+    return request({
+      url: '/member/auth/login-or-register',
+      method: 'POST',
+      params: {
+        mobile,
+      },
+      custom: {
+        showSuccess: true,
+        loadingMsg: '登录中',
+        successMsg: '登录成功',
+      },
+    });
+  },
   // 发送手机验证码
   sendSmsCode: (mobile, scene) => {
     return request({

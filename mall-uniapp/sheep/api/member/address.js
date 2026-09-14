@@ -40,6 +40,17 @@ const AddressApi = {
       params: { id }
     });
   },
+  // 获得用户默认收件地址
+  getDefaultAddress: () => {
+    return request({
+      url: '/member/address/get-default',
+      method: 'GET',
+      custom: {
+        showLoading: false,
+        showError: false,
+      },
+    });
+  },
   // 删除用户收件地址
   deleteAddress: (id) => {
     return request({
