@@ -27,6 +27,13 @@
             <version>${revision}</version>
         </dependency>
 
+        <!-- 支付模块（E 维护）：统一支付依赖，提供应用/渠道/订单/退款能力 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-pay</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- Web 相关 -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
