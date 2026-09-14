@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryCatalogMapper">
+    <select id="lockWarehouseStatus" resultType="java.lang.Integer">
+        SELECT status FROM ph_warehouse
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId}
+          AND store_id = #{scope.storeId} AND deleted = b'0'
+        FOR UPDATE
+    </select>
+    <insert id="insertWarehouse" useGeneratedKeys="true" keyProperty="key.id" keyColumn="id">
+        INSERT INTO ph_warehouse
+            (tenant_id, store_id, wh_code, wh_name, temp_zone, is_default, status, creator, updater)
+        VALUES (#{scope.tenantId}, #{scope.storeId}, #{q.whCode}, #{q.whName}, #{q.tempZone},
+                0, 1, #{actor}, #{actor})
+    </insert>
+    <insert id="insertLocation" useGeneratedKeys="true" keyProperty="key.id" keyColumn="id">
+        INSERT INTO ph_location
+            (tenant_id, warehouse_id, location_code, location_type, max_capacity, status, creator, updater)
+        VALUES (#{scope.tenantId}, #{q.warehouseId}, #{q.locationCode}, #{q.locationType},
+                #{q.maxCapacity,jdbcType=BIGINT}, 1, #{actor}, #{actor})
+    </insert>
+</mapper>

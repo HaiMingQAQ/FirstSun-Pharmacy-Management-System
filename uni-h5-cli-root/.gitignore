@@ -1,0 +1,2 @@
+# 本地依赖联接（指向 mall-uniapp/node_modules），不纳入版本库
+node_modules/

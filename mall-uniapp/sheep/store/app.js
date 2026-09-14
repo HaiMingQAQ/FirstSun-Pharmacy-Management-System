@@ -181,13 +181,22 @@ const adaptTenant = async () => {
 
 /** 初始化装修模版 */
 const adaptTemplate = async (appTemplate, templateId) => {
-  const { data: diyTemplate } = templateId
-    ? // 查询指定模板，一般是预览时使用
-      await DiyApi.getDiyTemplate(templateId)
-    : await DiyApi.getUsedDiyTemplate();
-  // 模板不存在
+  let diyTemplate = null;
+  try {
+    const res = templateId
+      ? // 查询指定模板，一般是预览时使用
+        await DiyApi.getDiyTemplate(templateId)
+      : await DiyApi.getUsedDiyTemplate();
+    diyTemplate = res?.data ?? null;
+  } catch (error) {
+    // 记录真实异常，不做静默吞掉
+    console.warn('装修模板加载失败:', error);
+  }
+  // 模板不存在（本项目未启用商城装修模块 yudao-module-mall），
+  // 药店小程序页面不依赖装修模板，故降级为「不使用装修」，
+  // 避免整站跳转错误页导致小程序不可用。
   if (!diyTemplate) {
-    $router.error('TemplateError');
+    console.warn('未获取到装修模板，跳过装修初始化（药店小程序不依赖装修）');
     return;
   }
 
