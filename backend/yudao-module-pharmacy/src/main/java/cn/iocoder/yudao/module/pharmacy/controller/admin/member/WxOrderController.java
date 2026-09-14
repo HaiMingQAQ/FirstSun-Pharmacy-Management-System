@@ -103,4 +103,55 @@ public class WxOrderController {
                 BeanUtils.toBean(list, WxOrderRespVO.class));
     }
 
+    // ========== 状态流转与核销接口 ==========
+
+    @PutMapping("/pay")
+    @Operation(summary = "支付成功回调（幂等）：待支付 → 待拣货")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> payWxOrder(@RequestParam("id") Long id,
+                                            @RequestParam(value = "payNo", required = false) String payNo) {
+        wxOrderService.payWxOrder(id, payNo);
+        return success(true);
+    }
+
+    @PutMapping("/cancel")
+    @Operation(summary = "取消订单（幂等）：待支付/待拣货 → 取消")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> cancelWxOrder(@RequestParam("id") Long id,
+                                               @RequestParam(value = "cancelReason", required = false) String cancelReason) {
+        wxOrderService.cancelWxOrder(id, cancelReason);
+        return success(true);
+    }
+
+    @PutMapping("/start-picking")
+    @Operation(summary = "开始拣货：待拣货 → 拣货中")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> startPicking(@RequestParam("id") Long id) {
+        wxOrderService.startPicking(id);
+        return success(true);
+    }
+
+    @PutMapping("/finish-picking")
+    @Operation(summary = "拣货完成：拣货中 → 待自提")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> finishPicking(@RequestParam("id") Long id) {
+        wxOrderService.finishPicking(id);
+        return success(true);
+    }
+
+    @PutMapping("/verify")
+    @Operation(summary = "核销订单（幂等）：待自提 → 完成")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> verifyWxOrder(@RequestParam("id") Long id,
+                                               @RequestParam("pickupCode") String pickupCode,
+                                               @RequestParam("verifyBy") Long verifyBy) {
+        wxOrderService.verifyWxOrder(id, pickupCode, verifyBy);
+        return success(true);
+    }
+
 }

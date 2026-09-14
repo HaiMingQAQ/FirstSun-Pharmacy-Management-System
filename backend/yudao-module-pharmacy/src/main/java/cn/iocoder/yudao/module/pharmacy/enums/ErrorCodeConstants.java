@@ -76,10 +76,17 @@ public interface ErrorCodeConstants {
     // ========== 小程序购物车 1-030-010-000 ==========
     ErrorCode PHARMACY_WX_CART_NOT_EXISTS = new ErrorCode(1_030_010_000, "购物车记录不存在");
     ErrorCode PHARMACY_WX_CART_ITEM_DUPLICATE = new ErrorCode(1_030_010_001, "该商品已在购物车中，同一门店同一商品只能有一条记录");
+    ErrorCode PHARMACY_WX_CART_QTY_INVALID = new ErrorCode(1_030_010_002, "购物车数量必须大于 0");
 
     // ========== 小程序订单 1-030-011-000 ==========
     ErrorCode PHARMACY_WX_ORDER_NOT_EXISTS = new ErrorCode(1_030_011_000, "小程序订单不存在");
     ErrorCode PHARMACY_WX_ORDER_NO_DUPLICATE = new ErrorCode(1_030_011_001, "订单号已存在");
+    ErrorCode PHARMACY_WX_ORDER_STATUS_INVALID = new ErrorCode(1_030_011_002, "订单状态非法");
+    ErrorCode PHARMACY_WX_ORDER_STATUS_FLOW_ERROR = new ErrorCode(1_030_011_003, "订单状态流转非法：当前状态不允许该操作");
+    ErrorCode PHARMACY_WX_ORDER_ALREADY_PAID = new ErrorCode(1_030_011_004, "订单已支付，不能重复支付");
+    ErrorCode PHARMACY_WX_ORDER_PICKUP_CODE_ERROR = new ErrorCode(1_030_011_005, "取货码错误");
+    ErrorCode PHARMACY_WX_ORDER_ALREADY_VERIFIED = new ErrorCode(1_030_011_006, "订单已核销，不能重复核销");
+    ErrorCode PHARMACY_WX_ORDER_NOT_OWNER = new ErrorCode(1_030_011_007, "无权查看他人订单");
 
     // ========== 小程序订单明细 1-030-012-000 ==========
     ErrorCode PHARMACY_WX_ORDER_LINE_NOT_EXISTS = new ErrorCode(1_030_012_000, "小程序订单明细不存在");
