@@ -28,4 +28,13 @@ public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO
         return selectList(MemberPointRecordDO::getUserId, userId);
     }
 
+    /**
+     * 按会员 + 业务编码查询积分记录，用于积分幂等校验（同一业务单号只处理一次）
+     */
+    default MemberPointRecordDO selectByUserIdAndBizId(Long userId, String bizId) {
+        return selectOne(new LambdaQueryWrapperX<MemberPointRecordDO>()
+                .eq(MemberPointRecordDO::getUserId, userId)
+                .eq(MemberPointRecordDO::getBizId, bizId));
+    }
+
 }

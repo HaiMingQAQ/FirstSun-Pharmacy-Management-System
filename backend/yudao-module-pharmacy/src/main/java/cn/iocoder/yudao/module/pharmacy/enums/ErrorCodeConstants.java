@@ -103,6 +103,7 @@ public interface ErrorCodeConstants {
 
     // ========== 会员积分记录 1-030-008-000 ==========
     ErrorCode PHARMACY_MEMBER_POINT_RECORD_NOT_EXISTS = new ErrorCode(1_030_008_000, "会员积分记录不存在");
+    ErrorCode PHARMACY_MEMBER_POINT_BIZ_INVALID = new ErrorCode(1_030_008_001, "积分业务参数非法：会员编号与业务编码不能为空");
 
     // ========== 会员收件地址 1-030-009-000 ==========
     ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_EXISTS = new ErrorCode(1_030_009_000, "会员收件地址不存在");
