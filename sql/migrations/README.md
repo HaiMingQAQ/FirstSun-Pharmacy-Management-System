@@ -16,12 +16,14 @@
 | 6 | `20260909_f_pharmacy_menu_path_fix.sql` | 修复 22010「基础资料」二级目录 path 前导 `/` 导致前端动态路由 404 |
 | 7 | `20260909_g_pharmacy_role_menu_tenant_fix.sql` | 修复 system_role_menu 33 条关系 tenant_id=0 → 1，幂等校验含 tenant_id |
 | 8 | `20260909_h_pharmacy_barcode_menu_icon_fix.sql` | 修复药品条码菜单使用不存在的 `ep:barcode` 导致图标空白 |
-| 9 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并仅绑定药店套餐权限 |
-| 10 | `20260908_d_pos_menu.sql` | D 模块 POS 管理菜单与按钮权限 |
-| 11 | `20260908_d_pos_menu_bind_role.sql` | 将 POS 菜单绑定至超级管理员角色 |
-| 12 | `20260909_d_pos_tables_fix.sql` | POS 销售与退货明细表兼容性修正 |
-| 13 | `fix_pos_menu_name.sql` | 修正 POS 菜单中文名称 |
-| 14 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
+| 9 | `20260908_d_pos_menu.sql` | D 模块 POS 管理菜单与按钮权限 |
+| 10 | `20260908_d_pos_menu_bind_role.sql` | 将 POS 菜单绑定至超级管理员角色 |
+| 11 | `20260909_d_pos_tables_fix.sql` | POS 销售与退货明细表兼容性修正 |
+| 12 | `fix_pos_menu_name.sql` | 修正 POS 菜单中文名称 |
+| 13 | `20260914_k_pharmacy_inventory_menu.sql` | C 模块库存管理菜单与全部库存按钮权限 |
+| 14 | `20260911_f_pharmacy_member_menu.sql` | F 模块会员管理菜单、按钮权限与字典 |
+| 15 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
+| 16 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
 
 ## 统一执行方法
 
@@ -38,11 +40,18 @@ $scripts = @(
   "20260909_f_pharmacy_menu_path_fix.sql",
   "20260909_g_pharmacy_role_menu_tenant_fix.sql",
   "20260909_h_pharmacy_barcode_menu_icon_fix.sql",
-  "20260910_i_firstsun_shared_account.sql"
+  "20260908_d_pos_menu.sql",
+  "20260908_d_pos_menu_bind_role.sql",
+  "20260909_d_pos_tables_fix.sql",
+  "fix_pos_menu_name.sql",
+  "20260914_k_pharmacy_inventory_menu.sql",
+  "20260911_f_pharmacy_member_menu.sql",
+  "20260910_i_firstsun_shared_account.sql",
+  "20260911_j_pos_menu_path_fix.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
-  docker exec firstsun-pharmacy-mysql mysql -uroot -proot123456 --default-character-set=utf8mb4 -D firstsun_yudao_test_20260908 -e "source /tmp/mig.sql"
+  docker exec firstsun-pharmacy-mysql mysql -uroot -proot123456 --default-character-set=utf8mb4 -D firstsun_pharmacy -e "source /tmp/mig.sql"
 }
 ```
 
