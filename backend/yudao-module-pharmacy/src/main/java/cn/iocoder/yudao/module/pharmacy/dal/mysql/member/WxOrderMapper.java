@@ -39,4 +39,12 @@ public interface WxOrderMapper extends BaseMapperX<WxOrderDO> {
         return selectOne(WxOrderDO::getPickupCode, pickupCode);
     }
 
+    /**
+     * 统计指定订单号前缀的订单数量，用于生成当日流水号
+     */
+    default Long selectCountByOrderNoPrefix(String orderNoPrefix) {
+        return selectCount(new LambdaQueryWrapperX<WxOrderDO>()
+                .likeRight(WxOrderDO::getOrderNo, orderNoPrefix));
+    }
+
 }

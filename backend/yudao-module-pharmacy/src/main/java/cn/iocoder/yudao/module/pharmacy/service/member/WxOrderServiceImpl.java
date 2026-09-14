@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.pharmacy.service.member;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.pharmacy.api.DrugApi;
+import cn.iocoder.yudao.module.pharmacy.api.dto.DrugRespDTO;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
@@ -9,22 +11,31 @@ import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
 import cn.iocoder.yudao.module.pharmacy.api.payment.dto.PayOrderDTO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.order.WxOrderPageReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.order.WxOrderSaveReqVO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.MemberAddressDO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxCartDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderLineDO;
+import cn.iocoder.yudao.module.pharmacy.dal.mysql.member.WxOrderLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.member.WxOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.enums.WxOrderStatusEnum;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.*;
@@ -36,8 +47,18 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.*;
 @Validated
 public class WxOrderServiceImpl implements WxOrderService {
 
+    /** 支付状态：待支付 */
+    private static final Integer PAY_STATUS_WAIT = 0;
     /** 支付状态：已支付 */
     private static final Integer PAY_STATUS_PAID = 1;
+    /** 订单类型：到店自提 */
+    private static final Integer ORDER_TYPE_PICKUP = 0;
+    /** 订单类型：同城配送 */
+    private static final Integer ORDER_TYPE_DELIVERY = 1;
+    /** 未支付订单有效期（分钟） */
+    private static final int ORDER_EXPIRE_MINUTES = 30;
+    /** 订单号日期格式 */
+    private static final DateTimeFormatter ORDER_NO_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     @Resource
     private WxOrderMapper wxOrderMapper;
@@ -53,6 +74,22 @@ public class WxOrderServiceImpl implements WxOrderService {
     /** 订单明细服务：查询订单下的药品与数量，用于构建扣减/回补项 */
     @Resource
     private WxOrderLineService wxOrderLineService;
+
+    /** 订单明细 Mapper：小程序下单时批量写入明细 */
+    @Resource
+    private WxOrderLineMapper wxOrderLineMapper;
+
+    /** 购物车服务：小程序下单时读取已勾选商品并清空 */
+    @Resource
+    private WxCartService wxCartService;
+
+    /** 收货地址服务：同城配送时读取地址快照 */
+    @Resource
+    private MemberAddressService memberAddressService;
+
+    /** A 的商品查询接口：下单时校验药品并获取价格/名称/规格快照 */
+    @Resource
+    private DrugApi drugApi;
 
     @Override
     public Long createWxOrder(WxOrderSaveReqVO createReqVO) {
@@ -278,7 +315,153 @@ public class WxOrderServiceImpl implements WxOrderService {
         return wxOrder;
     }
 
+    // ========== 小程序端（app）下单 ==========
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createOrderFromCart(Long memberId, Long storeId, Integer orderType,
+                                    Long addressId, Long prescId, String remark) {
+        // 1. 校验订单类型
+        if (!Objects.equals(orderType, ORDER_TYPE_PICKUP) && !Objects.equals(orderType, ORDER_TYPE_DELIVERY)) {
+            throw exception(PHARMACY_WX_ORDER_TYPE_INVALID);
+        }
+        // 2. 读取该会员已勾选的购物车记录，并限定本次履约门店
+        List<WxCartDO> checkedList = wxCartService.getSelectedCartListByMemberId(memberId).stream()
+                .filter(item -> Objects.equals(item.getStoreId(), storeId))
+                .collect(Collectors.toList());
+        if (checkedList.isEmpty()) {
+            throw exception(PHARMACY_WX_CART_SELECTED_EMPTY);
+        }
+        // 3. 对接 A 商品接口：批量校验药品可销售，并生成明细快照
+        List<Long> drugIds = checkedList.stream().map(WxCartDO::getDrugId).distinct()
+                .collect(Collectors.toList());
+        Map<Long, DrugRespDTO> drugMap = drugApi.getDrugList(drugIds).stream()
+                .collect(Collectors.toMap(DrugRespDTO::getId, Function.identity(), (a, b) -> a));
+        BigDecimal goodsAmount = BigDecimal.ZERO;
+        boolean hasRx = false;
+        List<WxOrderLineDO> lines = new ArrayList<>(checkedList.size());
+        for (WxCartDO cart : checkedList) {
+            DrugRespDTO drug = drugMap.get(cart.getDrugId());
+            if (drug == null) {
+                throw exception(PHARMACY_DRUG_NOT_EXISTS);
+            }
+            if (!Objects.equals(drug.getStatus(), 1) || !Objects.equals(drug.getApproveStatus(), 1)) {
+                throw exception(PHARMACY_DRUG_NOT_SALEABLE);
+            }
+            if (Objects.equals(drug.getIsRx(), 1)) {
+                hasRx = true;
+            }
+            // 会员价优先，无会员价则使用零售价
+            BigDecimal price = drug.getMemberPrice() != null ? drug.getMemberPrice() : drug.getRetailPrice();
+            if (price == null) {
+                price = BigDecimal.ZERO;
+            }
+            price = price.setScale(2, RoundingMode.HALF_UP);
+            BigDecimal lineAmount = price.multiply(BigDecimal.valueOf(cart.getQty()))
+                    .setScale(2, RoundingMode.HALF_UP);
+            goodsAmount = goodsAmount.add(lineAmount);
+            // 明细快照
+            WxOrderLineDO line = new WxOrderLineDO();
+            line.setDrugId(drug.getId());
+            line.setQty(cart.getQty());
+            line.setPrice(price);
+            line.setLineAmount(lineAmount);
+            line.setPickedQty(0);
+            line.setDrugName(drug.getGenericName() != null ? drug.getGenericName() : drug.getTradeName());
+            line.setSpecification(drug.getSpecification());
+            line.setUnit(drug.getUnit());
+            lines.add(line);
+        }
+        // 4. 处方药必须关联已审方通过的处方（审方状态由 E 的处方服务保证）
+        if (hasRx && prescId == null) {
+            throw exception(PHARMACY_WX_ORDER_PRESC_REQUIRED);
+        }
+        // 5. 同城配送必须选择本人收货地址，并生成地址快照
+        String addressSnapshot = null;
+        BigDecimal freightAmount = BigDecimal.ZERO;
+        if (Objects.equals(orderType, ORDER_TYPE_DELIVERY)) {
+            if (addressId == null) {
+                throw exception(PHARMACY_WX_ORDER_ADDRESS_REQUIRED);
+            }
+            MemberAddressDO address = memberAddressService.validateMemberAddressExists(addressId);
+            if (!Objects.equals(address.getUserId(), memberId)) {
+                throw exception(PHARMACY_MEMBER_ADDRESS_NOT_OWNER);
+            }
+            addressSnapshot = address.getName() + " " + address.getMobile() + " " + address.getDetailAddress();
+            // 配送费规则暂未配置，保持 0，避免虚构业务规则
+            freightAmount = BigDecimal.ZERO;
+        }
+        // 6. 服务端精确计算金额（元），不接受前端传入金额
+        BigDecimal couponAmount = BigDecimal.ZERO;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal payableAmount = goodsAmount.add(freightAmount)
+                .subtract(couponAmount).subtract(discountAmount);
+        if (payableAmount.signum() < 0) {
+            payableAmount = BigDecimal.ZERO;
+        }
+        // 7. 生成订单号与一次性取货码
+        LocalDateTime now = LocalDateTime.now();
+        WxOrderDO order = new WxOrderDO();
+        order.setOrderNo(generateOrderNo(storeId, now));
+        order.setMemberId(memberId);
+        order.setStoreId(storeId);
+        order.setOrderType(orderType);
+        order.setGoodsAmount(goodsAmount);
+        order.setCouponAmount(couponAmount);
+        order.setFreightAmount(freightAmount);
+        order.setDiscountAmount(discountAmount);
+        order.setPayableAmount(payableAmount);
+        order.setPayStatus(PAY_STATUS_WAIT);
+        order.setStatus(WxOrderStatusEnum.WAIT_PAY.getStatus());
+        order.setPrescId(prescId);
+        order.setAddressSnapshot(addressSnapshot);
+        order.setRemark(remark);
+        order.setPickupCode(generatePickupCode());
+        // 未支付截止时间：下单后 30 分钟
+        order.setExpireAt(now.plusMinutes(ORDER_EXPIRE_MINUTES));
+        wxOrderMapper.insert(order);
+        // 8. 写入订单明细
+        for (WxOrderLineDO line : lines) {
+            line.setWxOrderId(order.getId());
+            wxOrderLineMapper.insert(line);
+        }
+        // 9. 清空本次已结算的购物车记录
+        for (WxCartDO cart : checkedList) {
+            wxCartService.deleteWxCart(cart.getId());
+        }
+        return order.getId();
+    }
+
     // ========== 私有方法 ==========
+
+    /**
+     * 生成线上订单号，格式：WX-{门店}-{yyyyMMdd}-{4位流水}
+     *
+     * 依据当日已有订单数生成流水号，并校验唯一性，避免并发下重复。
+     */
+    private String generateOrderNo(Long storeId, LocalDateTime now) {
+        String prefix = "WX-" + storeId + "-" + now.format(ORDER_NO_DATE_FORMAT) + "-";
+        Long count = wxOrderMapper.selectCountByOrderNoPrefix(prefix);
+        long seq = (count == null ? 0L : count) + 1L;
+        String orderNo;
+        do {
+            orderNo = prefix + String.format("%04d", seq);
+            seq++;
+        } while (wxOrderMapper.selectByOrderNo(orderNo) != null);
+        return orderNo;
+    }
+
+    /**
+     * 生成一次性取货码（6 位大写字母数字），用于到店自提核销
+     */
+    private String generatePickupCode() {
+        String chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) {
+            sb.append(chars.charAt(ThreadLocalRandom.current().nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
 
     private void validateStatus(Integer status) {
         if (!WxOrderStatusEnum.isValid(status)) {

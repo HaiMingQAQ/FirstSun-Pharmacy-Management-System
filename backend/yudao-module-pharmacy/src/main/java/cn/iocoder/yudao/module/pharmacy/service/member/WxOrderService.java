@@ -107,4 +107,23 @@ public interface WxOrderService {
      */
     WxOrderDO validateWxOrderOwner(Long memberId, Long orderId);
 
+    // ========== 小程序端（app）下单 ==========
+
+    /**
+     * 从购物车已勾选商品创建订单（小程序下单）
+     *
+     * 业务校验：购物车不能为空、药品必须可销售、处方药必须关联处方、同城配送必须有地址。
+     * 下单成功后清空本次结算的购物车记录。
+     *
+     * @param memberId  会员编号（取自登录令牌）
+     * @param storeId   履约门店编号
+     * @param orderType 订单类型 0到店自提/1同城配送
+     * @param addressId 收货地址编号（同城配送必填）
+     * @param prescId   处方案编号（含处方药时必填）
+     * @param remark    备注
+     * @return 订单编号
+     */
+    Long createOrderFromCart(Long memberId, Long storeId, Integer orderType,
+                             Long addressId, Long prescId, String remark);
+
 }
