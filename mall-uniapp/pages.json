@@ -7,6 +7,79 @@
 		}
 	},
 	"pages": [{
+			"path": "pages/pharmacy/index",
+			"style": {
+				"navigationBarTitleText": "FirstSun 药店",
+				"enablePullDownRefresh": true
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "药店首页",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/category",
+			"style": {
+				"navigationBarTitleText": "药品分类"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "药品分类",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/cart",
+			"style": {
+				"navigationBarTitleText": "购物车"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "购物车",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/user",
+			"style": {
+				"navigationBarTitleText": "会员中心"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "会员中心",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/detail",
+			"style": {
+				"navigationBarTitleText": "药品详情"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "药品详情",
+				"group": "药店"
+			}
+		},
+		{
+			"path": "pages/pharmacy/login",
+			"style": {
+				"navigationBarTitleText": "会员登录"
+			},
+			"meta": {
+				"auth": false,
+				"sync": true,
+				"title": "会员登录",
+				"group": "药店"
+			}
+		},
+		{
 			"path": "pages/index/index",
 			"aliasPath": "/",
 			"style": {
