@@ -37,7 +37,7 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORD
  * <p>
  * 1) 幂等：order_no 全局唯一 + paymentNo 幂等唯一，防重复提交重复扣库；
  * 2) 金额：服务端重算（前端仅供展示）；
- * 3) 库存：只经 InventoryFacade（C 未实现时抛 INV_SERVICE_UNAVAILABLE 并整体回滚）。
+ * 3) 库存：只经 InventoryFacade；库存拒绝时整单回滚。
  */
 @Service
 public class SaleOrderServiceImpl implements SaleOrderService {
@@ -170,14 +170,17 @@ public class SaleOrderServiceImpl implements SaleOrderService {
             salePaymentMapper.insert(pm);
         }
 
-        // 7. 扣库存（C 服务；未实现抛业务异常，事务整体回滚）
+        // 7. 扣库存。库存拒绝时事务整体回滚。
         List<DeductItem> deductItems = new ArrayList<>();
-        for (SaleOrderSaveReqVO.Item item : reqVO.getItems()) {
+        for (PhSaleOrderLineDO line : lines) {
             DeductItem di = new DeductItem();
-            di.setDrugId(item.getDrugId());
-            di.setBatchId(item.getBatchId());
-            di.setQty(item.getQty());
-            di.setLocationId(item.getLocationId());
+            di.setDrugId(line.getDrugId());
+            di.setBatchId(line.getBatchId());
+            di.setQty(line.getQty());
+            di.setLocationId(line.getLocationId());
+            // Persisted order/line identifiers are the inventory-flow idempotency key.
+            di.setBizNo(order.getOrderNo());
+            di.setBizLineId(line.getId());
             deductItems.add(di);
         }
         try {

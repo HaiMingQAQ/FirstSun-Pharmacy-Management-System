@@ -44,6 +44,7 @@ services:
       - ./sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/21-pharmacy-demo-data.sql:ro
       - ./sql/migrations/20260914_m_pharmacy_rx_pay_menu.sql:/docker-entrypoint-initdb.d/22-pharmacy-rx-pay-menu.sql:ro
       - ./sql/migrations/20260914_n_pay_app_init.sql:/docker-entrypoint-initdb.d/23-pay-app-init.sql:ro
+      - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/24-inventory-facade-flow-ref.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s

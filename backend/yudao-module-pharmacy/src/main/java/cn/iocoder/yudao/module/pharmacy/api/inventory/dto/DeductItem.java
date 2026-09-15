@@ -15,4 +15,10 @@ public class DeductItem {
     private Integer qty;
 
     private Long locationId;
+
+    /** Source sale order number. Required by the real adapter for idempotency. */
+    private String bizNo;
+
+    /** Source sale order line id. Required by the real adapter for idempotency. */
+    private Long bizLineId;
 }

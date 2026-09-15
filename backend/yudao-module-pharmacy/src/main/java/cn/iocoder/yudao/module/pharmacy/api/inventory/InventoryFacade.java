@@ -11,9 +11,8 @@ import java.util.List;
 /**
  * 库存服务门面（POS 域与库存域的依赖边界）。
  * <p>
- * 由 C 成员实现选批/扣减/回补/收货入库；当前 C 未实现，调用方需捕获
- * {@link UnsupportedOperationException} 并转换为 INV_SERVICE_UNAVAILABLE，
- * 保证销售/退单/收货事务整体回滚，不静默放行。
+ * 由库存域实现选批、扣减、回补和收货入库。调用方必须提供来源单据和来源行，
+ * 使库存流水的唯一约束能够作为操作级幂等键。
  */
 public interface InventoryFacade {
 
