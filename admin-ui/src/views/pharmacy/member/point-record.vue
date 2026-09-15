@@ -25,7 +25,7 @@
           class="!w-240px"
         >
           <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.MEMBER_POINT_BIZ_TYPE)"
+            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_MEMBER_POINT_BIZ_TYPE)"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -54,7 +54,7 @@
       <el-table-column label="会员ID" align="center" prop="userId" width="100" />
       <el-table-column label="业务类型" align="center" prop="bizType" width="150">
         <template #default="scope">
-          <dict-tag :type="DICT_TYPE.MEMBER_POINT_BIZ_TYPE" :value="scope.row.bizType" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_MEMBER_POINT_BIZ_TYPE" :value="scope.row.bizType" />
         </template>
       </el-table-column>
       <el-table-column label="标题" align="center" prop="title" />
@@ -91,7 +91,6 @@ import * as PointRecordApi from '@/api/pharmacy/member/point-record'
 defineOptions({ name: 'PharmacyMemberPointRecord' })
 
 const message = useMessage() // 消息弹窗
-const { t } = useI18n() // 国际化
 
 const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数

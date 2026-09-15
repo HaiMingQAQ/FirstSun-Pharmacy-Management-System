@@ -190,10 +190,10 @@ const open = async (id: number) => {
 }
 defineExpose({ open }) // 提供 open 方法，用于打开抽屉
 
-/** 构造保存载荷，显式逐字段返回 */
-const buildSaveData = (): MemberApi.MemberUserVO => {
+/** 构造保存载荷，显式逐字段返回（只提交后端 SaveReqVO 支持的字段） */
+const buildSaveData = (): MemberApi.MemberUserSaveVO => {
   const v = formData.value
-  const payload: MemberApi.MemberUserVO = {
+  const payload: MemberApi.MemberUserSaveVO = {
     id: v.id,
     mobile: v.mobile,
     nickname: v.nickname,

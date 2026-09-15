@@ -29,7 +29,7 @@
       <el-form-item label="订单状态" prop="status">
         <el-select v-model="queryParams.status" placeholder="请选择订单状态" clearable class="!w-240px">
           <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.TRADE_ORDER_STATUS)"
+            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_WX_ORDER_STATUS)"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -39,7 +39,7 @@
       <el-form-item label="支付状态" prop="payStatus">
         <el-select v-model="queryParams.payStatus" placeholder="请选择支付状态" clearable class="!w-240px">
           <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.PAY_ORDER_STATUS)"
+            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_WX_PAY_STATUS)"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -49,7 +49,7 @@
       <el-form-item label="订单类型" prop="orderType">
         <el-select v-model="queryParams.orderType" placeholder="请选择订单类型" clearable class="!w-240px">
           <el-option
-            v-for="dict in getIntDictOptions(DICT_TYPE.TRADE_ORDER_TYPE)"
+            v-for="dict in getIntDictOptions(DICT_TYPE.PHARMACY_WX_ORDER_TYPE)"
             :key="dict.value"
             :label="dict.label"
             :value="dict.value"
@@ -71,7 +71,7 @@
       <el-table-column label="门店ID" align="center" prop="storeId" width="100" />
       <el-table-column label="订单类型" align="center" prop="orderType" width="120">
         <template #default="scope">
-          <dict-tag :type="DICT_TYPE.TRADE_ORDER_TYPE" :value="scope.row.orderType" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_ORDER_TYPE" :value="scope.row.orderType" />
         </template>
       </el-table-column>
       <el-table-column label="商品金额" align="center" prop="goodsAmount" width="110">
@@ -86,12 +86,12 @@
       </el-table-column>
       <el-table-column label="支付状态" align="center" prop="payStatus" width="100">
         <template #default="scope">
-          <dict-tag :type="DICT_TYPE.PAY_ORDER_STATUS" :value="scope.row.payStatus" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_PAY_STATUS" :value="scope.row.payStatus" />
         </template>
       </el-table-column>
       <el-table-column label="订单状态" align="center" prop="status" width="100">
         <template #default="scope">
-          <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="scope.row.status" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_ORDER_STATUS" :value="scope.row.status" />
         </template>
       </el-table-column>
       <el-table-column label="下单时间" align="center" prop="createTime" width="170">
@@ -151,7 +151,6 @@ import OrderDetail from './OrderDetail.vue'
 defineOptions({ name: 'PharmacyMemberOrder' })
 
 const message = useMessage() // 消息弹窗
-const { t } = useI18n() // 国际化
 
 const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数
