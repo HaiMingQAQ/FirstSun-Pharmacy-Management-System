@@ -151,7 +151,7 @@ management:
     web:
       base-path: /actuator # Actuator 提供的 API 接口的根目录。默认为 /actuator
       exposure:
-        include: '*' # 需要开放的端点。默认值只打开 health 和 info 两个端点。通过设置 * ，可以开放所有端点。
+        include: health # 仅开放 health 端点，供 Docker healthcheck 使用；env/beans 等敏感端点不对外暴露
 
 # Spring Boot Admin 配置项
 spring:

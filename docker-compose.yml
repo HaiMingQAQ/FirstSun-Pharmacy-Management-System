@@ -89,6 +89,13 @@ services:
         --spring.data.redis.port=6379
     ports:
       - "${BACKEND_PORT:-48080}:48080"
+    healthcheck:
+      # 真实请求 Actuator 健康接口：返回非 2xx（如 503 DOWN、404）时 curl -f 判定失败，容器标记为 unhealthy
+      test: ["CMD", "curl", "-fsS", "http://localhost:48080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   admin-ui:
     build:

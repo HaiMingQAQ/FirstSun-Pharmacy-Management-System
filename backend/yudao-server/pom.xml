@@ -165,6 +165,12 @@
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
 
+        <!-- 监控相关：Actuator 健康检查端点，供 Docker healthcheck 使用 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- spring boot 配置所需依赖 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
