@@ -22,6 +22,23 @@ export interface MemberUserVO {
   createTime?: Date
 }
 
+/** 会员档案新增/修改 VO（与后端 MemberUserSaveReqVO 对齐，注册/登录信息由服务端维护，不在提交载荷内） */
+export interface MemberUserSaveVO {
+  id?: number
+  mobile: string
+  nickname: string
+  avatar?: string
+  name?: string
+  sex?: number
+  status: number
+  birthday?: string
+  mark?: string
+  point?: number
+  levelId?: number
+  experience?: number
+  email?: string
+}
+
 // 查询会员档案分页
 export const getMemberPage = async (params: PageParam) => {
   return await request.get({ url: '/pharmacy/member/user/page', params })
@@ -33,7 +50,7 @@ export const getMember = async (id: number) => {
 }
 
 // 修改会员档案
-export const updateMember = async (data: MemberUserVO) => {
+export const updateMember = async (data: MemberUserSaveVO) => {
   return await request.put({ url: '/pharmacy/member/user/update', data })
 }
 
