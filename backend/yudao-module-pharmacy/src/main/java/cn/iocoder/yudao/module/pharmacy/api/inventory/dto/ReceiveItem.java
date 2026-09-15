@@ -23,7 +23,7 @@ import java.time.LocalDate;
 public class ReceiveItem implements Serializable {
 
     /**
-     * 业务行标识：收货明细编号（字符串形式），作为幂等键的一部分
+     * 业务行标识：收货明细编号（字符串形式且必须可解析为正整数），作为幂等键的一部分
      */
     private String bizLineId;
 

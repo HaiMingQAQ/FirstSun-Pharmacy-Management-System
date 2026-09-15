@@ -76,6 +76,7 @@ class SaleReturnServiceImplTest {
     void setUp() {
         order = new PhSaleOrderDO();
         order.setId(1L);
+        order.setOrderNo("SO-1-20260909101000-001");
         order.setStoreId(1L);
         order.setStatus(1); // 已完成
         order.setReturnFlag(0);
@@ -88,6 +89,7 @@ class SaleReturnServiceImplTest {
         line.setOrderId(1L);
         line.setDrugId(1L);
         line.setBatchId(2L);
+        line.setLocationId(21L);
         line.setQty(5);
         line.setReturnedQty(0);
         line.setPrice(new BigDecimal("10.00"));
@@ -101,7 +103,10 @@ class SaleReturnServiceImplTest {
             invocation.getArgument(0, PhSaleReturnDO.class).setId(1L);
             return 1;
         }).when(saleReturnMapper).insert(any(PhSaleReturnDO.class));
-        when(saleReturnLineMapper.insert(any(PhSaleReturnLineDO.class))).thenReturn(1);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, PhSaleReturnLineDO.class).setId(21L);
+            return 1;
+        }).when(saleReturnLineMapper).insert(any(PhSaleReturnLineDO.class));
     }
 
     private SaleReturnSaveReqVO buildReqVO() {
@@ -122,6 +127,14 @@ class SaleReturnServiceImplTest {
 
     @Test
     void testCreateReturn_success() {
+        doAnswer(invocation -> {
+            List<cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem> items = invocation.getArgument(1);
+            assertEquals("SO-1-20260909101000-001", items.get(0).getOriginalBizNo());
+            assertEquals(11L, items.get(0).getOriginalBizLineId());
+            assertEquals(21L, items.get(0).getBizLineId());
+            assertEquals(21L, items.get(0).getLocationId());
+            return null;
+        }).when(inventoryFacade).returnBack(anyLong(), anyList());
         Long id = saleReturnService.createReturn(buildReqVO());
         assertEquals(1L, id);
         // 原批次回补库存；现金退款不触发电渠道

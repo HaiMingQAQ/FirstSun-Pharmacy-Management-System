@@ -15,4 +15,16 @@ public class ReturnBackItem {
     private Integer qty;
 
     private Long locationId;
+
+    /** Newly created return document number. */
+    private String bizNo;
+
+    /** Newly created return document line id. */
+    private Long bizLineId;
+
+    /** Original sale order number used to locate the exact outbound flow. */
+    private String originalBizNo;
+
+    /** Original sale order line id used to locate the exact outbound flow. */
+    private Long originalBizLineId;
 }

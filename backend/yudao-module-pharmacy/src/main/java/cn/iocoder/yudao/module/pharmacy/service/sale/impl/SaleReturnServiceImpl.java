@@ -103,7 +103,11 @@ public class SaleReturnServiceImpl implements SaleReturnService {
             rl.setPrice(line.getPrice());
             rl.setAmount(line.getPrice().multiply(BigDecimal.valueOf(item.getQty())));
             rl.setPointsDeduct(0);
-            rl.setLocationId(item.getLocationId());
+            // A return must restore the exact outbound allocation. Do not accept a caller-selected location.
+            if (line.getBatchId() == null || line.getLocationId() == null) {
+                throw ServiceExceptionUtil.invalidParamException("原销售明细缺少批次或货位，不能执行原批次退货");
+            }
+            rl.setLocationId(line.getLocationId());
             totalAmount = totalAmount.add(rl.getAmount());
             lines.add(rl);
         }
@@ -111,44 +115,8 @@ public class SaleReturnServiceImpl implements SaleReturnService {
             throw ServiceExceptionUtil.exception(SALE_RETURN_QTY_EXCEED);
         }
 
-        // 3. 渠道退款（refundMethod=0 原路，依赖 E 支付；未实现整体回滚；幂等键后续改为 returnNo）
-        Integer refundMethod = reqVO.getRefundMethod() == null ? 0 : reqVO.getRefundMethod();
-        try {
-            if (refundMethod == 0) {
-                paymentFacade.refund(null, "REFUND-" + System.currentTimeMillis(), totalAmount.movePointRight(2).intValue(), null);
-            }
-        } catch (UnsupportedOperationException ex) {
-            throw ServiceExceptionUtil.exception(PAY_SERVICE_UNAVAILABLE);
-        }
-
-        // 4. 积分回退（F 服务；本期 pointsDeduct=0 不触发）
-        try {
-            // 有积分抵扣的销售退货应回退积分；本期销售 pointsDeduct=0
-            if (order.getPointsDeduct() != null && order.getPointsDeduct().signum() > 0) {
-                memberPointFacade.backPoints(order.getMemberId(),
-                        order.getOrderNo(), order.getPointsDeduct().intValue());
-            }
-        } catch (UnsupportedOperationException ex) {
-            throw ServiceExceptionUtil.exception(MEMBER_SERVICE_UNAVAILABLE);
-        }
-
-        // 5. 库存回补（C 服务；未实现整体回滚）
-        List<ReturnBackItem> returnItems = new ArrayList<>();
-        for (PhSaleReturnLineDO rl : lines) {
-            ReturnBackItem rbi = new ReturnBackItem();
-            rbi.setDrugId(rl.getDrugId());
-            rbi.setBatchId(rl.getBatchId());
-            rbi.setQty(rl.getQty());
-            rbi.setLocationId(rl.getLocationId());
-            returnItems.add(rbi);
-        }
-        try {
-            inventoryFacade.returnBack(order.getStoreId(), returnItems);
-        } catch (UnsupportedOperationException ex) {
-            throw ServiceExceptionUtil.exception(INV_SERVICE_UNAVAILABLE);
-        }
-
-        // 6. 写退货单（本期流程直接置“已完成”，审批流由后续迭代接入）
+        // 3. Persist the return source rows before calling C. Their generated ids are the idempotency
+        // key, and all later payment/points/inventory failures still roll this transaction back.
         String returnNo = genReturnNo(order.getStoreId());
         if (saleReturnMapper.selectByReturnNo(returnNo) != null) {
             throw ServiceExceptionUtil.exception(SALE_RETURN_NO_DUPLICATE);
@@ -160,15 +128,56 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         ret.setReturnType(reqVO.getReturnType());
         ret.setReason(reqVO.getReason());
         ret.setTotalAmount(totalAmount);
-        ret.setRefundMethod(refundMethod);
-        ret.setStatus(1); // 1 待审批（一期直接完成审批，简化流程）
+        ret.setRefundMethod(reqVO.getRefundMethod() == null ? 0 : reqVO.getRefundMethod());
+        ret.setStatus(1);
         ret.setCashierId(reqVO.getCashierId() != null ? reqVO.getCashierId() : order.getCashierId());
         ret.setPharmacistConfirm(reqVO.getPharmacistConfirm());
         ret.setRefundStatus(0);
         saleReturnMapper.insert(ret);
-        for (PhSaleReturnLineDO l : lines) {
-            l.setReturnId(ret.getId());
-            saleReturnLineMapper.insert(l);
+        for (PhSaleReturnLineDO line : lines) {
+            line.setReturnId(ret.getId());
+            saleReturnLineMapper.insert(line);
+        }
+
+        // 4. 渠道退款（refundMethod=0 原路，依赖 E 支付；未实现整体回滚；幂等键后续改为 returnNo）
+        Integer refundMethod = reqVO.getRefundMethod() == null ? 0 : reqVO.getRefundMethod();
+        try {
+            if (refundMethod == 0) {
+                paymentFacade.refund(null, "REFUND-" + System.currentTimeMillis(), totalAmount.movePointRight(2).intValue(), null);
+            }
+        } catch (UnsupportedOperationException ex) {
+            throw ServiceExceptionUtil.exception(PAY_SERVICE_UNAVAILABLE);
+        }
+
+        // 5. 积分回退（F 服务；本期 pointsDeduct=0 不触发）
+        try {
+            // 有积分抵扣的销售退货应回退积分；本期销售 pointsDeduct=0
+            if (order.getPointsDeduct() != null && order.getPointsDeduct().signum() > 0) {
+                memberPointFacade.backPoints(order.getMemberId(),
+                        order.getOrderNo(), order.getPointsDeduct().intValue());
+            }
+        } catch (UnsupportedOperationException ex) {
+            throw ServiceExceptionUtil.exception(MEMBER_SERVICE_UNAVAILABLE);
+        }
+
+        // 6. 库存回补（C 服务；真实实现按原销售流水回补）
+        List<ReturnBackItem> returnItems = new ArrayList<>();
+        for (PhSaleReturnLineDO rl : lines) {
+            ReturnBackItem rbi = new ReturnBackItem();
+            rbi.setDrugId(rl.getDrugId());
+            rbi.setBatchId(rl.getBatchId());
+            rbi.setQty(rl.getQty());
+            rbi.setLocationId(rl.getLocationId());
+            rbi.setBizNo(ret.getReturnNo());
+            rbi.setBizLineId(rl.getId());
+            rbi.setOriginalBizNo(order.getOrderNo());
+            rbi.setOriginalBizLineId(rl.getSaleLineId());
+            returnItems.add(rbi);
+        }
+        try {
+            inventoryFacade.returnBack(order.getStoreId(), returnItems);
+        } catch (UnsupportedOperationException ex) {
+            throw ServiceExceptionUtil.exception(INV_SERVICE_UNAVAILABLE);
         }
 
         // 7. 更新原单行已退数量与整单退货标志
