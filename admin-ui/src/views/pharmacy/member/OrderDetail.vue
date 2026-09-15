@@ -12,13 +12,13 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="订单号">{{ orderData.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="订单类型">
-          <dict-tag :type="DICT_TYPE.TRADE_ORDER_TYPE" :value="orderData.orderType" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_ORDER_TYPE" :value="orderData.orderType" />
         </el-descriptions-item>
         <el-descriptions-item label="订单状态">
-          <dict-tag :type="DICT_TYPE.TRADE_ORDER_STATUS" :value="orderData.status" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_ORDER_STATUS" :value="orderData.status" />
         </el-descriptions-item>
         <el-descriptions-item label="支付状态">
-          <dict-tag :type="DICT_TYPE.PAY_ORDER_STATUS" :value="orderData.payStatus" />
+          <dict-tag :type="DICT_TYPE.PHARMACY_WX_PAY_STATUS" :value="orderData.payStatus" />
         </el-descriptions-item>
         <el-descriptions-item label="会员ID">{{ orderData.memberId }}</el-descriptions-item>
         <el-descriptions-item label="门店ID">{{ orderData.storeId }}</el-descriptions-item>
