@@ -4,8 +4,13 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.module.pharmacy.api.DrugApi;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductResult;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
 import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.WxOrderDO;
@@ -209,7 +214,7 @@ class WxOrderStockLifecycleTest {
         ArgumentCaptor<WxOrderLineAllocDO> allocCaptor = ArgumentCaptor.forClass(WxOrderLineAllocDO.class);
         verify(wxOrderLineAllocMapper).updateById(allocCaptor.capture());
         assertEquals(2, allocCaptor.getValue().getReturnedQty());
-        assertEquals(WxOrderLineAllocDO.STATUS_RETURNED, allocCaptor.getValue().getStatus());
+        assertEquals(WxOrderLineAllocDO.STATUS_SETTLED, allocCaptor.getValue().getStatus());
         // 已支付订单取消同时退回款项
         verify(paymentFacade).refund(eq(PAY_ORDER_ID), anyString(), anyInt(), anyString());
     }
@@ -255,7 +260,10 @@ class WxOrderStockLifecycleTest {
     void testRefundWxOrder_returnsStockOnlyOnce() {
         when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PICK, 1));
         when(wxOrderMapper.update(any(), any())).thenReturn(1);
-        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildAlloc(0)));
+        // 冻结转出库产生的出库流水行号是分配记录编号
+        WxOrderLineAllocDO consumed = buildAlloc(0);
+        consumed.setOutBizLineId(ALLOC_ID);
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(consumed));
 
         wxOrderService.refundWxOrder(ORDER_ID, "用户申请退款");
 
@@ -263,6 +271,8 @@ class WxOrderStockLifecycleTest {
         ArgumentCaptor<List<ReturnBackItem>> itemCaptor = ArgumentCaptor.forClass(List.class);
         verify(inventoryFacade).returnBack(eq(STORE_ID), itemCaptor.capture());
         assertEquals("WXR-" + ORDER_NO, itemCaptor.getValue().get(0).getBizNo());
+        assertEquals(ALLOC_ID, itemCaptor.getValue().get(0).getOriginalBizLineId(),
+                "回补必须引用正式出库流水的行号，否则 C 找不到原出库流水");
 
         // 第二次退款（重复回调）：订单已是已退款状态，直接返回
         when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.CANCELED, 2));
@@ -277,6 +287,160 @@ class WxOrderStockLifecycleTest {
         when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.COMPLETED, 1));
 
         assertThrows(ServiceException.class, () -> wxOrderService.refundWxOrder(ORDER_ID, "退款"));
+        verify(inventoryFacade, never()).returnBack(anyLong(), anyList());
+    }
+
+    // ========== 门店节点：下单冻结 ==========
+
+    /** 冻结：按 FEFO 分配并落库为「已冻结」，请求携带订单号 + 明细行号作为幂等键 */
+    @Test
+    void testReserveWxOrder_freezesStockAndRecordsFrozenAllocation() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0));
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(wxOrderLineService.getWxOrderLineListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildLine(2)));
+        when(inventoryFacade.getAvailableQty(eq(STORE_ID), anyList())).thenReturn(List.of(buildAvailableQty(30)));
+        when(inventoryFacade.reserve(anyLong(), anyList())).thenReturn(buildReserveResult(2));
+
+        wxOrderService.reserveWxOrder(ORDER_ID);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ReserveItem>> itemCaptor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryFacade).reserve(eq(STORE_ID), itemCaptor.capture());
+        ReserveItem item = itemCaptor.getValue().get(0);
+        assertEquals(ORDER_NO, item.getBizNo(), "冻结必须携带业务单号，否则 C 无法做操作级幂等");
+        assertEquals(LINE_ID, item.getBizLineId());
+        assertEquals(DRUG_ID, item.getDrugId());
+        assertEquals(2, item.getQty());
+
+        ArgumentCaptor<WxOrderLineAllocDO> allocCaptor = ArgumentCaptor.forClass(WxOrderLineAllocDO.class);
+        verify(wxOrderLineAllocMapper).insert(allocCaptor.capture());
+        assertEquals(WxOrderLineAllocDO.STATUS_FROZEN, allocCaptor.getValue().getStatus());
+        assertEquals(BATCH_ID, allocCaptor.getValue().getBatchId());
+        assertEquals(LOCATION_ID, allocCaptor.getValue().getLocationId());
+    }
+
+    /** 冻结前粗校验：门店可售量不足时直接拒绝，不产生任何冻结 */
+    @Test
+    void testReserveWxOrder_notEnoughAvailableRejected() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0));
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(Collections.emptyList());
+        when(wxOrderLineService.getWxOrderLineListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildLine(2)));
+        when(inventoryFacade.getAvailableQty(eq(STORE_ID), anyList())).thenReturn(List.of(buildAvailableQty(1)));
+
+        ServiceException ex = assertThrows(ServiceException.class, () -> wxOrderService.reserveWxOrder(ORDER_ID));
+
+        assertEquals(PHARMACY_WX_ORDER_STOCK_NOT_ENOUGH.getCode(), ex.getCode());
+        verify(inventoryFacade, never()).reserve(anyLong(), anyList());
+        verify(wxOrderLineAllocMapper, never()).insert(any(WxOrderLineAllocDO.class));
+    }
+
+    /** 冻结幂等：已存在分配记录时不重复冻结、不重复读可售量 */
+    @Test
+    void testReserveWxOrder_idempotent() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0));
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildFrozenAlloc()));
+
+        wxOrderService.reserveWxOrder(ORDER_ID);
+
+        verify(inventoryFacade, never()).reserve(anyLong(), anyList());
+        verify(inventoryFacade, never()).getAvailableQty(anyLong(), anyList());
+    }
+
+    // ========== 支付：冻结转出库 ==========
+
+    /** 已冻结订单支付：走冻结转出库，不再按 FEFO 重新扣库 */
+    @Test
+    void testPayWxOrder_consumesReservation() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0));
+        when(wxOrderMapper.update(any(), any())).thenReturn(1);
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildFrozenAlloc()));
+
+        wxOrderService.payWxOrder(ORDER_ID, "PAY-0005");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ConsumeItem>> itemCaptor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryFacade).consumeReservation(eq(STORE_ID), itemCaptor.capture());
+        ConsumeItem item = itemCaptor.getValue().get(0);
+        assertEquals(ORDER_NO, item.getBizNo());
+        assertEquals(ALLOC_ID, item.getBizLineId());
+        assertEquals(ORDER_NO, item.getOriginalBizNo(), "必须指向原冻结业务单号");
+        assertEquals(LINE_ID, item.getOriginalBizLineId(), "必须指向原冻结来源行");
+        assertEquals(BATCH_ID, item.getBatchId());
+        assertEquals(LOCATION_ID, item.getLocationId());
+        assertEquals(2, item.getQty());
+        verify(inventoryFacade, never()).deduct(anyLong(), anyList());
+
+        ArgumentCaptor<WxOrderLineAllocDO> allocCaptor = ArgumentCaptor.forClass(WxOrderLineAllocDO.class);
+        verify(wxOrderLineAllocMapper).updateById(allocCaptor.capture());
+        assertEquals(WxOrderLineAllocDO.STATUS_OUT, allocCaptor.getValue().getStatus());
+        assertEquals(ALLOC_ID, allocCaptor.getValue().getOutBizLineId(),
+                "必须记录出库流水的来源行号（分配记录编号），否则回补时找不到原出库流水");
+    }
+
+    // ========== 门店节点：超时关闭与释放冻结 ==========
+
+    /** 未支付订单取消：释放冻结，不做回补 */
+    @Test
+    void testCancelWxOrder_releasesFrozenStock() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0));
+        when(wxOrderMapper.update(any(), any())).thenReturn(1);
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildFrozenAlloc()));
+
+        wxOrderService.cancelWxOrder(ORDER_ID, "用户取消未支付订单");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ReleaseItem>> itemCaptor = ArgumentCaptor.forClass(List.class);
+        verify(inventoryFacade).release(eq(STORE_ID), itemCaptor.capture());
+        ReleaseItem item = itemCaptor.getValue().get(0);
+        assertEquals("WXC-" + ORDER_NO, item.getBizNo(), "释放需使用独立业务号，避免与冻结 / 出库冲突");
+        assertEquals(ALLOC_ID, item.getBizLineId());
+        assertEquals(ORDER_NO, item.getOriginalBizNo());
+        assertEquals(LINE_ID, item.getOriginalBizLineId());
+        assertEquals(2, item.getQty());
+        verify(inventoryFacade, never()).returnBack(anyLong(), anyList());
+    }
+
+    /** 会员取消：只关订单，不触发任何库存作业（小程序没有库存作业身份） */
+    @Test
+    void testCancelWxOrderByMember_hasNoStockAction() {
+        when(wxOrderMapper.selectById(ORDER_ID)).thenReturn(buildOrder(WxOrderStatusEnum.WAIT_PICK, 1));
+        when(wxOrderMapper.update(any(), any())).thenReturn(1);
+
+        wxOrderService.cancelWxOrderByMember(ORDER_ID, "会员取消");
+
+        verify(inventoryFacade, never()).release(anyLong(), anyList());
+        verify(inventoryFacade, never()).returnBack(anyLong(), anyList());
+        verify(inventoryFacade, never()).consumeReservation(anyLong(), anyList());
+        verify(inventoryFacade, never()).deduct(anyLong(), anyList());
+        verify(paymentFacade, never()).refund(any(), anyString(), anyInt(), anyString());
+    }
+
+    /** 关闭超时未支付订单：逐单条件关闭并返回关闭数 */
+    @Test
+    void testCloseExpiredWxOrders() {
+        when(wxOrderMapper.selectExpiredList(eq(STORE_ID), anyInt(), any(), anyInt()))
+                .thenReturn(List.of(buildOrder(WxOrderStatusEnum.WAIT_PAY, 0), buildOrder(WxOrderStatusEnum.WAIT_PAY, 0)));
+        when(wxOrderMapper.update(any(), any())).thenReturn(1);
+
+        int closed = wxOrderService.closeExpiredWxOrders(STORE_ID, 50);
+
+        assertEquals(2, closed);
+        verify(wxOrderMapper, times(2)).update(any(), any());
+    }
+
+    /** 批量释放：只释放仍冻结的分配，已出库的不动（避免未退款先回补） */
+    @Test
+    void testReleaseFrozenStockOfClosedOrders_releasesOnlyFrozen() {
+        when(wxOrderMapper.selectListByStoreIdAndStatus(eq(STORE_ID), anyInt(), anyInt()))
+                .thenReturn(List.of(buildOrder(WxOrderStatusEnum.CANCELED, 0)));
+        WxOrderLineAllocDO out = buildAlloc(0);
+        out.setId(ALLOC_ID + 1);
+        when(wxOrderLineAllocMapper.selectListByWxOrderId(ORDER_ID)).thenReturn(List.of(buildFrozenAlloc(), out));
+
+        int released = wxOrderService.releaseFrozenStockOfClosedOrders(STORE_ID, 50);
+
+        assertEquals(1, released);
+        verify(inventoryFacade).release(eq(STORE_ID), anyList());
         verify(inventoryFacade, never()).returnBack(anyLong(), anyList());
     }
 
@@ -317,7 +481,14 @@ class WxOrderStockLifecycleTest {
         alloc.setLocationId(LOCATION_ID);
         alloc.setQty(2);
         alloc.setReturnedQty(returnedQty);
-        alloc.setStatus(returnedQty >= 2 ? WxOrderLineAllocDO.STATUS_RETURNED : WxOrderLineAllocDO.STATUS_OUT);
+        alloc.setStatus(returnedQty >= 2 ? WxOrderLineAllocDO.STATUS_SETTLED : WxOrderLineAllocDO.STATUS_OUT);
+        return alloc;
+    }
+
+    /** 冻结阶段的分配记录 */
+    private WxOrderLineAllocDO buildFrozenAlloc() {
+        WxOrderLineAllocDO alloc = buildAlloc(0);
+        alloc.setStatus(WxOrderLineAllocDO.STATUS_FROZEN);
         return alloc;
     }
 
@@ -338,6 +509,32 @@ class WxOrderStockLifecycleTest {
         }
         result.setAllocations(allocations);
         return result;
+    }
+
+    /** 构造 C 的冻结结果，qtys 长度即为 FEFO 拆分出的批次数 */
+    private ReserveResult buildReserveResult(int... qtys) {
+        ReserveResult result = new ReserveResult();
+        result.setSuccess(true);
+        List<ReserveResult.Allocation> allocations = new ArrayList<>();
+        long batchId = BATCH_ID;
+        long locationId = LOCATION_ID;
+        for (int qty : qtys) {
+            ReserveResult.Allocation allocation = new ReserveResult.Allocation();
+            allocation.setBizLineId(LINE_ID);
+            allocation.setBatchId(batchId++);
+            allocation.setLocationId(locationId++);
+            allocation.setQty(qty);
+            allocations.add(allocation);
+        }
+        result.setAllocations(allocations);
+        return result;
+    }
+
+    private AvailableQty buildAvailableQty(int qtyAvail) {
+        AvailableQty available = new AvailableQty();
+        available.setDrugId(DRUG_ID);
+        available.setQtyAvail(qtyAvail);
+        return available;
     }
 
 }

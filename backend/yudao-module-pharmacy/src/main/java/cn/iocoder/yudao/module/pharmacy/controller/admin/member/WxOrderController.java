@@ -135,6 +135,33 @@ public class WxOrderController {
         return success(true);
     }
 
+    @PutMapping("/reserve")
+    @Operation(summary = "冻结订单库存（幂等）：按门店可售量校验后按 FEFO 冻结")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> reserveWxOrder(@RequestParam("id") Long id) {
+        wxOrderService.reserveWxOrder(id);
+        return success(true);
+    }
+
+    @PutMapping("/close-expired")
+    @Operation(summary = "关闭门店超时未支付订单（门店库存清理节点）")
+    @Parameter(name = "storeId", description = "门店编号", required = true, example = "407")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Integer> closeExpiredWxOrders(@RequestParam("storeId") Long storeId,
+                                                      @RequestParam(value = "limit", required = false) Integer limit) {
+        return success(wxOrderService.closeExpiredWxOrders(storeId, limit));
+    }
+
+    @PutMapping("/release-frozen")
+    @Operation(summary = "释放已关闭订单仍冻结的库存（门店库存清理节点，幂等）")
+    @Parameter(name = "storeId", description = "门店编号", required = true, example = "407")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Integer> releaseFrozenStock(@RequestParam("storeId") Long storeId,
+                                                    @RequestParam(value = "limit", required = false) Integer limit) {
+        return success(wxOrderService.releaseFrozenStockOfClosedOrders(storeId, limit));
+    }
+
     @PutMapping("/start-picking")
     @Operation(summary = "开始拣货：待拣货 → 拣货中")
     @Parameter(name = "id", description = "订单编号", required = true, example = "1024")

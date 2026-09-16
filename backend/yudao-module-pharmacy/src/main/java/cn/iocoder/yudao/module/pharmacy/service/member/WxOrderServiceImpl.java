@@ -6,8 +6,13 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.pharmacy.api.DrugApi;
 import cn.iocoder.yudao.module.pharmacy.api.dto.DrugRespDTO;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductResult;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
 import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
 import cn.iocoder.yudao.module.pharmacy.api.payment.dto.PayOrderDTO;
@@ -72,6 +77,10 @@ public class WxOrderServiceImpl implements WxOrderService {
     private static final String CANCEL_BIZ_PREFIX = "WXC-";
     /** 退款回补业务单号前缀 */
     private static final String REFUND_BIZ_PREFIX = "WXR-";
+    /** 门店批量清理（关闭超时订单 / 释放冻结）的默认单次处理上限 */
+    private static final int STOCK_CLEANUP_LIMIT = 100;
+    /** 门店批量清理的单次处理硬上限，防止一次请求拖垮库存作业 */
+    private static final int STOCK_CLEANUP_MAX_LIMIT = 200;
 
     @Resource
     private WxOrderMapper wxOrderMapper;
@@ -226,8 +235,23 @@ public class WxOrderServiceImpl implements WxOrderService {
             // 并发下已被其他请求支付，视为幂等成功
             return;
         }
-        // 对接 C：支付成功即按 FEFO 正式出库（同事务），并记录实际批次/货位供后续回补
-        deductStock(wxOrder);
+        // 对接 C：已冻结的订单把冻结转正式出库；未冻结的历史订单退化为按 FEFO 直接出库（同事务）
+        consumeReservedOrDeductStock(wxOrder);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void reserveWxOrder(Long id) {
+        WxOrderDO wxOrder = validateWxOrderExists(id);
+        // 仅待支付订单需要冻结库存
+        if (!Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.WAIT_PAY.getStatus())) {
+            throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
+        }
+        // 幂等：已存在分配记录说明本单已冻结，直接返回
+        if (!wxOrderLineAllocMapper.selectListByWxOrderId(wxOrder.getId()).isEmpty()) {
+            return;
+        }
+        reserveStock(wxOrder);
     }
 
     @Override
@@ -266,9 +290,68 @@ public class WxOrderServiceImpl implements WxOrderService {
             // 对接 E：已支付订单取消需退回款项（E 未就绪时降级不阻塞）
             refundChannelPayOrder(wxOrder);
         }
-        // 已支付（待拣货）的订单此前已出库，取消需按原批次、原货位回补库存。
-        // 通过状态条件更新 + 出库分配表的已回补数量双重保证「只释放一次」。
-        returnBackStock(wxOrder, true);
+        // 对接 C：关闭订单时结算库存 —— 仍冻结的释放，已出库的按原批次、原货位回补
+        settleStockOnClose(wxOrder, CANCEL_BIZ_PREFIX, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelWxOrderByMember(Long id, String cancelReason) {
+        WxOrderDO wxOrder = validateWxOrderExists(id);
+        // 幂等：已取消直接返回
+        if (Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.CANCELED.getStatus())) {
+            return;
+        }
+        // 已完成订单不允许取消
+        if (Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.COMPLETED.getStatus())) {
+            throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
+        }
+        // 仅待支付、待拣货状态允许取消
+        if (!Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.WAIT_PAY.getStatus())
+                && !Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.WAIT_PICK.getStatus())) {
+            throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
+        }
+        // 小程序端不具备「目标门店在职管理员」身份，C 的库存门禁会拒绝库存作业，
+        // 因此会员取消只关闭订单状态，库存由门店节点释放或回补（见 releaseFrozenStockOfClosedOrders / refundWxOrder）。
+        // 注意：订单支付状态保持「已支付」，等门店退款节点才置为「已退款」，避免出现未退款却标记退款。
+        WxOrderDO updateObj = new WxOrderDO();
+        updateObj.setStatus(WxOrderStatusEnum.CANCELED.getStatus());
+        updateObj.setCancelReason(cancelReason);
+        wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
+                .eq(WxOrderDO::getId, id)
+                .in(WxOrderDO::getStatus, WxOrderStatusEnum.WAIT_PAY.getStatus(), WxOrderStatusEnum.WAIT_PICK.getStatus()));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int closeExpiredWxOrders(Long storeId, Integer limit) {
+        LocalDateTime now = LocalDateTime.now();
+        List<WxOrderDO> expired = wxOrderMapper.selectExpiredList(storeId, WxOrderStatusEnum.WAIT_PAY.getStatus(),
+                now, normalizeCleanupLimit(limit));
+        int closed = 0;
+        for (WxOrderDO order : expired) {
+            WxOrderDO updateObj = new WxOrderDO();
+            updateObj.setStatus(WxOrderStatusEnum.CANCELED.getStatus());
+            updateObj.setCancelReason("支付超时自动关闭");
+            // 条件更新保证并发下只关闭一次
+            closed += wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
+                    .eq(WxOrderDO::getId, order.getId())
+                    .eq(WxOrderDO::getStatus, WxOrderStatusEnum.WAIT_PAY.getStatus()));
+        }
+        return closed;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int releaseFrozenStockOfClosedOrders(Long storeId, Integer limit) {
+        List<WxOrderDO> closed = wxOrderMapper.selectListByStoreIdAndStatus(storeId,
+                WxOrderStatusEnum.CANCELED.getStatus(), normalizeCleanupLimit(limit));
+        int released = 0;
+        for (WxOrderDO order : closed) {
+            // frozenOnly=true：只释放仍冻结的分配，已出库的留给退款 / 退货节点回补
+            released += settleStockOnClose(order, CANCEL_BIZ_PREFIX, true);
+        }
+        return released;
     }
 
     @Override
@@ -283,8 +366,9 @@ public class WxOrderServiceImpl implements WxOrderService {
         if (!Objects.equals(wxOrder.getPayStatus(), PAY_STATUS_PAID)) {
             throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
         }
-        // 已完成订单的出库已转销售，退款需走 D 的销售退货流程，不在本接口处理
-        if (WxOrderStatusEnum.isFinished(wxOrder.getStatus())) {
+        // 已完成订单的出库已转销售，退款需走 D 的销售退货流程，不在本接口处理。
+        // 已取消但尚未退款的订单（例如会员先取消）仍允许退款，因此这里只排除已完成状态。
+        if (Objects.equals(wxOrder.getStatus(), WxOrderStatusEnum.COMPLETED.getStatus())) {
             throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
         }
         // 条件更新抢占：仅当仍为「已支付」时翻转，重复退款回调 rows=0 直接返回
@@ -300,8 +384,8 @@ public class WxOrderServiceImpl implements WxOrderService {
         }
         // 对接 E：渠道退款。E 未就绪时降级不阻塞（与下单创建支付单的降级策略一致）
         refundChannelPayOrder(wxOrder);
-        // 对接 C：按原批次、原货位回补库存（同事务，失败整体回滚）
-        returnBackStock(wxOrder, false);
+        // 对接 C：结算库存 —— 仍冻结的释放，已出库的按原批次、原货位回补（同事务，失败整体回滚）
+        settleStockOnClose(wxOrder, REFUND_BIZ_PREFIX, false);
     }
 
     @Override
@@ -549,15 +633,226 @@ public class WxOrderServiceImpl implements WxOrderService {
      * - 不指定批次/货位时由 C 按效期最早优先选批，实际分配通过 {@link DeductResult} 回传；
      * - 出库分配写入 {@code ph_wx_order_line_alloc}，是取消/退款回补「原批次、原货位」的唯一依据。
      */
+    /**
+     * 对接 C：下单冻结库存（{@code InventoryFacade#reserve}，门店管理端节点）
+     *
+     * 与 C 的契约：
+     * - 每行必填 {@code bizNo}（订单号，全行一致）与 {@code bizLineId}（订单明细编号），是操作级幂等键（流水 80）；
+     * - 不指定批次/货位时由 C 按效期最早优先选批，实际分配通过 {@link ReserveResult} 回传；
+     * - 库存不足、批次停售或过期时 C 抛业务异常，调用方事务整体回滚，不会留下半个冻结。
+     *
+     * 返回的实际分配写入 {@code ph_wx_order_line_alloc}（状态=已冻结），
+     * 后续「转出库 / 释放 / 回补」都按该分配逐条调用。
+     */
+    private void reserveStock(WxOrderDO wxOrder) {
+        List<WxOrderLineDO> lines = wxOrderLineService.getWxOrderLineListByWxOrderId(wxOrder.getId());
+        if (lines == null || lines.isEmpty()) {
+            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "订单缺少明细，无法冻结库存");
+        }
+        // 下单前粗校验：C 的可售量为门店级汇总且已扣冻结，仅用于快速拒绝，权威判断由 reserve 完成
+        assertAvailableQty(wxOrder.getStoreId(), lines);
+        Map<Long, WxOrderLineDO> lineMap = new HashMap<>();
+        List<ReserveItem> items = new ArrayList<>(lines.size());
+        for (WxOrderLineDO line : lines) {
+            ReserveItem item = new ReserveItem();
+            item.setBizNo(wxOrder.getOrderNo());
+            item.setBizLineId(line.getId());
+            item.setDrugId(line.getDrugId());
+            item.setQty(line.getQty());
+            items.add(item);
+            lineMap.put(line.getId(), line);
+        }
+        ReserveResult result;
+        try {
+            result = inventoryFacade.reserve(wxOrder.getStoreId(), items);
+        } catch (UnsupportedOperationException ex) {
+            throw exception(INV_SERVICE_UNAVAILABLE);
+        } catch (AccessDeniedException ex) {
+            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "当前操作人不是该门店在职员工，无库存作业权限");
+        } catch (ServiceException ex) {
+            throw translateStockException(ex);
+        }
+        persistAllocations(wxOrder, lineMap, lines,
+                fromReserve(result == null ? null : result.getAllocations()), WxOrderLineAllocDO.STATUS_FROZEN);
+    }
+
+    /**
+     * 对接 C：订单关闭（取消 / 退款）时结算库存。
+     *
+     * - 仍处于「已冻结」的分配 → {@code release}（流水 81，业务单号 WXC-/WXR- + 订单号），释放占用；
+     * - 「已出库」的分配 → {@code returnBack}（流水 21），携带 originalBizNo/originalBizLineId 指向原出库流水，
+     *   按原批次、原货位回补；
+     * - 「已释放或已回补」的分配 → 跳过，配合状态标记保证只结算一次。
+     *
+     * @param bizPrefix  本次结算的业务单号前缀（取消 WXC- / 退款 WXR-）
+     * @param frozenOnly true=只释放冻结（门店批量清理超时订单时使用），不处理已出库分配
+     * @return 本次结算的分配条数
+     */
+    private int settleStockOnClose(WxOrderDO wxOrder, String bizPrefix, boolean frozenOnly) {
+
+        List<WxOrderLineAllocDO> allocations = wxOrderLineAllocMapper.selectListByWxOrderId(wxOrder.getId());
+        if (allocations == null || allocations.isEmpty()) {
+            // 从未冻结 / 出库的订单没有库存动作
+            return 0;
+        }
+        String bizNo = bizPrefix + wxOrder.getOrderNo();
+        List<ReleaseItem> releaseItems = new ArrayList<>(allocations.size());
+        List<ReturnBackItem> returnItems = new ArrayList<>(allocations.size());
+        List<WxOrderLineAllocDO> settled = new ArrayList<>(allocations.size());
+        for (WxOrderLineAllocDO allocation : allocations) {
+            // 已了结的分配跳过，配合 C 的累计校验保证「只结算一次」
+            if (Objects.equals(allocation.getStatus(), WxOrderLineAllocDO.STATUS_SETTLED)) {
+                continue;
+            }
+            if (Objects.equals(allocation.getStatus(), WxOrderLineAllocDO.STATUS_FROZEN)) {
+                ReleaseItem item = new ReleaseItem();
+                item.setBizNo(bizNo);
+                item.setBizLineId(allocation.getId());
+                item.setOriginalBizNo(allocation.getOrderNo());
+                item.setOriginalBizLineId(allocation.getWxOrderLineId());
+                item.setDrugId(allocation.getDrugId());
+                item.setBatchId(allocation.getBatchId());
+                item.setLocationId(allocation.getLocationId());
+                item.setQty(allocation.getQty());
+                releaseItems.add(item);
+                settled.add(allocation);
+                continue;
+            }
+            // 已出库的分配：批量释放冻结的场景不处理，交由退款 / 退货节点回补，避免「未退款先回补」
+            if (frozenOnly) {
+                continue;
+            }
+            int returned = allocation.getReturnedQty() == null ? 0 : allocation.getReturnedQty();
+            int pendingQty = allocation.getQty() - returned;
+            if (pendingQty <= 0) {
+                continue;
+            }
+            ReturnBackItem item = new ReturnBackItem();
+            item.setBizNo(bizNo);
+            // 行号用分配记录编号，保证同一批次拆分出的多条分配各自唯一
+            item.setBizLineId(allocation.getId());
+            // 原出库引用必须精确指向「正式出库流水」的业务单号与行号：
+            // 冻结转出库用分配记录编号，直接扣库用订单明细编号，取落库的出库来源行号
+            item.setOriginalBizNo(allocation.getOrderNo());
+            item.setOriginalBizLineId(allocation.getOutBizLineId() == null
+                    ? allocation.getWxOrderLineId() : allocation.getOutBizLineId());
+            item.setDrugId(allocation.getDrugId());
+            item.setBatchId(allocation.getBatchId());
+            item.setLocationId(allocation.getLocationId());
+            item.setQty(pendingQty);
+            returnItems.add(item);
+            settled.add(allocation);
+        }
+        if (!releaseItems.isEmpty()) {
+            try {
+                inventoryFacade.release(wxOrder.getStoreId(), releaseItems);
+            } catch (UnsupportedOperationException ex) {
+                throw exception(INV_SERVICE_UNAVAILABLE);
+            } catch (AccessDeniedException ex) {
+                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "当前操作人不是该门店在职员工，无库存作业权限");
+            } catch (ServiceException ex) {
+                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, ex.getMessage());
+            }
+        }
+        if (!returnItems.isEmpty()) {
+            try {
+                inventoryFacade.returnBack(wxOrder.getStoreId(), returnItems);
+            } catch (UnsupportedOperationException ex) {
+                throw exception(INV_SERVICE_UNAVAILABLE);
+            } catch (AccessDeniedException ex) {
+                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "当前操作人不是该门店在职员工，无库存作业权限");
+            } catch (ServiceException ex) {
+                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, ex.getMessage());
+            }
+        }
+        // 标记已了结，重复取消 / 退款 / 批量清理不再重复提交库存请求
+        for (WxOrderLineAllocDO allocation : settled) {
+            settleAllocation(allocation);
+        }
+        return settled.size();
+    }
+
+    /** 把分配标记为已释放 / 已回补 */
+    private void settleAllocation(WxOrderLineAllocDO allocation) {
+        WxOrderLineAllocDO update = new WxOrderLineAllocDO();
+        update.setId(allocation.getId());
+        update.setReturnedQty(allocation.getQty());
+        update.setStatus(WxOrderLineAllocDO.STATUS_SETTLED);
+        wxOrderLineAllocMapper.updateById(update);
+    }
+
+    /**
+     * 对接 C：支付成功后的出库。
+     *
+     * 已冻结的订单走「冻结转正式出库」（{@code consumeReservation}，流水 82）；
+     * 从未冻结的历史订单退化为按 FEFO 直接扣库（{@code deduct}，流水 20），保证上线期间的订单仍可支付。
+     */
+    private void consumeReservedOrDeductStock(WxOrderDO wxOrder) {
+        List<WxOrderLineAllocDO> allocations = wxOrderLineAllocMapper.selectListByWxOrderId(wxOrder.getId());
+        if (allocations != null && !allocations.isEmpty()) {
+            consumeReservedStock(wxOrder, allocations);
+            return;
+        }
+        deductStock(wxOrder);
+    }
+
+    /**
+     * 对接 C：冻结转正式出库（{@code InventoryFacade#consumeReservation}）
+     *
+     * 必须携带原冻结的 originalBizNo / originalBizLineId 与原批次、原货位、药品、数量；
+     * C 按原冻结流水累计校验不超过冻结量。新业务单号用订单号、行号用分配记录编号，
+     * 与冻结（流水 80）属不同流水类型，重复调用不会重复出库。
+     */
+    private void consumeReservedStock(WxOrderDO wxOrder, List<WxOrderLineAllocDO> allocations) {
+        List<ConsumeItem> items = new ArrayList<>(allocations.size());
+        List<WxOrderLineAllocDO> pending = new ArrayList<>(allocations.size());
+        for (WxOrderLineAllocDO allocation : allocations) {
+            // 已出库 / 已了结的分配不重复转出库
+            if (!Objects.equals(allocation.getStatus(), WxOrderLineAllocDO.STATUS_FROZEN)) {
+                continue;
+            }
+            ConsumeItem item = new ConsumeItem();
+            item.setBizNo(wxOrder.getOrderNo());
+            item.setBizLineId(allocation.getId());
+            item.setOriginalBizNo(allocation.getOrderNo());
+            item.setOriginalBizLineId(allocation.getWxOrderLineId());
+            item.setDrugId(allocation.getDrugId());
+            item.setBatchId(allocation.getBatchId());
+            item.setLocationId(allocation.getLocationId());
+            item.setQty(allocation.getQty());
+            items.add(item);
+            pending.add(allocation);
+        }
+        if (items.isEmpty()) {
+            return;
+        }
+        try {
+            inventoryFacade.consumeReservation(wxOrder.getStoreId(), items);
+        } catch (UnsupportedOperationException ex) {
+            throw exception(INV_SERVICE_UNAVAILABLE);
+        } catch (AccessDeniedException ex) {
+            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "当前操作人不是该门店在职员工，无库存作业权限");
+        } catch (ServiceException ex) {
+            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, ex.getMessage());
+        }
+        for (WxOrderLineAllocDO allocation : pending) {
+            WxOrderLineAllocDO update = new WxOrderLineAllocDO();
+            update.setId(allocation.getId());
+            update.setStatus(WxOrderLineAllocDO.STATUS_OUT);
+            // 记录本次出库流水的来源行号（冻结转出库用分配记录编号），供后续回补精确引用
+            update.setOutBizLineId(allocation.getId());
+            wxOrderLineAllocMapper.updateById(update);
+        }
+    }
+
+    /**
+     * 对接 C：按 FEFO 直接出库（未冻结订单的兼容路径，{@code InventoryFacade#deduct}）
+     */
     private void deductStock(WxOrderDO wxOrder) {
         List<WxOrderLineDO> lines = wxOrderLineService.getWxOrderLineListByWxOrderId(wxOrder.getId());
         if (lines == null || lines.isEmpty()) {
             // 没有明细的订单不允许出库，避免出现「订单已支付但库存无变化」
             throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "订单缺少明细，无法出库");
-        }
-        // 已存在出库分配说明本单已出库（重复支付回调），直接返回，不重复扣库
-        if (!wxOrderLineAllocMapper.selectListByWxOrderId(wxOrder.getId()).isEmpty()) {
-            return;
         }
         Map<Long, WxOrderLineDO> lineMap = new HashMap<>();
         List<DeductItem> items = new ArrayList<>(lines.size());
@@ -580,107 +875,118 @@ public class WxOrderServiceImpl implements WxOrderService {
         } catch (ServiceException ex) {
             throw translateStockException(ex);
         }
-        if (result == null || result.getAllocations() == null || result.getAllocations().isEmpty()) {
-            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "库存服务未返回出库分配");
+        persistAllocations(wxOrder, lineMap, lines,
+                fromDeduct(result == null ? null : result.getAllocations()), WxOrderLineAllocDO.STATUS_OUT);
+    }
+
+    /** 库存分配的统一视图：C 的 reserve / deduct 返回结构不同，落库逻辑共用 */
+    private record Allocation(Long bizLineId, Long batchId, Long locationId, Integer qty) {
+    }
+
+    private List<Allocation> fromReserve(List<ReserveResult.Allocation> source) {
+        if (source == null) {
+            return List.of();
+        }
+        return source.stream()
+                .map(item -> new Allocation(item.getBizLineId(), item.getBatchId(), item.getLocationId(), item.getQty()))
+                .toList();
+    }
+
+    private List<Allocation> fromDeduct(List<DeductResult.Allocation> source) {
+        if (source == null) {
+            return List.of();
+        }
+        return source.stream()
+                .map(item -> new Allocation(item.getBizLineId(), item.getBatchId(), item.getLocationId(), item.getQty()))
+                .toList();
+    }
+
+    /**
+     * 把 C 返回的库存分配落库，并把首个分配回填订单明细便于拣货。
+     *
+     * 分配总量必须等于明细数量，否则说明关键库存数据不完整，抛异常让调用方事务整体回滚。
+     */
+    private void persistAllocations(WxOrderDO wxOrder, Map<Long, WxOrderLineDO> lineMap, List<WxOrderLineDO> lines,
+                                    List<Allocation> allocations, Integer status) {
+        if (allocations.isEmpty()) {
+            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "库存服务未返回库存分配");
         }
         Map<Long, Integer> allocatedByLine = new HashMap<>();
-        for (DeductResult.Allocation allocation : result.getAllocations()) {
-            WxOrderLineDO line = lineMap.get(allocation.getBizLineId());
+        for (Allocation allocation : allocations) {
+            WxOrderLineDO line = lineMap.get(allocation.bizLineId());
             if (line == null) {
                 throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "库存服务返回了未知的订单明细分配");
             }
-            allocatedByLine.merge(line.getId(), allocation.getQty(), Integer::sum);
+            allocatedByLine.merge(line.getId(), allocation.qty(), Integer::sum);
             WxOrderLineAllocDO alloc = new WxOrderLineAllocDO();
             alloc.setWxOrderId(wxOrder.getId());
             alloc.setWxOrderLineId(line.getId());
             alloc.setOrderNo(wxOrder.getOrderNo());
             alloc.setDrugId(line.getDrugId());
-            alloc.setBatchId(allocation.getBatchId());
-            alloc.setLocationId(allocation.getLocationId());
-            alloc.setQty(allocation.getQty());
+            alloc.setBatchId(allocation.batchId());
+            alloc.setLocationId(allocation.locationId());
+            alloc.setQty(allocation.qty());
             alloc.setReturnedQty(0);
-            alloc.setStatus(WxOrderLineAllocDO.STATUS_OUT);
+            alloc.setStatus(status);
+            if (Objects.equals(status, WxOrderLineAllocDO.STATUS_OUT)) {
+                // 直接扣库路径的出库来源行号是订单明细编号，回补时需按此精确引用
+                alloc.setOutBizLineId(line.getId());
+            }
             wxOrderLineAllocMapper.insert(alloc);
             // 首个分配回填订单明细，便于拣货与页面展示
             if (line.getBatchId() == null) {
                 WxOrderLineDO lineUpdate = new WxOrderLineDO();
                 lineUpdate.setId(line.getId());
-                lineUpdate.setBatchId(allocation.getBatchId());
-                lineUpdate.setLocationId(allocation.getLocationId());
+                lineUpdate.setBatchId(allocation.batchId());
+                lineUpdate.setLocationId(allocation.locationId());
                 wxOrderLineMapper.updateById(lineUpdate);
-                line.setBatchId(allocation.getBatchId());
-                line.setLocationId(allocation.getLocationId());
+                line.setBatchId(allocation.batchId());
+                line.setLocationId(allocation.locationId());
             }
         }
-        // 分配总量必须等于明细数量，否则说明关键库存数据不完整，直接回滚本次支付
         for (WxOrderLineDO line : lines) {
             Integer allocated = allocatedByLine.get(line.getId());
             if (allocated == null || !allocated.equals(line.getQty())) {
-                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "出库分配数量与订单明细不一致");
+                throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "库存分配数量与订单明细不一致");
             }
         }
     }
 
     /**
-     * 对接 C：取消 / 退款后按原批次、原货位回补库存。
+     * 下单前粗校验可售量（{@code InventoryFacade#getAvailableQty}）
      *
-     * 与 C 的契约（{@code InventoryFacade#returnBack}）：
-     * - bizNo 为本次回补的业务单号（WXC-/WXR- 前缀 + 订单号），bizLineId 为出库分配记录编号，
-     *   同一 (bizType, bizNo, bizLineId) 重复提交由 C 幂等重放；
-     * - originalBizNo / originalBizLineId 指向原出库的业务单号与来源行，C 据此定位原出库流水，
-     *   并校验累计回补数量不超过原出库数量；
-     * - 已回补完成的分配不再提交，配合 C 的累计校验保证「只释放一次」。
-     *
-     * @param isCancel true=取消回补（WXC-），false=退款回补（WXR-）
+     * C 的可售量为门店级汇总（已扣冻结）且不校验效期与质量状态，因此只能用于快速拒绝，
+     * 权威判断仍由 {@code reserve} 在具体批次、货位上完成。
      */
-    private void returnBackStock(WxOrderDO wxOrder, boolean isCancel) {
-        List<WxOrderLineAllocDO> allocations = wxOrderLineAllocMapper.selectListByWxOrderId(wxOrder.getId());
-        if (allocations == null || allocations.isEmpty()) {
-            // 未出库（未支付）的订单没有需要释放的库存
-            return;
+    private void assertAvailableQty(Long storeId, List<WxOrderLineDO> lines) {
+        Map<Long, Integer> required = new LinkedHashMap<>();
+        for (WxOrderLineDO line : lines) {
+            required.merge(line.getDrugId(), line.getQty(), Integer::sum);
         }
-        String bizNo = (isCancel ? CANCEL_BIZ_PREFIX : REFUND_BIZ_PREFIX) + wxOrder.getOrderNo();
-        List<ReturnBackItem> items = new ArrayList<>(allocations.size());
-        Map<Long, WxOrderLineAllocDO> pending = new LinkedHashMap<>();
-        for (WxOrderLineAllocDO allocation : allocations) {
-            int returned = allocation.getReturnedQty() == null ? 0 : allocation.getReturnedQty();
-            int pendingQty = allocation.getQty() - returned;
-            if (pendingQty <= 0) {
-                continue;
-            }
-            ReturnBackItem item = new ReturnBackItem();
-            item.setBizNo(bizNo);
-            item.setBizLineId(allocation.getId());
-            item.setOriginalBizNo(allocation.getOrderNo());
-            item.setOriginalBizLineId(allocation.getWxOrderLineId());
-            item.setDrugId(allocation.getDrugId());
-            item.setBatchId(allocation.getBatchId());
-            item.setLocationId(allocation.getLocationId());
-            item.setQty(pendingQty);
-            items.add(item);
-            pending.put(allocation.getId(), allocation);
-        }
-        if (items.isEmpty()) {
-            // 全部已回补，视为幂等成功
-            return;
-        }
+        List<AvailableQty> available;
         try {
-            inventoryFacade.returnBack(wxOrder.getStoreId(), items);
+            available = inventoryFacade.getAvailableQty(storeId, new ArrayList<>(required.keySet()));
         } catch (UnsupportedOperationException ex) {
             throw exception(INV_SERVICE_UNAVAILABLE);
         } catch (AccessDeniedException ex) {
             throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, "当前操作人不是该门店在职员工，无库存作业权限");
         } catch (ServiceException ex) {
-            throw exception(PHARMACY_WX_ORDER_STOCK_OP_FAILED, ex.getMessage());
+            throw translateStockException(ex);
         }
-        // 标记已回补，重复取消 / 退款不再重复提交回补请求
-        for (Map.Entry<Long, WxOrderLineAllocDO> entry : pending.entrySet()) {
-            WxOrderLineAllocDO update = new WxOrderLineAllocDO();
-            update.setId(entry.getKey());
-            update.setReturnedQty(entry.getValue().getQty());
-            update.setStatus(WxOrderLineAllocDO.STATUS_RETURNED);
-            wxOrderLineAllocMapper.updateById(update);
+        for (AvailableQty qty : available == null ? List.<AvailableQty>of() : available) {
+            Integer need = required.get(qty.getDrugId());
+            if (need != null && (qty.getQtyAvail() == null || qty.getQtyAvail() < need)) {
+                throw exception(PHARMACY_WX_ORDER_STOCK_NOT_ENOUGH);
+            }
         }
+    }
+
+    /** 门店批量清理的单次处理上限，避免一次请求触发过多库存作业 */
+    private int normalizeCleanupLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return STOCK_CLEANUP_LIMIT;
+        }
+        return Math.min(limit, STOCK_CLEANUP_MAX_LIMIT);
     }
 
     /**
