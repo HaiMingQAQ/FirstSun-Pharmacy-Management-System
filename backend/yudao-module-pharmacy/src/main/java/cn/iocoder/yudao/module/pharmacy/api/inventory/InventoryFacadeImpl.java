@@ -5,6 +5,11 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
 
 import java.util.List;
 
@@ -31,5 +36,10 @@ public class InventoryFacadeImpl implements InventoryFacade {
     public ReceiveResult receive(Long storeId, String receiptNo, List<ReceiveItem> items) {
         throw new UnsupportedOperationException("C 库存服务未实现，采购收货入库不可用");
     }
+
+    @Override public ReserveResult reserve(Long storeId, List<ReserveItem> items) { throw new UnsupportedOperationException("C 库存服务未实现，库存冻结不可用"); }
+    @Override public void release(Long storeId, List<ReleaseItem> items) { throw new UnsupportedOperationException("C 库存服务未实现，库存释放不可用"); }
+    @Override public DeductResult consumeReservation(Long storeId, List<ConsumeItem> items) { throw new UnsupportedOperationException("C 库存服务未实现，冻结转出库不可用"); }
+    @Override public List<AvailableQty> getAvailableQty(Long storeId, List<Long> drugIds) { throw new UnsupportedOperationException("C 库存服务未实现，可售量查询不可用"); }
 
 }

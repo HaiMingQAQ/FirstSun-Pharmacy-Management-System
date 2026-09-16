@@ -2,11 +2,26 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper">
     <select id="selectFlows" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Flow">
-        SELECT id, batch_id, location_id, in_qty, out_qty
+        SELECT id, batch_id, location_id, drug_id, flow_type, in_qty, out_qty, frozen_delta, original_flow_id
         FROM ph_inv_flow
         WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
           AND biz_type = #{bizType} AND biz_no = #{bizNo} AND biz_line_id = #{bizLineId}
         ORDER BY id
+    </select>
+    <select id="selectFlowsByType" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Flow">
+        SELECT id, batch_id, location_id, drug_id, flow_type, in_qty, out_qty, frozen_delta, original_flow_id
+        FROM ph_inv_flow
+        WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+          AND biz_type = #{bizType} AND biz_no = #{bizNo} AND biz_line_id = #{bizLineId} AND flow_type = #{flowType}
+        ORDER BY id
+    </select>
+    <select id="selectAvailableQty" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Available">
+        SELECT drug_id, COALESCE(SUM(qty_avail), 0) AS qty_avail
+        FROM ph_inv_batch
+        WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+          AND drug_id IN
+          <foreach collection="drugIds" item="drugId" open="(" separator="," close=")">#{drugId}</foreach>
+        GROUP BY drug_id
     </select>
     <select id="lockWarehouse" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Warehouse">
         SELECT id, status FROM ph_warehouse
@@ -62,11 +77,20 @@
           AND b.store_id = #{scope.storeId} AND s.deleted = b'0' AND b.deleted = b'0' AND l.deleted = b'0'
         FOR UPDATE
     </select>
-    <select id="lockOriginalSaleFlow" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Flow">
-        SELECT id, batch_id, location_id, in_qty, out_qty
+    <select id="lockOriginalOutboundFlow" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Flow">
+        SELECT id, batch_id, location_id, drug_id, flow_type, in_qty, out_qty, frozen_delta, original_flow_id
         FROM ph_inv_flow
         WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
-          AND flow_type = 20 AND biz_type = 2 AND biz_no = #{bizNo} AND biz_line_id = #{bizLineId}
+          AND ((flow_type = 20 AND biz_type = 2) OR (flow_type = 82 AND biz_type = 6))
+          AND biz_no = #{bizNo} AND biz_line_id = #{bizLineId}
+          AND batch_id = #{batchId} AND location_id = #{locationId}
+        FOR UPDATE
+    </select>
+    <select id="lockReservationFlow" resultType="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper$Flow">
+        SELECT id, batch_id, location_id, drug_id, flow_type, in_qty, out_qty, frozen_delta, original_flow_id
+        FROM ph_inv_flow
+        WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+          AND flow_type = 80 AND biz_type = 6 AND biz_no = #{bizNo} AND biz_line_id = #{bizLineId}
           AND batch_id = #{batchId} AND location_id = #{locationId}
         FOR UPDATE
     </select>
@@ -74,6 +98,12 @@
         SELECT COALESCE(SUM(in_qty), 0) FROM ph_inv_flow
         WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
           AND flow_type = 21 AND original_flow_id = #{originalFlowId}
+    </select>
+    <select id="resolvedReservationQty" resultType="int">
+        SELECT COALESCE(SUM(CASE WHEN frozen_delta &lt; 0 THEN -frozen_delta ELSE 0 END), 0)
+        FROM ph_inv_flow
+        WHERE tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+          AND original_flow_id = #{originalFlowId} AND flow_type IN (81, 82)
     </select>
     <insert id="upsertBatch">
         INSERT INTO ph_inv_batch (tenant_id, store_id, warehouse_id, drug_id, batch_no, manufacture_date, expiry_date,
@@ -119,6 +149,34 @@
             version = version + 1, updater = #{operator}, update_time = CURRENT_TIMESTAMP
         WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0' AND qty_sold >= #{qty}
     </update>
+    <update id="reserveStock">
+        UPDATE ph_inv_location_stock SET qty_frozen = qty_frozen + #{qty}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0' AND qty - qty_frozen >= #{qty}
+    </update>
+    <update id="reserveBatch">
+        UPDATE ph_inv_batch SET qty_avail = qty_avail - #{qty}, qty_frozen = qty_frozen + #{qty}, version = version + 1,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0' AND qty_avail >= #{qty}
+    </update>
+    <update id="releaseStock">
+        UPDATE ph_inv_location_stock SET qty_frozen = qty_frozen - #{qty}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0' AND qty_frozen >= #{qty}
+    </update>
+    <update id="releaseBatch">
+        UPDATE ph_inv_batch SET qty_avail = qty_avail + #{qty}, qty_frozen = qty_frozen - #{qty}, version = version + 1,
+            updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0' AND qty_frozen >= #{qty}
+    </update>
+    <update id="consumeReservedStock">
+        UPDATE ph_inv_location_stock SET qty = qty - #{qty}, qty_frozen = qty_frozen - #{qty}, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND deleted = b'0' AND qty_frozen >= #{qty} AND qty >= #{qty}
+    </update>
+    <update id="consumeReservedBatch">
+        UPDATE ph_inv_batch SET qty_total = qty_total - #{qty}, qty_frozen = qty_frozen - #{qty}, qty_sold = qty_sold + #{qty},
+            last_issue_at = CURRENT_TIMESTAMP, version = version + 1, updater = #{operator}, update_time = CURRENT_TIMESTAMP
+        WHERE id = #{id} AND tenant_id = #{scope.tenantId} AND store_id = #{scope.storeId} AND deleted = b'0'
+          AND qty_frozen >= #{qty} AND qty_total >= #{qty}
+    </update>
     <insert id="insertFlow">
         INSERT INTO ph_inv_flow (tenant_id, store_id, batch_id, drug_id, batch_no, flow_type, in_qty, out_qty,
                                  balance_qty, biz_type, biz_no, biz_line_id, original_flow_id, flow_time, operator,
@@ -126,6 +184,6 @@
         VALUES (#{scope.tenantId}, #{scope.storeId}, #{flow.batchId}, #{flow.drugId}, #{flow.batchNo}, #{flow.flowType},
                 #{flow.inQty}, #{flow.outQty}, #{flow.balanceQty}, #{flow.bizType}, #{flow.bizNo}, #{flow.bizLineId},
                 #{flow.originalFlowId}, #{flow.flowTime}, #{flow.operator}, #{flow.operator}, #{flow.operator},
-                #{flow.locationId}, 0, #{flow.unitCost})
+                #{flow.locationId}, #{flow.frozenDelta}, #{flow.unitCost})
     </insert>
 </mapper>

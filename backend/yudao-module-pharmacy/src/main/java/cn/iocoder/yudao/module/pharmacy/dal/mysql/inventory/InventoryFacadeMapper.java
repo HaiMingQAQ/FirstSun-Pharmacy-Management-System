@@ -16,6 +16,10 @@ public interface InventoryFacadeMapper {
 
     List<Flow> selectFlows(@Param("scope") Scope scope, @Param("bizType") int bizType,
                            @Param("bizNo") String bizNo, @Param("bizLineId") long bizLineId);
+    List<Flow> selectFlowsByType(@Param("scope") Scope scope, @Param("bizType") int bizType,
+                                 @Param("bizNo") String bizNo, @Param("bizLineId") long bizLineId,
+                                 @Param("flowType") int flowType);
+    List<Available> selectAvailableQty(@Param("scope") Scope scope, @Param("drugIds") List<Long> drugIds);
     Warehouse lockWarehouse(@Param("scope") Scope scope, @Param("id") long id);
     Location lockLocation(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId,
                           @Param("id") long id);
@@ -27,10 +31,14 @@ public interface InventoryFacadeMapper {
                                    @Param("today") LocalDate today);
     Stock lockStock(@Param("scope") Scope scope, @Param("batchId") long batchId,
                     @Param("locationId") long locationId);
-    Flow lockOriginalSaleFlow(@Param("scope") Scope scope, @Param("bizNo") String bizNo,
-                              @Param("bizLineId") long bizLineId, @Param("batchId") long batchId,
-                              @Param("locationId") long locationId);
+    Flow lockOriginalOutboundFlow(@Param("scope") Scope scope, @Param("bizNo") String bizNo,
+                                 @Param("bizLineId") long bizLineId, @Param("batchId") long batchId,
+                                 @Param("locationId") long locationId);
+    Flow lockReservationFlow(@Param("scope") Scope scope, @Param("bizNo") String bizNo,
+                             @Param("bizLineId") long bizLineId, @Param("batchId") long batchId,
+                             @Param("locationId") long locationId);
     int returnedQty(@Param("scope") Scope scope, @Param("originalFlowId") long originalFlowId);
+    int resolvedReservationQty(@Param("scope") Scope scope, @Param("originalFlowId") long originalFlowId);
 
     int upsertBatch(@Param("scope") Scope scope, @Param("warehouseId") long warehouseId,
                     @Param("drugId") long drugId, @Param("batchNo") String batchNo,
@@ -51,6 +59,18 @@ public interface InventoryFacadeMapper {
                     @Param("operator") String operator);
     int returnBatch(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
                     @Param("operator") String operator);
+    int reserveStock(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                     @Param("operator") String operator);
+    int reserveBatch(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                     @Param("operator") String operator);
+    int releaseStock(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                     @Param("operator") String operator);
+    int releaseBatch(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                     @Param("operator") String operator);
+    int consumeReservedStock(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                             @Param("operator") String operator);
+    int consumeReservedBatch(@Param("scope") Scope scope, @Param("id") long id, @Param("qty") int qty,
+                             @Param("operator") String operator);
     int insertFlow(@Param("scope") Scope scope, @Param("flow") FlowCommand flow);
 
     @Data
@@ -72,11 +92,13 @@ public interface InventoryFacadeMapper {
         private Integer batchTotal; private Integer batchAvail; private Integer batchFrozen; private Integer batchSold;
     }
     @Data
-    class Flow { private Long id; private Long batchId; private Long locationId; private Integer inQty; private Integer outQty; }
+    class Flow { private Long id; private Long batchId; private Long locationId; private Long drugId; private Integer flowType; private Integer inQty; private Integer outQty; private Integer frozenDelta; private Long originalFlowId; }
+    @Data
+    class Available { private Long drugId; private Integer qtyAvail; }
     @Data
     class FlowCommand {
         private Long batchId; private Long locationId; private Long drugId; private String batchNo;
-        private int flowType; private int inQty; private int outQty; private int balanceQty;
+        private int flowType; private int inQty; private int outQty; private int frozenDelta; private int balanceQty;
         private int bizType; private String bizNo; private long bizLineId; private Long originalFlowId;
         private BigDecimal unitCost; private long operator; private LocalDateTime flowTime;
     }
