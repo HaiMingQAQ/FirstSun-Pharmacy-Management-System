@@ -4,9 +4,10 @@ package cn.iocoder.yudao.module.pharmacy.api.member;
 /**
  * 会员积分门面【临时降级实现】。
  * <p>
- * F 成员实现 {@link MemberPointFacade} 后，本 Bean 因 @ConditionalOnMissingBean 自动失效；
- * 在此之前，销售奖励积分（本期 pointsDeduct/pointsEarned 恒为 0，不触发调用）与
- * 退货积分回退会收到 UnsupportedOperationException，由 Service 层按业务降级。
+ * F 已提供真实实现 {@code MemberPointFacadeAdapter}（@Service），本 Bean 因
+ * {@code @ConditionalOnMissingBean} 在正常情况下不会生效，仅作为装配兜底保留：
+ * 一旦真实实现缺失（例如被误删或未加入扫描范围），调用方拿到的是明确的
+ * UnsupportedOperationException，而不是静默跳过积分变动。
  */
 public class MemberPointFacadeImpl implements MemberPointFacade {
 
@@ -17,6 +18,16 @@ public class MemberPointFacadeImpl implements MemberPointFacade {
 
     @Override
     public void backPoints(Long memberId, String bizNo, Integer point) {
+        throw new UnsupportedOperationException("F 会员积分服务未实现");
+    }
+
+    @Override
+    public void deductPoints(Long memberId, String bizNo, Integer point, String title) {
+        throw new UnsupportedOperationException("F 会员积分服务未实现");
+    }
+
+    @Override
+    public void returnPoints(Long memberId, String bizNo, Integer point, String title) {
         throw new UnsupportedOperationException("F 会员积分服务未实现");
     }
 

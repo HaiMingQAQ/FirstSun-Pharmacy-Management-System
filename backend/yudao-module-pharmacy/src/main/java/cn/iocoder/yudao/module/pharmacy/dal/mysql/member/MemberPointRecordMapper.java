@@ -37,4 +37,17 @@ public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO
                 .eq(MemberPointRecordDO::getBizId, bizId));
     }
 
+    /**
+     * 按会员 + 业务类型 + 业务编码查询积分记录。
+     *
+     * <p>幂等键与 {@code member_point_record.uk_point_event(tenant_id,user_id,biz_type,biz_id)} 一致，
+     * 同一订单号可以分别产生「消费获得」「消费抵扣」「退款冲回」各一条流水。
+     */
+    default MemberPointRecordDO selectByUserIdAndBizTypeAndBizId(Long userId, Integer bizType, String bizId) {
+        return selectOne(new LambdaQueryWrapperX<MemberPointRecordDO>()
+                .eq(MemberPointRecordDO::getUserId, userId)
+                .eq(MemberPointRecordDO::getBizType, bizType)
+                .eq(MemberPointRecordDO::getBizId, bizId));
+    }
+
 }
