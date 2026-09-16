@@ -5,6 +5,11 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
 
 import java.util.List;
 
@@ -42,4 +47,16 @@ public interface InventoryFacade {
      * @return 逐行入账结果（含生成的批次编号）
      */
     ReceiveResult receive(Long storeId, String receiptNo, List<ReceiveItem> items);
+
+    /** Reserve available stock for an online order. Repeat calls replay the FEFO allocations. */
+    ReserveResult reserve(Long storeId, List<ReserveItem> items);
+
+    /** Release an existing reservation by its original reservation allocation. */
+    void release(Long storeId, List<ReleaseItem> items);
+
+    /** Convert an existing reservation to outbound stock. */
+    DeductResult consumeReservation(Long storeId, List<ConsumeItem> items);
+
+    /** Read sellable quantity after reservations. */
+    List<AvailableQty> getAvailableQty(Long storeId, List<Long> drugIds);
 }
