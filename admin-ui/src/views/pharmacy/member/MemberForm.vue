@@ -15,7 +15,7 @@
     >
       <el-divider content-position="left">基本信息</el-divider>
       <el-form-item label="头像" prop="avatar">
-        <el-avatar :src="formData.avatar" size="80">
+        <el-avatar :src="formData.avatar" :size="80">
           <Icon icon="ep:user" />
         </el-avatar>
       </el-form-item>
