@@ -34,4 +34,14 @@ public class MemberPointFacadeAdapter implements MemberPointFacade {
         memberPointRecordService.backPoints(memberId, bizNo, point);
     }
 
+    @Override
+    public void deductPoints(Long memberId, String bizNo, Integer point, String title) {
+        memberPointRecordService.deductPoints(memberId, bizNo, point, title);
+    }
+
+    @Override
+    public void returnPoints(Long memberId, String bizNo, Integer point, String title) {
+        memberPointRecordService.returnPoints(memberId, bizNo, point, title);
+    }
+
 }

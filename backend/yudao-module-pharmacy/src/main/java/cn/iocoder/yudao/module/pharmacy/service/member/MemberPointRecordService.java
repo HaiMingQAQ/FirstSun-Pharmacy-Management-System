@@ -82,4 +82,30 @@ public interface MemberPointRecordService {
      */
     void backPoints(Long userId, String bizId, Integer point);
 
+    /**
+     * 积分抵扣扣减（订单使用积分抵扣现金）
+     *
+     * 幂等：同一会员 + 业务类型(消费抵扣) + 同一业务单号只处理一次，重复调用（重复支付回调等）不会重复扣减。
+     * 积分不足时抛出业务异常 {@code PHARMACY_MEMBER_POINT_NOT_ENOUGH}，调用方事务整体回滚。
+     *
+     * @param userId 会员用户编号
+     * @param bizId  业务单号（如订单号）
+     * @param point  抵扣的积分（<=0 视为无需处理）
+     * @param title  积分标题
+     */
+    void deductPoints(Long userId, String bizId, Integer point, String title);
+
+    /**
+     * 返还积分（订单取消 / 退货，退还此前抵扣的积分）
+     *
+     * 幂等：同一会员 + 业务类型(退款冲回) + 同一业务单号只处理一次，保证「只返还一次」；
+     * 返还上限为该业务单号已抵扣的积分，超出部分按上限返还，不会超返。
+     *
+     * @param userId 会员用户编号
+     * @param bizId  业务单号（与原抵扣同一单号，如订单号）
+     * @param point  返还的积分（<=0 视为无需处理）
+     * @param title  积分标题
+     */
+    void returnPoints(Long userId, String bizId, Integer point, String title);
+
 }
