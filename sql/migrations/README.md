@@ -30,6 +30,7 @@
 | 20 | `20260914_m_pharmacy_rx_pay_menu.sql` | E 模块处方登记/审核/台账、支付单/退款单查询菜单与按钮权限 |
 | 21 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
 | 22 | `20260915_c_inventory_facade_flow_ref.sql` | C 库存门面：销售退货关联原销售出库流水，支持并发下的累计回补校验 |
+| 23 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
 
 ## 统一执行方法
 
@@ -59,7 +60,8 @@ $scripts = @(
   "20260914_l_pharmacy_demo_data.sql",
   "20260914_m_pharmacy_rx_pay_menu.sql",
   "20260914_n_pay_app_init.sql",
-  "20260915_c_inventory_facade_flow_ref.sql"
+  "20260915_c_inventory_facade_flow_ref.sql",
+  "20260916_c_inventory_movement_menu.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
