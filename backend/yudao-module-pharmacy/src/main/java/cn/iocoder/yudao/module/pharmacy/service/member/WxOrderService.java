@@ -93,6 +93,45 @@ public interface WxOrderService {
     void refundWxOrder(Long id, String refundReason);
 
     /**
+     * 冻结订单库存（门店管理端节点，幂等）
+     *
+     * 下单后由门店节点调用：先按门店可售量粗校验，再按 FEFO 冻结库存并落库实际分配。
+     * 同一订单重复调用只冻结一次；可用库存不足抛业务错误且不产生任何冻结。
+     *
+     * <p>冻结必须由具备「目标门店在职管理员」身份的调用方发起（C 的库存门禁要求），
+     * 小程序端没有该身份，因此不在小程序下单时冻结。
+     */
+    void reserveWxOrder(Long id);
+
+    /**
+     * 会员取消订单（不做库存作业）
+     *
+     * 小程序端不具备库存作业身份，会员取消只关闭订单状态；
+     * 已冻结或已出库的库存由门店节点释放（{@link #releaseFrozenStockOfClosedOrders}）或回补（退款节点）。
+     */
+    void cancelWxOrderByMember(Long id, String cancelReason);
+
+    /**
+     * 关闭门店下已超时未支付的订单（门店管理端节点，幂等）
+     *
+     * @param storeId 门店编号
+     * @param limit   单次处理上限（为空取默认值）
+     * @return 实际关闭的订单数
+     */
+    int closeExpiredWxOrders(Long storeId, Integer limit);
+
+    /**
+     * 释放已关闭订单仍冻结的库存（门店管理端节点，幂等）
+     *
+     * 只处理仍处于「已冻结」的分配；已出库的分配需走退款 / 退货回补，避免未退款先回补。
+     *
+     * @param storeId 门店编号
+     * @param limit   单次处理上限（为空取默认值）
+     * @return 实际释放的分配条数
+     */
+    int releaseFrozenStockOfClosedOrders(Long storeId, Integer limit);
+
+    /**
      * 开始拣货：待拣货 → 拣货中
      */
     void startPicking(Long id);

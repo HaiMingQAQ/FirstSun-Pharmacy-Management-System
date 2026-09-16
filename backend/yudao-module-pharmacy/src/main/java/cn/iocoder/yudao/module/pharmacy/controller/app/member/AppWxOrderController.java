@@ -92,7 +92,8 @@ public class AppWxOrderController {
                                              @RequestParam(value = "cancelReason", required = false) String cancelReason) {
         // 校验订单归属后取消，避免越权取消他人订单
         wxOrderService.validateWxOrderOwner(getLoginUserId(), id);
-        wxOrderService.cancelWxOrder(id, cancelReason);
+        // 小程序端没有库存作业身份，会员取消只关闭订单，冻结 / 出库的库存由门店节点释放或回补
+        wxOrderService.cancelWxOrderByMember(id, cancelReason);
         return success(true);
     }
 
