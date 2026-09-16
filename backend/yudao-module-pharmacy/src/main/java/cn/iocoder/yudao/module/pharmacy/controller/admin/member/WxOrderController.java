@@ -125,6 +125,16 @@ public class WxOrderController {
         return success(true);
     }
 
+    @PutMapping("/refund")
+    @Operation(summary = "退款订单（幂等）：已支付未完成 → 已退款，并按原批次回补库存")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    public CommonResult<Boolean> refundWxOrder(@RequestParam("id") Long id,
+                                               @RequestParam(value = "refundReason", required = false) String refundReason) {
+        wxOrderService.refundWxOrder(id, refundReason);
+        return success(true);
+    }
+
     @PutMapping("/start-picking")
     @Operation(summary = "开始拣货：待拣货 → 拣货中")
     @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
