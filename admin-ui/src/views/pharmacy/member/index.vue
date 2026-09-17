@@ -55,6 +55,13 @@
         <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
         <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
         <el-button
+          type="primary"
+          @click="openCreate"
+          v-hasPermi="['pharmacy:member:user:create']"
+        >
+          <Icon icon="ep:plus" class="mr-5px" /> 新增
+        </el-button>
+        <el-button
           type="success"
           plain
           @click="handleExport"
@@ -94,7 +101,7 @@
           {{ formatDate(scope.row.createTime) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" align="center" width="180" fixed="right">
+      <el-table-column label="操作" align="center" width="240" fixed="right">
         <template #default="scope">
           <el-button
             link
@@ -111,6 +118,14 @@
             v-hasPermi="['pharmacy:member:user:update']"
           >
             {{ scope.row.status === 1 ? '禁用' : '启用' }}
+          </el-button>
+          <el-button
+            link
+            type="danger"
+            @click="handleDelete(scope.row.id)"
+            v-hasPermi="['pharmacy:member:user:delete']"
+          >
+            删除
           </el-button>
         </template>
       </el-table-column>
@@ -200,6 +215,21 @@ const resetQuery = () => {
 const formRef = ref()
 const openDetail = (id: number) => {
   formRef.value.open(id)
+}
+
+/** 新增会员操作 */
+const openCreate = () => {
+  formRef.value.openCreate()
+}
+
+/** 删除会员操作 */
+const handleDelete = async (id: number) => {
+  try {
+    await message.delConfirm()
+    await MemberApi.deleteMember(id)
+    message.success(t('common.delSuccess'))
+    await getList()
+  } catch {}
 }
 
 /** 启用/禁用操作 */

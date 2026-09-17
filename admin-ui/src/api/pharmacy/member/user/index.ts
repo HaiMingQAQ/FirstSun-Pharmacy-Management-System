@@ -49,14 +49,24 @@ export const getMember = async (id: number) => {
   return await request.get({ url: '/pharmacy/member/user/get?id=' + id })
 }
 
+// 创建会员档案
+export const createMember = async (data: MemberUserSaveVO) => {
+  return await request.post({ url: '/pharmacy/member/user/create', data })
+}
+
 // 修改会员档案
 export const updateMember = async (data: MemberUserSaveVO) => {
   return await request.put({ url: '/pharmacy/member/user/update', data })
 }
 
-// 修改会员状态
+// 删除会员档案
+export const deleteMember = async (id: number) => {
+  return await request.delete({ url: '/pharmacy/member/user/delete?id=' + id })
+}
+
+// 修改会员状态（后端契约：Query 参数 id、status）
 export const updateMemberStatus = async (id: number, status: number) => {
-  return await request.put({ url: '/pharmacy/member/user/update-status', data: { id, status } })
+  return await request.put({ url: '/pharmacy/member/user/update-status', params: { id, status } })
 }
 
 // 导出会员档案
