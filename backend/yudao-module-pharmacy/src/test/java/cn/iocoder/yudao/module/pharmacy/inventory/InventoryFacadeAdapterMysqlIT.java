@@ -4,7 +4,10 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.module.pharmacy.api.DrugApi;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper;
 import cn.iocoder.yudao.module.pharmacy.service.inventory.InventoryFacadeAdapter;
@@ -130,6 +133,56 @@ class InventoryFacadeAdapterMysqlIT {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM ph_warehouse WHERE wh_code=?", Integer.class, "IT" + token));
     }
 
+    @Test
+    void reservationLifecycleIsIdempotentAndKeepsThreeLedgersConsistent() {
+        String token = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        transaction.executeWithoutResult(status -> {
+            long warehouseId = insertWarehouse("IR" + token);
+            long locationId = insertLocation(warehouseId, "L" + token);
+            ReceiveItem receive = ReceiveItem.builder()
+                    .bizLineId("1001").storeId(7L).drugId(900000002L).batchNo("B" + token)
+                    .manufactureDate(LocalDate.now().minusMonths(1)).expiryDate(LocalDate.now().plusYears(1))
+                    .qty(10).unitPrice(new BigDecimal("12.50")).warehouseId(warehouseId).locationId(locationId).build();
+            long batchId = facade.receive(7L, "RC" + token, List.of(receive)).getLines().get(0).getBatchId();
+
+            ReserveItem reserve = new ReserveItem();
+            reserve.setBizNo("WO" + token); reserve.setBizLineId(4001L); reserve.setDrugId(900000002L); reserve.setQty(4);
+            assertEquals(1, facade.reserve(7L, List.of(reserve)).getAllocations().size());
+            assertEquals(1, facade.reserve(7L, List.of(reserve)).getAllocations().size());
+            assertLedger(batchId, locationId, 10, 6, 4, 0, 2);
+            assertStockFrozen(batchId, locationId, 4);
+
+            ReleaseItem release = new ReleaseItem();
+            release.setBizNo("WXC" + token); release.setBizLineId(5001L); release.setOriginalBizNo("WO" + token);
+            release.setOriginalBizLineId(4001L); release.setDrugId(900000002L); release.setBatchId(batchId);
+            release.setLocationId(locationId); release.setQty(1);
+            facade.release(7L, List.of(release));
+            facade.release(7L, List.of(release));
+            assertLedger(batchId, locationId, 10, 7, 3, 0, 3);
+            assertStockFrozen(batchId, locationId, 3);
+
+            ConsumeItem consume = new ConsumeItem();
+            consume.setBizNo("WXP" + token); consume.setBizLineId(6001L); consume.setOriginalBizNo("WO" + token);
+            consume.setOriginalBizLineId(4001L); consume.setDrugId(900000002L); consume.setBatchId(batchId);
+            consume.setLocationId(locationId); consume.setQty(3);
+            assertEquals(1, facade.consumeReservation(7L, List.of(consume)).getAllocations().size());
+            assertEquals(1, facade.consumeReservation(7L, List.of(consume)).getAllocations().size());
+            assertLedger(batchId, locationId, 7, 7, 0, 3, 4);
+            assertStockFrozen(batchId, locationId, 0);
+
+            ReturnBackItem returned = new ReturnBackItem();
+            returned.setBizNo("WXR" + token); returned.setBizLineId(7001L); returned.setOriginalBizNo("WXP" + token);
+            returned.setOriginalBizLineId(6001L); returned.setDrugId(900000002L); returned.setBatchId(batchId);
+            returned.setLocationId(locationId); returned.setQty(3);
+            facade.returnBack(7L, List.of(returned));
+            facade.returnBack(7L, List.of(returned));
+            assertLedger(batchId, locationId, 10, 10, 0, 0, 5);
+            assertStockFrozen(batchId, locationId, 0);
+            status.setRollbackOnly();
+        });
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM ph_warehouse WHERE wh_code=?", Integer.class, "IR" + token));
+    }
+
     private long insertWarehouse(String code) {
         jdbc.update("INSERT INTO ph_warehouse (tenant_id, store_id, wh_code, wh_name, temp_zone, status, creator, updater) "
                 + "VALUES (1, 7, ?, '库存门面测试仓', 0, 1, '407', '407')", code);
@@ -152,6 +205,11 @@ class InventoryFacadeAdapterMysqlIT {
         assertEquals(total, stockDb);
         assertEquals(total, available + frozen);
         assertEquals(flows, jdbc.queryForObject("SELECT COUNT(*) FROM ph_inv_flow WHERE batch_id=?", Integer.class, batchId));
+    }
+
+    private void assertStockFrozen(long batchId, long locationId, int frozen) {
+        assertEquals(frozen, jdbc.queryForObject(
+                "SELECT qty_frozen FROM ph_inv_location_stock WHERE batch_id=? AND location_id=?", Integer.class, batchId, locationId));
     }
 
     private static boolean blank(String value) {
