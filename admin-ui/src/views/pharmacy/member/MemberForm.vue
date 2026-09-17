@@ -137,6 +137,7 @@ const drawerVisible = ref(false) // 抽屉的是否展示
 const drawerTitle = ref('') // 抽屉的标题
 const formLoading = ref(false) // 表单的加载中
 const formRef = ref() // 表单 Ref
+const isCreate = ref(false) // 是否为新增模式
 
 /** 统一默认值，避免隐式 any 与类型漂移 */
 const createDefaultFormData = (): MemberApi.MemberUserVO => ({
@@ -175,9 +176,10 @@ const loadLevelList = async () => {
   levelList.value = data
 }
 
-/** 打开抽屉 */
+/** 打开抽屉：编辑（查看 / 修改） */
 const open = async (id: number) => {
   drawerVisible.value = true
+  isCreate.value = false
   drawerTitle.value = '会员详情'
   formLoading.value = true
   try {
@@ -188,7 +190,21 @@ const open = async (id: number) => {
     formLoading.value = false
   }
 }
-defineExpose({ open }) // 提供 open 方法，用于打开抽屉
+
+/** 打开抽屉：新增 */
+const openCreate = async () => {
+  drawerVisible.value = true
+  isCreate.value = true
+  drawerTitle.value = '新增会员'
+  formData.value = createDefaultFormData()
+  formLoading.value = true
+  try {
+    await loadLevelList()
+  } finally {
+    formLoading.value = false
+  }
+}
+defineExpose({ open, openCreate }) // 提供 open / openCreate 方法，用于打开抽屉
 
 /** 构造保存载荷，显式逐字段返回（只提交后端 SaveReqVO 支持的字段） */
 const buildSaveData = (): MemberApi.MemberUserSaveVO => {
@@ -220,8 +236,14 @@ const submitForm = async () => {
   formLoading.value = true
   try {
     const data = buildSaveData()
-    await MemberApi.updateMember(data)
-    message.success(t('common.updateSuccess'))
+    if (isCreate.value) {
+      // 新增：注册 / 登录信息由服务端维护，不提交
+      await MemberApi.createMember(data)
+      message.success(t('common.createSuccess'))
+    } else {
+      await MemberApi.updateMember(data)
+      message.success(t('common.updateSuccess'))
+    }
     drawerVisible.value = false
     emit('success')
   } finally {
@@ -232,6 +254,7 @@ const submitForm = async () => {
 /** 关闭前重置 */
 const handleClose = (done: () => void) => {
   formData.value = createDefaultFormData()
+  isCreate.value = false
   formRef.value?.resetFields()
   done()
 }

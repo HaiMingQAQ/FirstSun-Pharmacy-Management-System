@@ -25,6 +25,14 @@ public interface MemberUserService {
     void updateMemberUser(@Valid MemberUserSaveReqVO updateReqVO);
 
     /**
+     * 更新会员状态（仅更新 status，用于启用 / 停用）
+     *
+     * @param id     会员编号
+     * @param status 状态（0 禁用 / 1 启用）
+     */
+    void updateMemberUserStatus(Long id, Integer status);
+
+    /**
      * 删除会员用户
      */
     void deleteMemberUser(Long id);
