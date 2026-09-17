@@ -38,6 +38,12 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Pharmacy AI adapter: one-way dependency; pharmacy never depends on AI. -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-pharmacy</artifactId>
+            <version>${revision}</version>
+        </dependency>
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
             <artifactId>yudao-module-system</artifactId>

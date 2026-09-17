@@ -66,4 +66,16 @@ public interface DrugMapper extends BaseMapperX<DrugDO> {
                 .last("LIMIT 100"));
     }
 
+    default java.util.List<DrugDO> selectSearchList(String keyword, Integer status, int limit) {
+        return selectList(new LambdaQueryWrapperX<DrugDO>()
+                .eqIfPresent(DrugDO::getStatus, status)
+                .and(keyword != null && !keyword.trim().isEmpty(), w -> w
+                        .like(DrugDO::getDrugCode, keyword.trim())
+                        .or().like(DrugDO::getGenericName, keyword.trim())
+                        .or().like(DrugDO::getTradeName, keyword.trim())
+                        .or().like(DrugDO::getSpellCode, keyword.trim()))
+                .orderByDesc(DrugDO::getId)
+                .last("LIMIT " + Math.max(1, Math.min(limit, 20))));
+    }
+
 }
