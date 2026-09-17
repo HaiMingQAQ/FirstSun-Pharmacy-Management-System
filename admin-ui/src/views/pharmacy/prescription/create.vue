@@ -6,6 +6,9 @@
       icon="ep:edit-pen"
       page-type="处方管理"
       :loading="formLoading"
+      total-label="登记处方"
+      :total="0"
+      :current-count="0"
       subtitle="FirstSun 药店管理系统 · 登记纸质/电子处方，提交后进入待审"
     />
     <ContentWrap class="pharmacy-panel">

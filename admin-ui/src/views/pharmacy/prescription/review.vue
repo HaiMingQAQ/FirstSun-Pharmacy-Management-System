@@ -177,7 +177,7 @@ const reviewForm = reactive({
   reviewStatus: 1,
   reviewOpinion: '',
   reviewSnapshot: '',
-  dblCheckBy: undefined
+  dblCheckBy: undefined as number | undefined
 })
 const reviewRules = {
   reviewStatus: [{ required: true, message: '请选择审核结果', trigger: 'change' }],
