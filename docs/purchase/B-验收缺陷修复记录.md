@@ -1,8 +1,154 @@
 # B 模块验收缺陷修复记录
 
 对应验收报告：`docs/acceptance/reports/20260915-090535-main-functional-report.md`
-修复分支：`fix/b-purchase-ts`
+
+| 轮次 | 分支 | 范围 | 结果 |
+| --- | --- | --- | --- |
+| 第 1 轮 | `fix/b-purchase-ts`（PR #35，已合并） | 6 条：`dict-tag` 值与表单态类型 | 采购错误 6 → 0 |
+| 第 2 轮 | `fix/b-purchase-listid` | 4 条：下拉列表项主键 `id` 被声明为可选 | 采购错误 4 → 0 |
+
 修复范围：仅 `admin-ui` 采购域（B 主责目录），未改动后端、SQL、Docker 配置与共享组件。
+
+## 一、分派给 B 的缺陷
+
+| ID | 严重度 | 摘要 | 复验要求 |
+| --- | --- | --- | --- |
+| ACC-20260915-005 | P2 | 采购页面 TypeScript 检查失败（`admin-ui/src/views/pharmacy/purchase/**`） | 采购相关 vue-tsc 错误归零，创建/提交无回归 |
+
+报告中「B 收货入库/入账被 C 的 `InventoryFacade.receive` 阻塞」属**依赖阻塞**，主责为 C（ACC-20260915-001），不在本次 B 的修复范围。
+
+---
+
+# 第 2 轮修复（4 条列表项主键类型）
+
+## 一、现象
+
+在最新 `origin/main`（`ac111d62`）上执行 `node ./node_modules/vue-tsc/bin/vue-tsc.js --noEmit`，`pharmacy/purchase` 目录残留 4 条 TS2322，全部落在 `<el-option :value="...id">` 绑定上：
+
+```
+order/OrderForm.vue(107,18)       TS2322  :value="drug.id"
+receipt/index.vue(73,16)          TS2322  :value="item.id"
+receipt/ReceiptForm.vue(31,18)    TS2322  :value="item.id"
+receipt/ReceiptForm.vue(115,18)   TS2322  :value="drug.id"
+
+Type 'number | undefined' is not assignable to type
+'EpPropMergeType<(NumberConstructor | ObjectConstructor | BooleanConstructor | StringConstructor)[], unknown, unknown>'
+```
+
+`el-option` 的 `value` prop 不接受 `undefined`，而三个列表项的 `id` 都被声明成了可选。
+
+## 二、根因
+
+| 列表 | 使用的类型 | 原声明 | 后端真实契约 |
+| --- | --- | --- | --- |
+| 药品下拉 ×2 | `DrugVO`（A 维护） | `id?: number` | `DrugSimpleRespVO.id` = `private Long id`（REQUIRED） |
+| 订单下拉 | `PurchaseOrderVO`（B 维护） | `id?: number` | `PurchaseOrderRespVO.id` = `private Long id` |
+| 门店下拉 | `StoreSimpleVO`（A 维护） | `id: number` ✅ | `StoreSimpleRespVO.id` = `private Long id` |
+
+对照可见：**同类"精简列表"VO 在门店侧已声明为必填，药品/订单侧却写成了可选**——这是类型声明偏差，不是真实可空。
+
+另外 `GET /pharmacy/base/drug/simple-list` 返回的是 `DrugSimpleRespVO`（仅 6 个字段），而前端 `getSimpleDrugList()` **没有声明返回类型**（推断为 `any`），并被赋给 `DrugVO[]`，属契约不符。
+
+## 三、修复（不使用非空断言绕过）
+
+### 3.1 B 自己的订单/收货单 VO：按后端契约改正
+
+`PurchaseOrderVO.id`、`PurchaseReceiptVO.id` 改为必填，并在注释中写明依据的后端 VO 与字段。
+
+### 3.2 药品下拉：在采购域内按精简列表契约收窄
+
+新增 `admin-ui/src/api/pharmacy/purchase/module-types.ts`，定义 `DrugSimpleVO`，字段与后端 `DrugSimpleRespVO` 一一对应且 `id` 必填；`OrderForm.vue` / `ReceiptForm.vue` 的 `drugList` 改用该类型。
+
+**为什么不直接改 `@/api/pharmacy/base/drug`**：该文件属 A 负责，本次修复限定在 B 的采购域内。`module-types.ts` 的文件注释里写明了：若 A 后续给 `getSimpleDrugList` 补上正确返回类型，本文件可移除并改用它。
+
+**为什么不用非空断言**：`drug.id!` 会掩盖真实可空性，一旦后端某条记录缺 id（数据异常）就变成运行时静默错误。改为在类型层面如实声明 `id` 必填，让契约不符在编译期暴露。
+
+### 3.3 `if (!row.id) return` 守卫为何保留
+
+`order/index.vue`、`receipt/index.vue`、`supplier/index.vue` 的命令分发里有 `if (!row.id) return`。这是**运行时防御**（脏数据兜底），不是类型绕过，且 `strict` 模式下 TypeScript 不会因"条件恒真"报错，故保留。
+
+## 四、复验证据
+
+### 4.1 类型检查
+
+> ⚠️ **前置条件**：`admin-ui` 的 `auto-imports.d.ts` / `auto-components.d.ts` 被 `.gitignore` 的 `auto-*.d.ts` 忽略，且 `build/vite/index.ts` 里 `dts: !isBuild && ...` 表示**只在 dev 模式生成**。
+> 缺少这两份声明时，`<el-option>` 会被当成宽松的 HTML 元素，**反而把本缺陷掩盖掉**（实测缺 `auto-components.d.ts` 时采购错误显示为 0 条，是假阴性）。
+> 因此复验前需先生成声明文件，否则结果不可信。
+
+```powershell
+cd admin-ui
+# 生成声明（等价 vite dev 启动一次），随后执行类型检查
+node --max_old_space_size=8192 ./node_modules/vue-tsc/bin/vue-tsc.js --noEmit --pretty false
+```
+
+| 指标 | 修复前 | 修复后 |
+| --- | --- | --- |
+| **采购相关错误** | **4 条** | **0 条** ✅ |
+| 全项目错误 | 20 条 | 16 条 |
+
+修复后全项目剩余 16 条，**全部不在 B 范围**：
+
+| 归属 | 条数 | 明细 |
+| --- | --- | --- |
+| E 处方 | 5 | `prescription/create.vue(261)`、`index.vue(134,144)`、`review.vue(106,191)` |
+| 框架其他模块 | 11 | `mes/wm/*`、`ai/chat`、`fms/report`、`pms/kb`、`iot/alert`、`bpm/oa` 的 `ElMessage`/`ElMessageBox`/`ElTree` 全局未声明 |
+
+### 4.2 前端生产构建
+
+```powershell
+cd admin-ui
+node --max_old_space_size=8192 ./node_modules/vite/bin/vite.js build --mode env.local
+# → ✓ built in 26.36s   BUILD_EXIT=0
+```
+
+### 4.3 四个页面加载
+
+新产物已部署到 admin-ui 容器，四个列表页与四个表单 chunk 全部 HTTP 200：
+
+```
+receipt-BejHY4Og.js      HTTP 200  13.5 KB     ReceiptForm-D5R14a1N.js   HTTP 200  12.7 KB
+order-CX5mXxQp.js        HTTP 200  12.4 KB     OrderForm-BYvRrA86.js     HTTP 200   9.8 KB
+supplier-BW7C88pR.js     HTTP 200  11.0 KB     SupplierForm-BbuBHbmA.js  HTTP 200   7.0 KB
+license-DmPNzASb.js      HTTP 200   9.6 KB     LicenseForm-8R6idktZ.js   HTTP 200   4.9 KB
+```
+
+### 4.4 功能回归（含采购收货入账流程）
+
+`tools/run-all-checks.ps1`：**共 14 项检查，失败 0 项**。
+
+入账流程关键断言（主自测 30 项内）：
+
+```
+[通过] 创建供应商成功 / 登记供应商证照成功 / 证照列表回填状态=有效(1)
+[通过] 创建采购订单成功 → 金额服务端重算（50.00/5.00/45.00）→ 提交 → 审批 → 标记已发出
+[通过] 创建收货单成功 → 部分收货被标记为数量差异(1)
+[通过] 收货时间按毫秒时间戳正确落库（非 1970）
+[通过] 收货单号日期段为当天（回归校验）
+[通过] 超收拦截生效（收货数量超过订购数量被拒绝）
+[通过] 提交收货单（待提交→已提交）
+[通过] 收货入账在库存服务未就绪时返回明确错误（code=1029002001）
+[通过] 入账失败后状态回滚为已提交(1)，未写入入账时间（事务一致）
+[通过] 入账失败后订单已收数量保持 0（库存与单据一致，不虚增）
+```
+
+> 入账的**成功**路径仍被 C 的 `InventoryFacade.receive` 阻塞（ACC-20260915-001）；B 侧已验证「未就绪时明确报错 + 整单回滚」。
+
+### 4.5 改动范围与合规
+
+```
+ M admin-ui/src/api/pharmacy/purchase/order/index.ts           (+8 -1)
+ M admin-ui/src/api/pharmacy/purchase/receipt/index.ts         (+6 -1)
+ M admin-ui/src/views/pharmacy/purchase/order/OrderForm.vue    (+4 -1)
+ M admin-ui/src/views/pharmacy/purchase/receipt/ReceiptForm.vue (+4 -1)
+?? admin-ui/src/api/pharmacy/purchase/module-types.ts           (新增)
+```
+
+- 全部改动位于 `pharmacy/purchase` 采购域，**未触碰 B 以外代码**；
+- 全文检索确认**无 `as any` / `@ts-ignore` / `@ts-expect-error` / 非空断言**。
+
+---
+
+# 第 1 轮修复（6 条类型错误，已合并）
 
 ## 一、分派给 B 的缺陷
 
