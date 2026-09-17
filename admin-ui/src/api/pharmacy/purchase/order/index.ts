@@ -2,7 +2,13 @@ import request from '@/config/axios'
 
 /** 采购订单 VO */
 export interface PurchaseOrderVO {
-  id?: number
+  /** 主键。
+   *
+   *  后端 `PurchaseOrderRespVO.id` 为实体主键（`private Long id`），分页/详情/精简接口均必定返回，
+   *  故不声明为可选：声明成可选会让 `<el-option :value="item.id">` 收到 `number | undefined` 而报 TS2322
+   *  （`el-option` 的 value 不接受 undefined）。
+   */
+  id: number
   orderNo?: string
   storeId?: number
   storeName?: string

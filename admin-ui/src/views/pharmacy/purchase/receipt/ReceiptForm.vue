@@ -229,6 +229,7 @@ import { toLocalDateString } from '../utils/date'
 import * as OrderApi from '@/api/pharmacy/purchase/order'
 import * as StoreApi from '@/api/pharmacy/base/store'
 import * as DrugApi from '@/api/pharmacy/base/drug'
+import type { DrugSimpleVO } from '@/api/pharmacy/purchase/module-types'
 
 defineOptions({ name: 'PharmacyPurchaseReceiptForm' })
 
@@ -328,7 +329,8 @@ const formRef = ref()
 
 /** 下拉数据 */
 const storeList = ref<StoreApi.StoreSimpleVO[]>([])
-const drugList = ref<DrugApi.DrugVO[]>([])
+// 药品下拉用精简列表契约（DrugSimpleVO，id 必填），详见 module-types.ts 的说明
+const drugList = ref<DrugSimpleVO[]>([])
 /** 可收货的采购订单：已审批(2)/已发出(3)/部分到货(4) */
 const receivableOrders = ref<OrderApi.PurchaseOrderVO[]>([])
 

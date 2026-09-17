@@ -2,7 +2,11 @@ import request from '@/config/axios'
 
 /** 采购收货单 VO */
 export interface PurchaseReceiptVO {
-  id?: number
+  /** 主键。
+   *
+   *  后端 `PurchaseReceiptRespVO.id` 为实体主键，分页/详情均必定返回，故不声明为可选。
+   */
+  id: number
   receiptNo?: string
   orderId?: number
   orderNo?: string

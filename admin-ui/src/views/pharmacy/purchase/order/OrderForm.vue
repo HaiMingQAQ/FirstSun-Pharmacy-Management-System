@@ -183,6 +183,7 @@ import { toLocalDateString } from '../utils/date'
 import * as SupplierApi from '@/api/pharmacy/purchase/supplier'
 import * as StoreApi from '@/api/pharmacy/base/store'
 import * as DrugApi from '@/api/pharmacy/base/drug'
+import type { DrugSimpleVO } from '@/api/pharmacy/purchase/module-types'
 
 defineOptions({ name: 'PharmacyPurchaseOrderForm' })
 
@@ -236,7 +237,8 @@ const formRef = ref()
 /** 下拉数据：门店、可采购供应商、可采购药品 */
 const storeList = ref<StoreApi.StoreSimpleVO[]>([])
 const supplierList = ref<SupplierApi.SupplierSimpleVO[]>([])
-const drugList = ref<DrugApi.DrugVO[]>([])
+// 药品下拉用精简列表契约（DrugSimpleVO，id 必填），详见 module-types.ts 的说明
+const drugList = ref<DrugSimpleVO[]>([])
 const loadOptions = async () => {
   const [stores, suppliers, drugs] = await Promise.all([
     StoreApi.getSimpleStoreList(),
