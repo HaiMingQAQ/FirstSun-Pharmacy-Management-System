@@ -18,8 +18,12 @@ export interface PurchaseOrderVO {
   totalAmount?: number
   discountAmount?: number
   payableAmount?: number
-  /** 订单状态 -1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成（后端维护） */
-  status?: number
+  /** 订单状态 -1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成（后端维护）
+   *
+   *  数据库 `status` 为 NOT NULL DEFAULT 0，后端必定返回，故此处不声明为可选：
+   *  声明成可选会让 `dict-tag :value` 收到 `number | undefined` 而报 TS2322。
+   */
+  status: number
   isAuto?: number
   remark?: string
   /** 审批人（后端维护，前端只读） */

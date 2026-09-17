@@ -248,8 +248,13 @@ const loadOptions = async () => {
   drugList.value = drugs
 }
 
-/** 行金额预览：数量 × 单价 × 折扣率，保留两位小数 */
-const calcLineAmount = (line: OrderApi.PurchaseOrderLineCreateVO) => {
+/**
+ * 行金额预览：数量 × 单价 × 折扣率，保留两位小数
+ *
+ * 形参用表单态类型 OrderLineFormItem 而非提交 DTO：抽屉里 drugId 允许为空（未选择），
+ * 两个调用点（表格 scope.row、预览合计）传的也都是表单行，用 DTO 类型会因 drugId 必填而报 TS2345。
+ */
+const calcLineAmount = (line: OrderLineFormItem) => {
   const qty = Number(line.orderQty || 0)
   const price = Number(line.unitPrice || 0)
   const rate = line.discountRate === undefined ? 1 : Number(line.discountRate)
