@@ -240,9 +240,31 @@ const dialogTitle = ref('') // 抽屉的标题
 const formLoading = ref(false) // 表单加载中
 const formType = ref('') // create / update
 
-/** 抽屉内明细行：无单收货时 drugId 可为空（未选择），提交时收窄为必填 */
-type ReceiptLineFormItem = Omit<ReceiptApi.PurchaseReceiptLineCreateVO, 'drugId'> & {
+/**
+ * 抽屉内明细行（表单态）。
+ *
+ * 独立定义而不是从提交 DTO 派生：表单态与提交态字段可空性不同，
+ * 用 Omit/& 拼接会与基础接口的可选性冲突（如 manufactureDate 一旦放宽为可选，
+ * 就无法再赋给要求 `string` 的提交类型）。
+ *
+ * 与提交态 PurchaseReceiptLineCreateVO 的差异只有一处：
+ * - drugId 允许为空（无单收货未选择），提交前由 buildSaveData 收窄为必填。
+ * 其余字段（含 expiryDate）在表单校验通过后必然有值，故保持必填，
+ * 这样 buildSaveData 的返回值无需强制类型转换即可满足接口契约。
+ */
+type ReceiptLineFormItem = {
+  lineNo?: number
+  orderLineId?: number
   drugId?: number
+  batchNo: string
+  manufactureDate?: string
+  expiryDate: string
+  qty: number
+  unitPrice: number
+  locationId?: number
+  qualityFlag?: number
+  qaRemark?: string
+  coldChainTemp?: number
 }
 
 /** 抽屉表单数据：创建载荷 + 可选 id（修改时回填） */
@@ -264,6 +286,25 @@ const createDefaultLine = (): ReceiptLineFormItem => ({
   qualityFlag: 0,
   qaRemark: '',
   coldChainTemp: undefined
+})
+
+/**
+ * 详情明细（响应 VO）→ 表单明细：LocalDate 响应是数组 [y,m,d]，
+ * 必须转成 YYYY-MM-DD 字符串才能回填 el-date-picker。
+ */
+const toReceiptLineFormItem = (line: ReceiptApi.PurchaseReceiptLineVO): ReceiptLineFormItem => ({
+  lineNo: line.lineNo,
+  orderLineId: line.orderLineId,
+  drugId: line.drugId,
+  batchNo: line.batchNo || '',
+  manufactureDate: toLocalDateString(line.manufactureDate),
+  expiryDate: toLocalDateString(line.expiryDate),
+  qty: line.qty || 1,
+  unitPrice: Number(line.unitPrice || 0),
+  locationId: line.locationId,
+  qualityFlag: line.qualityFlag,
+  qaRemark: line.qaRemark,
+  coldChainTemp: line.coldChainTemp
 })
 
 const createDefaultFormData = (): ReceiptFormData => ({
@@ -409,21 +450,7 @@ const open = async (type: string, id?: number) => {
         warehouseId: data.warehouseId,
         receiveDate: data.receiveDate,
         isFreeReceipt: data.isFreeReceipt,
-        lines: (data.lines || []).map((line) => ({
-          lineNo: line.lineNo,
-          orderLineId: line.orderLineId,
-          drugId: line.drugId,
-          batchNo: line.batchNo,
-          // LocalDate 响应是数组 [y,m,d]，必须转成 YYYY-MM-DD 才能回填 el-date-picker
-          manufactureDate: toLocalDateString(line.manufactureDate),
-          expiryDate: toLocalDateString(line.expiryDate),
-          qty: line.qty || 1,
-          unitPrice: Number(line.unitPrice || 0),
-          locationId: line.locationId,
-          qualityFlag: line.qualityFlag,
-          qaRemark: line.qaRemark,
-          coldChainTemp: line.coldChainTemp
-        }))
+        lines: (data.lines || []).map((line) => toReceiptLineFormItem(line))
       }
       if (formData.value.lines.length === 0) {
         formData.value.lines = [createDefaultLine()]
