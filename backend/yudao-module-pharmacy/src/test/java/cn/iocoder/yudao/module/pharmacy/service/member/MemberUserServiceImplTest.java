@@ -16,6 +16,7 @@ import org.mockito.quality.Strictness;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,6 +91,36 @@ class MemberUserServiceImplTest {
         assertNotNull(created.getRegisterIp());
         assertFalse(created.getRegisterIp().isBlank());
         assertTrue(created.getRegisterIp().length() <= 32);
+    }
+
+    /** 启用 / 停用：校验会员存在，且只更新 status 字段 */
+    @Test
+    void testUpdateMemberUserStatus_updatesOnlyStatus() {
+        MemberUserDO exist = new MemberUserDO();
+        exist.setId(11L);
+        exist.setStatus(1);
+        when(memberUserMapper.selectById(11L)).thenReturn(exist);
+
+        memberUserService.updateMemberUserStatus(11L, 0);
+
+        ArgumentCaptor<MemberUserDO> captor = ArgumentCaptor.forClass(MemberUserDO.class);
+        verify(memberUserMapper).updateById(captor.capture());
+        MemberUserDO updated = captor.getValue();
+        assertEquals(11L, updated.getId());
+        assertEquals(0, updated.getStatus());
+        // 只更新状态，不把档案字段一并覆盖
+        assertNull(updated.getMobile());
+        assertNull(updated.getNickname());
+        assertNull(updated.getLevelId());
+    }
+
+    /** 启用 / 停用：会员不存在时抛业务异常，不静默成功 */
+    @Test
+    void testUpdateMemberUserStatus_memberNotFound() {
+        when(memberUserMapper.selectById(99L)).thenReturn(null);
+
+        assertThrows(ServiceException.class, () -> memberUserService.updateMemberUserStatus(99L, 1));
+        verify(memberUserMapper, never()).updateById(any(MemberUserDO.class));
     }
 
     // ========== 测试辅助 ==========

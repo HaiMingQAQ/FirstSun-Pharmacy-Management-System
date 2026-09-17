@@ -51,6 +51,17 @@ public class MemberUserController {
         return success(true);
     }
 
+    @PutMapping("/update-status")
+    @Operation(summary = "更新会员状态（启用 / 停用）")
+    @Parameter(name = "id", description = "用户编号", required = true, example = "1024")
+    @Parameter(name = "status", description = "状态，0 禁用 / 1 启用", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:user:update')")
+    public CommonResult<Boolean> updateMemberUserStatus(@RequestParam("id") Long id,
+                                                        @RequestParam("status") Integer status) {
+        memberUserService.updateMemberUserStatus(id, status);
+        return success(true);
+    }
+
     @DeleteMapping("/delete")
     @Operation(summary = "删除会员用户")
     @Parameter(name = "id", description = "用户编号", required = true, example = "1024")

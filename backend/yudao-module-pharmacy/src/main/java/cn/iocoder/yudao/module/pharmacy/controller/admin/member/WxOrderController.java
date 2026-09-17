@@ -118,7 +118,7 @@ public class WxOrderController {
     @PutMapping("/cancel")
     @Operation(summary = "取消订单（幂等）：待支付/待拣货 → 取消")
     @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:cancel')")
     public CommonResult<Boolean> cancelWxOrder(@RequestParam("id") Long id,
                                                @RequestParam(value = "cancelReason", required = false) String cancelReason) {
         wxOrderService.cancelWxOrder(id, cancelReason);
@@ -183,7 +183,7 @@ public class WxOrderController {
     @PutMapping("/verify")
     @Operation(summary = "核销订单（幂等）：待自提 → 完成")
     @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:update')")
+    @PreAuthorize("@ss.hasPermission('pharmacy:member:order:verify')")
     public CommonResult<Boolean> verifyWxOrder(@RequestParam("id") Long id,
                                                @RequestParam("pickupCode") String pickupCode,
                                                @RequestParam("verifyBy") Long verifyBy) {

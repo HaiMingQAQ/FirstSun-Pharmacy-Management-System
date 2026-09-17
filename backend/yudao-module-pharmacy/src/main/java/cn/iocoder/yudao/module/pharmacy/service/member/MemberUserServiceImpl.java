@@ -69,6 +69,17 @@ public class MemberUserServiceImpl implements MemberUserService {
     }
 
     @Override
+    public void updateMemberUserStatus(Long id, Integer status) {
+        // 校验存在，避免对不存在的会员静默成功
+        validateMemberUserExists(id);
+        // 只更新状态字段，不触碰其它档案信息
+        MemberUserDO updateObj = new MemberUserDO();
+        updateObj.setId(id);
+        updateObj.setStatus(status);
+        memberUserMapper.updateById(updateObj);
+    }
+
+    @Override
     public void deleteMemberUser(Long id) {
         // 校验存在
         validateMemberUserExists(id);
