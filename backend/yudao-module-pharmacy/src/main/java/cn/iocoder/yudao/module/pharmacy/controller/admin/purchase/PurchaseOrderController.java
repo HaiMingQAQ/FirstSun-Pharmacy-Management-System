@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.pharmacy.api.dto.DrugRespDTO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderDetailRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderLineRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderPageReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderRejectReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.purchase.vo.order.PurchaseOrderSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.StoreDO;
@@ -130,9 +131,16 @@ public class PurchaseOrderController {
         return success(true);
     }
 
+    @PutMapping("/reject")
+    @Operation(summary = "驳回采购订单", description = "已提交 → 已驳回；驳回原因必填并落库（B-2）")
+    @PreAuthorize("@ss.hasPermission('pharmacy:purchase:order:approve')")
+    public CommonResult<Boolean> rejectOrder(@Valid @RequestBody PurchaseOrderRejectReqVO rejectReqVO) {
+        purchaseOrderService.rejectOrder(rejectReqVO.getId(), rejectReqVO.getRejectReason());
+        return success(true);
+    }
+
     @PutMapping("/issue")
-    @Operation(summary = "标记采购订单已发出", description = "已审批 → 已发出")
-    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    @Operation(summary = "标记采购订单已发出", description = "已审批 → 已发出")    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('pharmacy:purchase:order:issue')")
     public CommonResult<Boolean> issueOrder(@RequestParam("id") Long id) {
         purchaseOrderService.issueOrder(id);

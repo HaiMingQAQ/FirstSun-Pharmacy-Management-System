@@ -40,8 +40,9 @@ public interface PurchaseReceiptMapper extends BaseMapperX<PurchaseReceiptDO> {
     /**
      * 查询指定前缀（GR-门店-yyyyMMdd-）下已有的最大收货单号（含逻辑删除行）
      *
-     * 用于生成新单号：uk_receipt_no 不包含 deleted 列，逻辑删除的单据仍占号，
-     * 因此必须包含 deleted=1 的行一起取最大值，否则会生成已被占用的单号。
+     * <p><b>仅用于历史数据回填与单号对账</b>，不要用它来分配新单号：
+     * MySQL 默认 REPEATABLE-READ 下 MAX() 是不加锁的一致性读，同一事务内重试读到的快照不变，
+     * 并发时会算出同一个号并触发唯一键冲突/死锁。新单号请用 {@link PurchaseDocSeqMapper#allocateSeq}。
      */
     @Select("SELECT MAX(receipt_no) FROM ph_po_receipt WHERE receipt_no LIKE CONCAT(#{prefix}, '%')")
     String selectMaxReceiptNo(@Param("prefix") String prefix);

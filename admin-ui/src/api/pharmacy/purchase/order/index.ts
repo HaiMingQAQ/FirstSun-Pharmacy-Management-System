@@ -36,6 +36,12 @@ export interface PurchaseOrderVO {
   auditBy?: number
   /** 审批时间：毫秒时间戳（后端维护，前端只读） */
   auditAt?: number
+  /** 驳回原因（仅已驳回状态有值，B-2） */
+  rejectReason?: string
+  /** 驳回人员工编号（B-2） */
+  rejectBy?: number
+  /** 驳回时间：毫秒时间戳（B-2） */
+  rejectAt?: number
   /** 创建时间：毫秒时间戳（只读） */
   createTime?: number
 }
@@ -130,6 +136,14 @@ export const submitPurchaseOrder = (id: number) => {
 // 审批通过：已提交 → 已审批
 export const approvePurchaseOrder = (id: number) => {
   return request.put({ url: '/pharmacy/purchase/order/approve?id=' + id })
+}
+
+// 驳回订单（B-2）：已提交 → 已驳回；驳回原因必填并落库
+export const rejectPurchaseOrder = (id: number, rejectReason: string) => {
+  return request.put({
+    url: '/pharmacy/purchase/order/reject',
+    data: { id, rejectReason }
+  })
 }
 
 // 标记已发出：已审批 → 已发出
