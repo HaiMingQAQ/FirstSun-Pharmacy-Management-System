@@ -10,10 +10,12 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleReturnPageRe
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleReturnDetailRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleReturnSaveReqVO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderDO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSalePaymentDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleReturnDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleReturnLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderLineMapper;
+import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SalePaymentMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleReturnLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleReturnMapper;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -38,6 +41,7 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RET
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_NOT_EXISTS;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_PRESC_NOT_CONFIRM;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_QTY_EXCEED;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_REFUND_AMOUNT_INVALID;
 
 /**
  * 退货服务实现。
@@ -66,6 +70,8 @@ public class SaleReturnServiceImpl implements SaleReturnService {
     private PaymentFacade paymentFacade;
     @Resource
     private MemberPointFacade memberPointFacade;
+    @Resource
+    private SalePaymentMapper salePaymentMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -139,15 +145,9 @@ public class SaleReturnServiceImpl implements SaleReturnService {
             saleReturnLineMapper.insert(line);
         }
 
-        // 4. 渠道退款（refundMethod=0 原路，依赖 E 支付；未实现整体回滚；幂等键后续改为 returnNo）
-        Integer refundMethod = reqVO.getRefundMethod() == null ? 0 : reqVO.getRefundMethod();
-        try {
-            if (refundMethod == 0) {
-                paymentFacade.refund(null, "REFUND-" + System.currentTimeMillis(), totalAmount.movePointRight(2).intValue(), null);
-            }
-        } catch (UnsupportedOperationException ex) {
-            throw ServiceExceptionUtil.exception(PAY_SERVICE_UNAVAILABLE);
-        }
+        // 4. 渠道退款（E PaymentFacade）+ 销售支付明细退款记录（D-2）
+        //    退款金额由服务端按原支付明细占比计算，逐笔退款；现金支付同样落退款流水。
+        refundPayments(order, ret, lines, totalAmount, reqVO.getRefundMethod());
 
         // 5. 积分回退（F 服务；本期 pointsDeduct=0 不触发）
         try {
@@ -194,6 +194,12 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         order.setReturnFlag(allReturned ? 2 : 1);
         order.setStatus(allReturned ? 2 : 3);
         saleOrderMapper.updateById(order);
+
+        // 8. 退款、积分回退、库存回补全部成功后，标记退货单完成
+        ret.setStatus(3);        // 已完成
+        ret.setRefundStatus(2);  // 退款成功
+        ret.setReturnAt(LocalDateTime.now());
+        saleReturnMapper.updateById(ret);
         return ret.getId();
     }
 
@@ -218,6 +224,78 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         detail.setReturnOrder(ret);
         detail.setLines(saleReturnLineMapper.selectListByReturnId(id));
         return detail;
+    }
+
+    /**
+     * 退款（D-2）：按原销售支付明细逐笔退款，并落支付退款流水。
+     * <p>
+     * 1) 退款金额由服务端计算：按每笔支付占实付金额的比例分摊 totalAmount，末笔补差保证合计一致；
+     * 2) 原路退款（refundMethod=0）且该笔存在渠道支付单时，调用 E 的统一退款门面（refundNo 幂等）；
+     *    现金（无渠道支付单）或指定现金退款（refundMethod=1）时本地记录退款流水，不伪造渠道成功；
+     * 3) 每笔支付明细写 refund_no / refund_at；整单全退时置 status=3（已退款），部分退保持原状态，
+     *    避免阻断后续剩余数量的退货退款（超量/重复退款由数量校验与整单状态拦截）；
+     * 4) E 未实现（UnsupportedOperationException）时转 PAY_SERVICE_UNAVAILABLE，事务整体回滚。
+     */
+    private void refundPayments(PhSaleOrderDO order, PhSaleReturnDO ret, List<PhSaleReturnLineDO> lines,
+                                BigDecimal totalAmount, Integer refundMethodRaw) {
+        List<PhSalePaymentDO> payments = salePaymentMapper.selectListByOrderId(order.getId());
+        List<PhSalePaymentDO> refundable = new ArrayList<>();
+        for (PhSalePaymentDO pm : payments) {
+            if (pm.getStatus() != null && pm.getStatus() == 1) {
+                refundable.add(pm);
+            }
+        }
+        if (refundable.isEmpty()) {
+            throw ServiceExceptionUtil.exception(SALE_RETURN_REFUND_AMOUNT_INVALID);
+        }
+        BigDecimal paidTotal = BigDecimal.ZERO;
+        for (PhSalePaymentDO pm : refundable) {
+            paidTotal = paidTotal.add(pm.getPayAmount());
+        }
+        if (paidTotal.signum() <= 0 || totalAmount.compareTo(paidTotal) > 0) {
+            throw ServiceExceptionUtil.exception(SALE_RETURN_REFUND_AMOUNT_INVALID);
+        }
+        // 本次退货是否导致整单全退：决定支付明细状态是否置为已退款
+        boolean allReturned = true;
+        for (PhSaleReturnLineDO rl : lines) {
+            PhSaleOrderLineDO line = saleOrderLineMapper.selectById(rl.getSaleLineId());
+            int newReturned = line.getReturnedQty() + rl.getQty();
+            if (newReturned < line.getQty()) {
+                allReturned = false;
+                break;
+            }
+        }
+        int refundMethod = refundMethodRaw == null ? 0 : refundMethodRaw;
+        BigDecimal allocated = BigDecimal.ZERO;
+        for (int i = 0; i < refundable.size(); i++) {
+            PhSalePaymentDO pm = refundable.get(i);
+            BigDecimal refundAmt = (i == refundable.size() - 1)
+                    ? totalAmount.subtract(allocated)
+                    : totalAmount.multiply(pm.getPayAmount()).divide(paidTotal, 2, RoundingMode.HALF_UP);
+            allocated = allocated.add(refundAmt);
+            // refundNo 为退款幂等键（E 侧唯一），采用 退货单ID-支付明细ID 短格式，避免超出 refund_no(32) 列宽
+            String refundNo = "RF-" + ret.getId() + "-" + pm.getId();
+            LocalDateTime refundAt = LocalDateTime.now();
+            // 原路退款且该笔存在渠道支付单 → 调 E 统一退款门面（refundNo 幂等）
+            boolean channelRefund = (refundMethod != 1) && (pm.getPayOrderId() != null);
+            if (channelRefund) {
+                try {
+                    paymentFacade.refund(pm.getPayOrderId(), refundNo,
+                            refundAmt.movePointRight(2).intValue(), "药店销售退货");
+                } catch (UnsupportedOperationException ex) {
+                    throw ServiceExceptionUtil.exception(PAY_SERVICE_UNAVAILABLE);
+                }
+            }
+            // 现金支付同样必须有明确退款记录与状态变化
+            PhSalePaymentDO update = new PhSalePaymentDO();
+            update.setId(pm.getId());
+            update.setRefundNo(refundNo);
+            update.setRefundAt(refundAt);
+            if (allReturned) {
+                update.setStatus(3); // 已退款
+            }
+            salePaymentMapper.updateById(update);
+        }
     }
 
     private String genReturnNo(Long storeId) {
