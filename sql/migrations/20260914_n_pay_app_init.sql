@@ -21,5 +21,5 @@ INSERT IGNORE INTO `pay_channel`
   (`id`, `code`, `status`, `remark`, `fee_rate`, `app_id`, `config`,
    `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
 VALUES
-  (1, 'mock', 0, '模拟支付渠道（演示/联调用，无真实资金）', 0, 1, '{}',
+  (1, 'mock', 0, '模拟支付渠道（演示/联调用，无真实资金）', 0, 1, '{"@class": "cn.iocoder.yudao.module.pay.framework.pay.core.client.impl.NonePayClientConfig"}',
    '1', NOW(), '1', NOW(), b'0', 163);

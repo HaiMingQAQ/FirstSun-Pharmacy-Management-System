@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.PurchaseOrderLin
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseOrderLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptMapper;
+import cn.iocoder.yudao.module.pharmacy.enums.PurchaseDocSeqTypeEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseOrderStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.service.base.EmployeeService;
 import cn.iocoder.yudao.module.pharmacy.service.base.StoreService;
@@ -74,6 +75,12 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
 
     @Resource
     private PurchaseOrderLineMapper orderLineMapper;
+
+    /**
+     * 采购单号序列表：并发取号的原子分配入口
+     */
+    @Resource
+    private PurchaseDocSeqService seqService;
 
     @Resource
     private PurchaseReceiptMapper receiptMapper;
@@ -253,8 +260,39 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     }
 
     @Override
-    public void issueOrder(Long id) {
+    public void rejectOrder(Long id, String rejectReason) {
         PurchaseOrderDO order = validateOrderExists(id);
+        // 重复驳回：给出更精确的错误码，便于前端提示
+        if (PurchaseOrderStatusEnum.isRejected(order.getStatus())) {
+            throw exception(PURCHASE_ORDER_REJECT_DUP);
+        }
+        // 仅「已提交」可驳回：已审批/已取消/已发出/已收货/已完成一律拒绝
+        if (!PurchaseOrderStatusEnum.isSubmitted(order.getStatus())) {
+            throw exception(PURCHASE_ORDER_REJECT_STATUS_INVALID);
+        }
+        // 驳回原因必填：先做服务层校验（Controller 侧另有 @NotBlank 兜底）
+        if (rejectReason == null || rejectReason.trim().isEmpty()) {
+            throw exception(PURCHASE_ORDER_REJECT_REASON_REQUIRED);
+        }
+        // 驳回人：当前登录 system 用户对应的药店员工（与审批人同一口径）
+        Long loginUserId = SecurityFrameworkUtils.getLoginUserId();
+        EmployeeDO employee = employeeService.getEmployeeByUserId(loginUserId);
+        if (employee == null) {
+            throw exception(PURCHASE_ORDER_AUDITOR_NOT_EMPLOYEE);
+        }
+        PurchaseOrderDO update = new PurchaseOrderDO();
+        update.setId(id);
+        update.setStatus(PurchaseOrderStatusEnum.REJECTED.getStatus());
+        // 落库：原因（截断到列宽 500，避免超长导致 SQL 报错）、驳回人、驳回时间
+        String reason = rejectReason.trim();
+        update.setRejectReason(reason.length() > 500 ? reason.substring(0, 500) : reason);
+        update.setRejectBy(employee.getId());
+        update.setRejectAt(LocalDateTime.now());
+        orderMapper.updateById(update);
+    }
+
+    @Override
+    public void issueOrder(Long id) {        PurchaseOrderDO order = validateOrderExists(id);
         if (!PurchaseOrderStatusEnum.isApproved(order.getStatus())) {
             throw exception(PURCHASE_ORDER_STATUS_INVALID);
         }
@@ -421,16 +459,17 @@ public class PurchaseOrderServiceImpl implements PurchaseOrderService {
     /**
      * 生成订单号：PO-门店-yyyyMMdd-流水
      * <p>
-     * 必须取「前缀内已有的最大流水 + 1」，不能用 count + 1：uk_order_no 唯一键不包含 deleted 列，
-     * 而 MyBatis-Plus 的 selectCount 会自动过滤逻辑删除行，两者口径不一致会生成已被占用的单号。
+     * 流水号来自序列表 {@code ph_po_doc_seq} 的**原子分配**
+     * （{@link PurchaseDocSeqMapper#allocateSeq}），不再用 {@code MAX(单号) + 1} 推算。
+     * 原因同收货单：MySQL 默认 REPEATABLE-READ 下 MAX() 一致性读在重试时快照不变，
+     * 并发取号会算出同一个号并因争抢 uk_order_no 索引锁产生死锁。
+     * <p>
+     * 该方案同时天然覆盖「已被逻辑删除单据占号」问题：序号由序列表推进，不受 deleted 过滤影响。
      */
     private String generateOrderNo(Long storeId, LocalDate orderDate) {
         String prefix = "PO" + storeId + "-" + orderDate.format(NO_DATE) + "-";
-        String maxNo = orderMapper.selectMaxOrderNo(prefix);
-        long seq = 1L;
-        if (maxNo != null) {
-            seq = Long.parseLong(maxNo.substring(prefix.length())) + 1;
-        }
+        long seq = seqService.allocate(storeId, orderDate.format(NO_DATE),
+                PurchaseDocSeqTypeEnum.ORDER.getType());
         return prefix + String.format(NO_SEQ_FORMAT, seq);
     }
 

@@ -69,7 +69,10 @@ class SaleOrderServiceImplTest {
             invocation.getArgument(0, PhSaleOrderDO.class).setId(1L);
             return 1;
         }).when(saleOrderMapper).insert(any(PhSaleOrderDO.class));
-        when(saleOrderLineMapper.insert(any(cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderLineDO.class))).thenReturn(1);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderLineDO.class).setId(11L);
+            return 1;
+        }).when(saleOrderLineMapper).insert(any(cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderLineDO.class));
         when(salePaymentMapper.insert(any(cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSalePaymentDO.class))).thenReturn(1);
     }
 
@@ -104,6 +107,12 @@ class SaleOrderServiceImplTest {
 
     @Test
     void testCreateSaleOrder_success() {
+        doAnswer(invocation -> {
+            List<DeductItem> items = invocation.getArgument(1);
+            assertEquals("SO-1-20260909101000-001", items.get(0).getBizNo());
+            assertEquals(11L, items.get(0).getBizLineId());
+            return null;
+        }).when(inventoryFacade).deduct(anyLong(), anyList());
         Long id = saleOrderService.createSaleOrder(buildReqVO());
         assertEquals(1L, id);
         // 明细与支付均入库，库存按明细扣减

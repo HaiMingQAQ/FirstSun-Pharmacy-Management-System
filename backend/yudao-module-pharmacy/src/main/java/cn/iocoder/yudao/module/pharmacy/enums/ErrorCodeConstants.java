@@ -105,6 +105,8 @@ public interface ErrorCodeConstants {
     // ========== 会员积分记录 1-030-008-000 ==========
     ErrorCode PHARMACY_MEMBER_POINT_RECORD_NOT_EXISTS = new ErrorCode(1_030_008_000, "会员积分记录不存在");
     ErrorCode PHARMACY_MEMBER_POINT_BIZ_INVALID = new ErrorCode(1_030_008_001, "积分业务参数非法：会员编号与业务编码不能为空");
+    ErrorCode PHARMACY_MEMBER_POINT_NOT_ENOUGH = new ErrorCode(1_030_008_002, "会员积分不足：当前可用积分 {}，本次需要 {}");
+    ErrorCode PHARMACY_MEMBER_POINT_RETURN_EXCEED = new ErrorCode(1_030_008_003, "返还积分超过该业务单号已扣减的积分");
 
     // ========== 会员收件地址 1-030-009-000 ==========
     ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_EXISTS = new ErrorCode(1_030_009_000, "会员收件地址不存在");
@@ -129,6 +131,9 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_WX_ORDER_TYPE_INVALID = new ErrorCode(1_030_011_008, "订单类型非法：只能为 0(到店自提) 或 1(同城配送)");
     ErrorCode PHARMACY_WX_ORDER_ADDRESS_REQUIRED = new ErrorCode(1_030_011_009, "同城配送必须选择收货地址");
     ErrorCode PHARMACY_WX_ORDER_PRESC_REQUIRED = new ErrorCode(1_030_011_010, "含处方药，必须关联已审方通过的处方");
+    ErrorCode PHARMACY_WX_ORDER_STOCK_NOT_ENOUGH = new ErrorCode(1_030_011_011, "门店可用库存不足，订单无法继续");
+    ErrorCode PHARMACY_WX_ORDER_STOCK_OP_FAILED = new ErrorCode(1_030_011_012, "库存作业失败：{}");
+    ErrorCode PHARMACY_WX_ORDER_ALLOC_MISSING = new ErrorCode(1_030_011_013, "订单缺少出库批次/货位记录，无法精确回补库存");
 
     // ========== 小程序订单明细 1-030-012-000 ==========
     ErrorCode PHARMACY_WX_ORDER_LINE_NOT_EXISTS = new ErrorCode(1_030_012_000, "小程序订单明细不存在");
@@ -164,6 +169,9 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_ORDER_QTY_INVALID = new ErrorCode(1_031_003_008, "采购数量必须大于 0");
     ErrorCode PURCHASE_ORDER_DISCOUNT_INVALID = new ErrorCode(1_031_003_009, "折扣率非法：取值必须在 0 到 1 之间");
     ErrorCode PURCHASE_ORDER_APPROVE_DUP = new ErrorCode(1_031_003_010, "采购订单已审批，不能重复审批");
+    ErrorCode PURCHASE_ORDER_REJECT_REASON_REQUIRED = new ErrorCode(1_031_003_011, "驳回原因不能为空");
+    ErrorCode PURCHASE_ORDER_REJECT_STATUS_INVALID = new ErrorCode(1_031_003_012, "仅「已提交」状态的采购订单可以驳回");
+    ErrorCode PURCHASE_ORDER_REJECT_DUP = new ErrorCode(1_031_003_013, "采购订单已驳回，不能重复驳回");
 
     // ========== 采购收货 1-031-004-000（B 维护）==========
     ErrorCode PURCHASE_RECEIPT_NOT_EXISTS = new ErrorCode(1_031_004_000, "采购收货单不存在");
@@ -180,6 +188,7 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_RECEIPT_DRUG_INVALID = new ErrorCode(1_031_004_011, "收货明细中的药品不存在");
     ErrorCode PURCHASE_RECEIPT_RECEIVER_NOT_EMPLOYEE = new ErrorCode(1_031_004_012, "当前登录用户未绑定药店员工，无法收货");
     ErrorCode PURCHASE_RECEIPT_LOCATION_REQUIRED = new ErrorCode(1_031_004_013, "入账前必须填写入库货位");
+    ErrorCode PURCHASE_RECEIPT_DATE_INVALID = new ErrorCode(1_031_004_014, "收货时间非法：不能为空且必须是合理的业务日期（不能是 1970 等 Unix 起点时间）");
 
 
     // ========== 处方记录 1-032-001-000（E 维护）==========

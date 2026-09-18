@@ -2,7 +2,11 @@ import request from '@/config/axios'
 
 /** 采购收货单 VO */
 export interface PurchaseReceiptVO {
-  id?: number
+  /** 主键。
+   *
+   *  后端 `PurchaseReceiptRespVO.id` 为实体主键，分页/详情均必定返回，故不声明为可选。
+   */
+  id: number
   receiptNo?: string
   orderId?: number
   orderNo?: string
@@ -16,13 +20,23 @@ export interface PurchaseReceiptVO {
   /** 服务端重算字段，前端只读 */
   totalQty?: number
   totalAmount?: number
-  /** 差异标记 0无/1数量差异/2价格差异（后端计算，只读） */
-  diffType?: number
+  /** 差异标记 0无/1数量差异/2价格差异（后端计算，只读）
+   *
+   *  数据库 `diff_type` 为 NOT NULL DEFAULT 0，后端必定返回，故不声明为可选。
+   */
+  diffType: number
   isFreeReceipt?: number
-  /** 收货单状态 0待提交/1已提交/2已入账/3已作废（后端维护） */
-  status?: number
-  /** 质检结果 0未检/1合格/2有异常（后端计算，只读） */
-  qualityStatus?: number
+  /** 收货单状态 0待提交/1已提交/2已入账/3已作废（后端维护）
+   *
+   *  数据库 `status` 为 NOT NULL DEFAULT 0，后端必定返回，故不声明为可选：
+   *  声明成可选会让 `dict-tag :value` 收到 `number | undefined` 而报 TS2322。
+   */
+  status: number
+  /** 质检结果 0未检/1合格/2有异常（后端计算，只读）
+   *
+   *  数据库 `quality_status` 为 NOT NULL DEFAULT 0，后端必定返回，故不声明为可选。
+   */
+  qualityStatus: number
   /** 入账时间：毫秒时间戳（只读） */
   postedAt?: number
   /** 创建时间：毫秒时间戳（只读） */

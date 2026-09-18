@@ -87,7 +87,8 @@
             canLedger ||
             canHealth ||
             canStocktake ||
-            canDamage
+            canDamage ||
+            canMovement
           "
           label="操作"
           width="360"
@@ -105,6 +106,9 @@
             >
             <el-button v-if="canDamage" link type="primary" @click="damage?.open(row)"
               >报损</el-button
+            >
+            <el-button v-if="canMovement" link type="primary" @click="movement?.open(row)"
+              >上架移位</el-button
             >
             <el-button v-if="canUpdate" link type="primary" @click="editForm?.open(row)"
               >编辑</el-button
@@ -151,6 +155,7 @@
     <InventoryHealth ref="health" />
     <InventoryStocktake ref="stocktake" />
     <InventoryDamage ref="damage" />
+    <InventoryMovement ref="movement" @success="getList" />
   </div>
 </template>
 
@@ -168,6 +173,7 @@ import LocationList from './LocationList.vue'
 import InventoryHealth from './InventoryHealth.vue'
 import InventoryStocktake from './InventoryStocktake.vue'
 import InventoryDamage from './InventoryDamage.vue'
+import InventoryMovement from './InventoryMovement.vue'
 import {
   getWarehousePage,
   deleteWarehouse,
@@ -209,6 +215,8 @@ const canDamage = computed(() =>
   checkPermi(['pharmacy:inventory-damage:query', 'pharmacy:inventory-damage:create'])
 )
 const damage = ref<InstanceType<typeof InventoryDamage>>()
+const canMovement = computed(() => checkPermi(['pharmacy:inventory-movement:execute']))
+const movement = ref<InstanceType<typeof InventoryMovement>>()
 
 const getList = async () => {
   if (loading.value || !canQuery.value) return

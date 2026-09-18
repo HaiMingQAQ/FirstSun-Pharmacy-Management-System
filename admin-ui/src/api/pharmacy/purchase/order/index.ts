@@ -2,7 +2,13 @@ import request from '@/config/axios'
 
 /** 采购订单 VO */
 export interface PurchaseOrderVO {
-  id?: number
+  /** 主键。
+   *
+   *  后端 `PurchaseOrderRespVO.id` 为实体主键（`private Long id`），分页/详情/精简接口均必定返回，
+   *  故不声明为可选：声明成可选会让 `<el-option :value="item.id">` 收到 `number | undefined` 而报 TS2322
+   *  （`el-option` 的 value 不接受 undefined）。
+   */
+  id: number
   orderNo?: string
   storeId?: number
   storeName?: string
@@ -18,14 +24,24 @@ export interface PurchaseOrderVO {
   totalAmount?: number
   discountAmount?: number
   payableAmount?: number
-  /** 订单状态 -1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成（后端维护） */
-  status?: number
+  /** 订单状态 -1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成（后端维护）
+   *
+   *  数据库 `status` 为 NOT NULL DEFAULT 0，后端必定返回，故此处不声明为可选：
+   *  声明成可选会让 `dict-tag :value` 收到 `number | undefined` 而报 TS2322。
+   */
+  status: number
   isAuto?: number
   remark?: string
   /** 审批人（后端维护，前端只读） */
   auditBy?: number
   /** 审批时间：毫秒时间戳（后端维护，前端只读） */
   auditAt?: number
+  /** 驳回原因（仅已驳回状态有值，B-2） */
+  rejectReason?: string
+  /** 驳回人员工编号（B-2） */
+  rejectBy?: number
+  /** 驳回时间：毫秒时间戳（B-2） */
+  rejectAt?: number
   /** 创建时间：毫秒时间戳（只读） */
   createTime?: number
 }
@@ -120,6 +136,14 @@ export const submitPurchaseOrder = (id: number) => {
 // 审批通过：已提交 → 已审批
 export const approvePurchaseOrder = (id: number) => {
   return request.put({ url: '/pharmacy/purchase/order/approve?id=' + id })
+}
+
+// 驳回订单（B-2）：已提交 → 已驳回；驳回原因必填并落库
+export const rejectPurchaseOrder = (id: number, rejectReason: string) => {
+  return request.put({
+    url: '/pharmacy/purchase/order/reject',
+    data: { id, rejectReason }
+  })
 }
 
 // 标记已发出：已审批 → 已发出

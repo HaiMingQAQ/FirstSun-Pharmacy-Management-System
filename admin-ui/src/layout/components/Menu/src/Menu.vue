@@ -18,6 +18,9 @@ import {
   getRootMenuRoute,
   normalizeMenuTargetPath
 } from './menuRoute'
+import AiAssistantMenuEntry from '../../AiAssistant/AiAssistantMenuEntry.vue'
+import { checkPermi } from '@/utils/permission'
+import { useAiAssistantStore } from '@/store/modules/aiAssistant'
 
 const { getPrefixCls } = useDesign()
 
@@ -53,6 +56,7 @@ export default defineComponent({
   },
   setup(props) {
     const appStore = useAppStore()
+    const aiAssistantStore = useAiAssistantStore()
 
     const layout = computed(() => appStore.getLayout)
 
@@ -415,7 +419,7 @@ export default defineComponent({
       if (isHeaderNavLayout(unref(layout)) || unref(menuMode) === 'horizontal') {
         return renderMenu()
       } else {
-        return <ElScrollbar>{renderMenu()}</ElScrollbar>
+        return <ElScrollbar class="flex-1 min-h-0">{renderMenu()}</ElScrollbar>
       }
     }
 
@@ -545,7 +549,8 @@ export default defineComponent({
         class={[
           `${prefixCls} ${prefixCls}__${unref(menuMode)}`,
           `${prefixCls}--${props.theme}`,
-          'h-[100%] overflow-hidden flex-col bg-[var(--left-menu-bg-color)]',
+          { 'ai-assistant-open': aiAssistantStore.opened },
+          'h-[100%] overflow-hidden flex flex-col bg-[var(--left-menu-bg-color)]',
           {
             'w-[var(--left-menu-min-width)]':
               unref(collapse) &&
@@ -562,6 +567,12 @@ export default defineComponent({
         }}
       >
         {renderMenuWrap()}
+        {unref(menuMode) === 'vertical' && checkPermi(['pharmacy:ai:chat']) ? (
+          <AiAssistantMenuEntry
+            class="flex-none"
+            collapse={unref(collapse) && !isTwoColumnLayout(unref(layout))}
+          />
+        ) : undefined}
         {renderHorizontalOverflowFallback()}
       </div>
     )
@@ -747,6 +758,11 @@ $prefix-cls: #{$namespace}-menu;
         }
       }
     }
+  }
+
+  &.ai-assistant-open :deep(.#{$elNamespace}-menu-item.is-active) {
+    color: var(--left-menu-text-color) !important;
+    background-color: transparent !important;
   }
 }
 

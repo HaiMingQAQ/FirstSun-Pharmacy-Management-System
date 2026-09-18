@@ -6,7 +6,6 @@ import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRe
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordReviewReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordSaveReqVO;
-import cn.iocoder.yudao.module.pharmacy.dal.dataobject.prescription.PhPrescRecordDO;
 import cn.iocoder.yudao.module.pharmacy.service.prescription.PrescRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -61,7 +60,7 @@ public class PrescRecordController {
     @GetMapping("/page")
     @Operation(summary = "获得处方分页（台账）")
     @PreAuthorize("@ss.hasPermission('pharmacy:prescription:query')")
-    public CommonResult<PageResult<PhPrescRecordDO>> getPrescRecordPage(@Valid PrescRecordPageReqVO pageReqVO) {
+    public CommonResult<PageResult<PrescRecordRespVO>> getPrescRecordPage(@Valid PrescRecordPageReqVO pageReqVO) {
         return success(prescRecordService.getPrescRecordPage(pageReqVO));
     }
 
@@ -70,11 +69,6 @@ public class PrescRecordController {
     @Parameter(name = "id", description = "处方编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('pharmacy:prescription:query')")
     public CommonResult<PrescRecordRespVO> getPrescRecord(@RequestParam("id") Long id) {
-        PhPrescRecordDO record = prescRecordService.getPrescRecord(id);
-        PrescRecordRespVO respVO = new PrescRecordRespVO();
-        if (record != null) {
-            org.springframework.beans.BeanUtils.copyProperties(record, respVO);
-        }
-        return success(respVO);
+        return success(prescRecordService.getPrescRecord(id));
     }
 }

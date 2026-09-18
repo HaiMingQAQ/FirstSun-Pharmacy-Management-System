@@ -2,7 +2,7 @@ import request from '@/config/axios'
 
 // 处方明细项
 export interface PrescItemVO {
-  drugId: number // 药品
+  drugId?: number // 药品
   qty: number // 核准数量
   usage?: string // 用法
   dosage?: string // 用量
@@ -15,6 +15,7 @@ export interface PrescRecordVO {
   id: number
   prescNo: string // 处方号
   storeId: number // 门店
+  storeName?: string // 门店名称（关联填充）
   source: number // 0纸质拍照/1电子处方平台/2复诊续方
   hospital?: string // 开具医院
   doctorName?: string // 医师姓名
@@ -27,6 +28,7 @@ export interface PrescRecordVO {
   imageUrl?: string // 处方影像URL
   reviewStatus: number // 0待审/1通过/2驳回
   pharmacistId?: number // 审方药师
+  pharmacistName?: string // 审方药师姓名（关联填充）
   reviewAt?: string // 审方时间
   reviewOpinion?: string // 审方意见
   reviewSnapshot?: string // 电子签名

@@ -42,6 +42,13 @@ services:
       - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/19-firstsun-shared-account.sql:ro
       - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/20-pos-menu-path-fix.sql:ro
       - ./sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/21-pharmacy-demo-data.sql:ro
+      - ./sql/migrations/20260914_m_pharmacy_rx_pay_menu.sql:/docker-entrypoint-initdb.d/22-pharmacy-rx-pay-menu.sql:ro
+      - ./sql/migrations/20260914_n_pay_app_init.sql:/docker-entrypoint-initdb.d/23-pay-app-init.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_line_alloc.sql:/docker-entrypoint-initdb.d/25-pharmacy-wx-alloc.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_alloc_frozen_stage.sql:/docker-entrypoint-initdb.d/26-pharmacy-wx-alloc-frozen.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_alloc_out_ref.sql:/docker-entrypoint-initdb.d/27-pharmacy-wx-alloc-out-ref.sql:ro
+      - ./sql/migrations/20260917_f_member_address_update_menu.sql:/docker-entrypoint-initdb.d/28-pharmacy-member-address-update.sql:ro
+      - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/24-inventory-facade-flow-ref.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
@@ -74,6 +81,7 @@ services:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
+      PHARMACY_AI_API_KEY: ${PHARMACY_AI_API_KEY:-}
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
       ARGS: >-
         --spring.profiles.active=local
@@ -87,6 +95,13 @@ services:
         --spring.data.redis.port=6379
     ports:
       - "${BACKEND_PORT:-48080}:48080"
+    healthcheck:
+      # 真实请求 Actuator 健康接口：返回非 2xx（如 503 DOWN、404）时 curl -f 判定失败，容器标记为 unhealthy
+      test: ["CMD", "curl", "-fsS", "http://localhost:48080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
 
   admin-ui:
     build:

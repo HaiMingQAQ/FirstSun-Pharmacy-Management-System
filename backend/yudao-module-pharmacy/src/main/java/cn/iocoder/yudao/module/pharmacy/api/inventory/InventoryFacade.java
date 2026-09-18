@@ -5,15 +5,19 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReceiveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
+import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
 
 import java.util.List;
 
 /**
  * 库存服务门面（POS 域与库存域的依赖边界）。
  * <p>
- * 由 C 成员实现选批/扣减/回补/收货入库；当前 C 未实现，调用方需捕获
- * {@link UnsupportedOperationException} 并转换为 INV_SERVICE_UNAVAILABLE，
- * 保证销售/退单/收货事务整体回滚，不静默放行。
+ * 由库存域实现选批、扣减、回补和收货入库。调用方必须提供来源单据和来源行，
+ * 使库存流水的唯一约束能够作为操作级幂等键。
  */
 public interface InventoryFacade {
 
@@ -43,4 +47,16 @@ public interface InventoryFacade {
      * @return 逐行入账结果（含生成的批次编号）
      */
     ReceiveResult receive(Long storeId, String receiptNo, List<ReceiveItem> items);
+
+    /** Reserve available stock for an online order. Repeat calls replay the FEFO allocations. */
+    ReserveResult reserve(Long storeId, List<ReserveItem> items);
+
+    /** Release an existing reservation by its original reservation allocation. */
+    void release(Long storeId, List<ReleaseItem> items);
+
+    /** Convert an existing reservation to outbound stock. */
+    DeductResult consumeReservation(Long storeId, List<ConsumeItem> items);
+
+    /** Read sellable quantity after reservations. */
+    List<AvailableQty> getAvailableQty(Long storeId, List<Long> drugIds);
 }

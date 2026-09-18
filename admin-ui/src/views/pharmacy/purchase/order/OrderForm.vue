@@ -183,6 +183,7 @@ import { toLocalDateString } from '../utils/date'
 import * as SupplierApi from '@/api/pharmacy/purchase/supplier'
 import * as StoreApi from '@/api/pharmacy/base/store'
 import * as DrugApi from '@/api/pharmacy/base/drug'
+import type { DrugSimpleVO } from '@/api/pharmacy/purchase/module-types'
 
 defineOptions({ name: 'PharmacyPurchaseOrderForm' })
 
@@ -236,7 +237,8 @@ const formRef = ref()
 /** 下拉数据：门店、可采购供应商、可采购药品 */
 const storeList = ref<StoreApi.StoreSimpleVO[]>([])
 const supplierList = ref<SupplierApi.SupplierSimpleVO[]>([])
-const drugList = ref<DrugApi.DrugVO[]>([])
+// 药品下拉用精简列表契约（DrugSimpleVO，id 必填），详见 module-types.ts 的说明
+const drugList = ref<DrugSimpleVO[]>([])
 const loadOptions = async () => {
   const [stores, suppliers, drugs] = await Promise.all([
     StoreApi.getSimpleStoreList(),
@@ -248,8 +250,13 @@ const loadOptions = async () => {
   drugList.value = drugs
 }
 
-/** 行金额预览：数量 × 单价 × 折扣率，保留两位小数 */
-const calcLineAmount = (line: OrderApi.PurchaseOrderLineCreateVO) => {
+/**
+ * 行金额预览：数量 × 单价 × 折扣率，保留两位小数
+ *
+ * 形参用表单态类型 OrderLineFormItem 而非提交 DTO：抽屉里 drugId 允许为空（未选择），
+ * 两个调用点（表格 scope.row、预览合计）传的也都是表单行，用 DTO 类型会因 drugId 必填而报 TS2345。
+ */
+const calcLineAmount = (line: OrderLineFormItem) => {
   const qty = Number(line.orderQty || 0)
   const price = Number(line.unitPrice || 0)
   const rate = line.discountRate === undefined ? 1 : Number(line.discountRate)

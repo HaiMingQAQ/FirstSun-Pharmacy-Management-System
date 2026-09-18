@@ -26,10 +26,12 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.*;
 @Validated
 public class MemberPointRecordServiceImpl implements MemberPointRecordService {
 
-    /** 积分业务类型：消费奖励（与字典 pharmacy_member_point_biz_type 对应） */
-    private static final Integer BIZ_TYPE_CONSUME = 2;
-    /** 积分业务类型：退款回退 */
-    private static final Integer BIZ_TYPE_REFUND = 3;
+    /** 积分业务类型：消费获得（与字典 pharmacy_member_point_biz_type 对应） */
+    private static final Integer BIZ_TYPE_CONSUME_EARN = 2;
+    /** 积分业务类型：消费抵扣（订单使用积分抵扣现金） */
+    private static final Integer BIZ_TYPE_CONSUME_DEDUCT = 3;
+    /** 积分业务类型：退款冲回（退货扣回奖励积分 / 取消返还抵扣积分） */
+    private static final Integer BIZ_TYPE_REFUND = 6;
 
     @Resource
     private MemberPointRecordMapper memberPointRecordMapper;
@@ -97,31 +99,60 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         return memberPointRecord;
     }
 
-    // ========== 跨模块积分变动（销售奖励 / 退货回退） ==========
+    // ========== 跨模块积分变动（销售奖励 / 退货扣回 / 积分抵扣 / 取消返还） ==========
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addPoints(Long userId, String bizId, Integer point, String title) {
-        changePoints(userId, bizId, point, title, BIZ_TYPE_CONSUME, true);
+        changePoints(userId, bizId, point, title, BIZ_TYPE_CONSUME_EARN, 1, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void backPoints(Long userId, String bizId, Integer point) {
-        changePoints(userId, bizId, point, "退货积分回退", BIZ_TYPE_REFUND, false);
+        changePoints(userId, bizId, point, "退货积分回退", BIZ_TYPE_REFUND, -1, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deductPoints(Long userId, String bizId, Integer point, String title) {
+        changePoints(userId, bizId, point, title, BIZ_TYPE_CONSUME_DEDUCT, -1, true);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void returnPoints(Long userId, String bizId, Integer point, String title) {
+        if (point == null || point <= 0) {
+            return;
+        }
+        // 入参校验
+        if (userId == null || bizId == null || bizId.trim().isEmpty()) {
+            throw exception(PHARMACY_MEMBER_POINT_BIZ_INVALID);
+        }
+        // 返还上限 = 该业务单号已抵扣的积分；没有抵扣记录说明本次无需返还
+        MemberPointRecordDO deducted = memberPointRecordMapper
+                .selectByUserIdAndBizTypeAndBizId(userId, BIZ_TYPE_CONSUME_DEDUCT, bizId);
+        if (deducted == null || deducted.getPoint() == null || deducted.getPoint() >= 0) {
+            return;
+        }
+        int amount = Math.min(point, Math.abs(deducted.getPoint()));
+        // 幂等键为 (会员, 退款冲回, 业务单号)，同一单号重复返还只会成功一次
+        changePoints(userId, bizId, amount, title, BIZ_TYPE_REFUND, 1, false);
     }
 
     /**
      * 积分变动统一入口
      *
-     * 1. 幂等：同一会员 + 同一业务编码只处理一次（积分流水唯一）
+     * 1. 幂等：同一会员 + 同一业务类型 + 同一业务编码只处理一次（与 uk_point_event 一致）
      * 2. 原子增减：通过 UPDATE ... SET point = point + delta 避免并发覆盖
      * 3. 记录变动后积分，保证流水与会员积分一致
+     * 4. 扣减类：{@code rejectInsufficient=true} 时积分不足直接抛业务异常，使调用方事务回滚
      *
-     * @param increase true=增加，false=扣回
+     * @param sign               +1=增加，-1=扣减
+     * @param rejectInsufficient 扣减时积分不足是否抛业务异常
      */
     private void changePoints(Long userId, String bizId, Integer point, String title,
-                              Integer bizType, boolean increase) {
+                              Integer bizType, int sign, boolean rejectInsufficient) {
         // 积分为 0 视为无需处理（如销售未产生奖励积分）
         if (point == null || point <= 0) {
             return;
@@ -130,8 +161,8 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         if (userId == null || bizId == null || bizId.trim().isEmpty()) {
             throw exception(PHARMACY_MEMBER_POINT_BIZ_INVALID);
         }
-        // 幂等校验：同一业务编码已处理过，直接返回，避免重复积分
-        if (memberPointRecordMapper.selectByUserIdAndBizId(userId, bizId) != null) {
+        // 幂等校验：同一业务类型 + 同一业务编码已处理过，直接返回，避免重复积分
+        if (memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType, bizId) != null) {
             return;
         }
         // 会员必须存在
@@ -140,9 +171,13 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
             throw exception(PHARMACY_MEMBER_USER_NOT_EXISTS);
         }
         int current = user.getPoint() == null ? 0 : user.getPoint();
-        int delta = increase ? point : -point;
-        // 扣回不允许把积分扣成负数
-        if (current + delta < 0) {
+        int delta = sign * point;
+        if (delta < 0 && current + delta < 0) {
+            if (rejectInsufficient) {
+                // 积分不足：抛业务异常，保证「订单成功但积分未扣减」不会出现
+                throw exception(PHARMACY_MEMBER_POINT_NOT_ENOUGH, current, point);
+            }
+            // 扣回类操作不允许把积分扣成负数
             delta = -current;
         }
         if (delta == 0) {

@@ -79,6 +79,16 @@ public interface PurchaseOrderService {
     void approveOrder(Long id);
 
     /**
+     * 审批驳回：已提交(1) → 已驳回(6)，驳回原因必填并落库，记录驳回人与时间
+     *
+     * <p>仅「已提交」可驳回；已审批/已取消/已收货/已完成等状态一律拒绝（B-2）。
+     *
+     * @param id          订单编号
+     * @param rejectReason 驳回原因（必填，去除首尾空白后不得为空）
+     */
+    void rejectOrder(Long id, String rejectReason);
+
+    /**
      * 标记已发出：已审批(2) → 已发出(3)
      */
     void issueOrder(Long id);

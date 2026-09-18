@@ -103,7 +103,7 @@
           <el-input v-model="reviewForm.reviewOpinion" type="textarea" :rows="3" placeholder="审核意见（驳回必填）" :disabled="reviewTarget?.reviewStatus !== 0" />
         </el-form-item>
         <el-form-item v-if="reviewTarget?.reviewStatus !== 0" label="审方药师">
-          <el-input :model-value="String(reviewTarget?.pharmacistId ?? '-')" disabled />
+          <el-input :model-value="reviewTarget?.pharmacistName || String(reviewTarget?.pharmacistId ?? '-')" disabled />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -177,7 +177,7 @@ const reviewForm = reactive({
   reviewStatus: 1,
   reviewOpinion: '',
   reviewSnapshot: '',
-  dblCheckBy: undefined
+  dblCheckBy: undefined as number | undefined
 })
 const reviewRules = {
   reviewStatus: [{ required: true, message: '请选择审核结果', trigger: 'change' }],

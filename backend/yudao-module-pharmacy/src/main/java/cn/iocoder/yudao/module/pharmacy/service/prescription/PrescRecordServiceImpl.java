@@ -6,13 +6,18 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescItemVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordPageReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordReviewReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.prescription.vo.PrescRecordSaveReqVO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.DrugDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.EmployeeDO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.base.StoreDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.prescription.PhPrescRecordDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.prescription.PrescRecordMapper;
 import cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants;
+import cn.iocoder.yudao.module.pharmacy.service.base.DrugService;
 import cn.iocoder.yudao.module.pharmacy.service.base.EmployeeService;
+import cn.iocoder.yudao.module.pharmacy.service.base.StoreService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -49,10 +54,19 @@ public class PrescRecordServiceImpl implements PrescRecordService {
     private PrescRecordMapper prescRecordMapper;
     @Resource
     private EmployeeService employeeService;
+    @Resource
+    private StoreService storeService;
+    @Resource
+    private DrugService drugService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createPrescRecord(PrescRecordSaveReqVO createReqVO) {
+        // 0. 校验门店存在（处方必须归属真实门店，保证与门店档案关联）
+        Long storeId = createReqVO.getStoreId();
+        if (storeId == null || storeService.getStore(storeId) == null) {
+            throw exception(ErrorCodeConstants.PHARMACY_STORE_NOT_EXISTS);
+        }
         // 1. 校验来源
         Integer source = createReqVO.getSource();
         if (source == null || source < 0 || source > 2) {
@@ -69,6 +83,28 @@ public class PrescRecordServiceImpl implements PrescRecordService {
         List<String> images = createReqVO.getImages();
         if (images != null && images.size() > IMAGES_MAX) {
             throw exception(ErrorCodeConstants.PRESC_IMAGES_EXCEED);
+        }
+        // 3.5 校验药品明细：药品必须存在于药品档案，并自动带出名称/规格快照（保证数据来源）
+        List<PrescItemVO> items = createReqVO.getItems();
+        if (items == null || items.isEmpty()) {
+            throw exception(ErrorCodeConstants.PRESC_ITEMS_REQUIRED);
+        }
+        for (PrescItemVO item : items) {
+            if (item.getDrugId() == null) {
+                throw exception(ErrorCodeConstants.PHARMACY_DRUG_NOT_EXISTS);
+            }
+            DrugDO drug = drugService.getDrug(item.getDrugId());
+            if (drug == null) {
+                throw exception(ErrorCodeConstants.PHARMACY_DRUG_NOT_EXISTS);
+            }
+            if (StrUtil.isBlank(item.getDrugName())) {
+                item.setDrugName(StrUtil.isBlank(drug.getTradeName())
+                        ? drug.getGenericName()
+                        : drug.getGenericName() + "(" + drug.getTradeName() + ")");
+            }
+            if (StrUtil.isBlank(item.getSpecification())) {
+                item.setSpecification(drug.getSpecification());
+            }
         }
         // 4. 组装 DO
         PhPrescRecordDO record = new PhPrescRecordDO();
@@ -87,7 +123,7 @@ public class PrescRecordServiceImpl implements PrescRecordService {
         record.setIsSpecial(createReqVO.getIsSpecial() != null ? createReqVO.getIsSpecial() : 0);
         record.setLimitCheck(createReqVO.getLimitCheck() != null ? createReqVO.getLimitCheck() : 0);
         record.setImages(images != null ? JsonUtils.toJsonString(images) : null);
-        record.setPrescribedItems(JsonUtils.toJsonString(createReqVO.getItems()));
+        record.setPrescribedItems(JsonUtils.toJsonString(items));
         record.setReviewStatus(0); // 待审
         record.setStatus(0);       // 有效
         record.setWxMemberId(createReqVO.getWxMemberId());
@@ -162,13 +198,41 @@ public class PrescRecordServiceImpl implements PrescRecordService {
     }
 
     @Override
-    public PageResult<PhPrescRecordDO> getPrescRecordPage(PrescRecordPageReqVO pageReqVO) {
-        return prescRecordMapper.selectPage(pageReqVO);
+    public PageResult<PrescRecordRespVO> getPrescRecordPage(PrescRecordPageReqVO pageReqVO) {
+        PageResult<PhPrescRecordDO> pageResult = prescRecordMapper.selectPage(pageReqVO);
+        List<PrescRecordRespVO> list = pageResult.getList().stream()
+                .map(this::toRespVO)
+                .collect(java.util.stream.Collectors.toList());
+        return new PageResult<>(list, pageResult.getTotal());
     }
 
     @Override
-    public PhPrescRecordDO getPrescRecord(Long id) {
-        return prescRecordMapper.selectById(id);
+    public PrescRecordRespVO getPrescRecord(Long id) {
+        return toRespVO(prescRecordMapper.selectById(id));
+    }
+
+    /**
+     * 组装响应 VO，并填充门店名称 / 审方药师姓名 / 双人复核人姓名（保证数据关联可读）
+     */
+    private PrescRecordRespVO toRespVO(PhPrescRecordDO record) {
+        if (record == null) {
+            return null;
+        }
+        PrescRecordRespVO respVO = new PrescRecordRespVO();
+        org.springframework.beans.BeanUtils.copyProperties(record, respVO);
+        if (record.getStoreId() != null) {
+            StoreDO store = storeService.getStore(record.getStoreId());
+            respVO.setStoreName(store != null ? store.getStoreName() : null);
+        }
+        if (record.getPharmacistId() != null) {
+            EmployeeDO pharmacist = employeeService.getEmployee(record.getPharmacistId());
+            respVO.setPharmacistName(pharmacist != null ? pharmacist.getEmpName() : null);
+        }
+        if (record.getDblCheckBy() != null) {
+            EmployeeDO dblChecker = employeeService.getEmployee(record.getDblCheckBy());
+            respVO.setDblCheckByName(dblChecker != null ? dblChecker.getEmpName() : null);
+        }
+        return respVO;
     }
 
     /**

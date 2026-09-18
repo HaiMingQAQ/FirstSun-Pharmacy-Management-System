@@ -73,7 +73,7 @@
     <ContentWrap class="pharmacy-panel">
       <el-table v-loading="loading" :data="list">
         <el-table-column label="处方号" align="center" prop="prescNo" min-width="190" />
-        <el-table-column label="门店" align="center" prop="storeId" width="70" />
+        <el-table-column label="门店" align="center" prop="storeName" min-width="150" />
         <el-table-column label="来源" align="center" width="90">
           <template #default="scope">{{ sourceLabel(scope.row.source) }}</template>
         </el-table-column>
@@ -131,7 +131,7 @@
     <el-drawer v-model="detailVisible" title="处方详情" size="min(760px, 90vw)" destroy-on-close>
       <el-descriptions v-if="detail" :column="2" border>
         <el-descriptions-item label="处方号">{{ detail.prescNo }}</el-descriptions-item>
-        <el-descriptions-item label="门店">{{ detail.storeId }}</el-descriptions-item>
+        <el-descriptions-item label="门店">{{ detail.storeName || detail.storeId }}</el-descriptions-item>
         <el-descriptions-item label="患者">{{ detail.patientName }}</el-descriptions-item>
         <el-descriptions-item label="年龄">{{ detail.patientAge ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="医师">{{ detail.doctorName ?? '-' }}</el-descriptions-item>

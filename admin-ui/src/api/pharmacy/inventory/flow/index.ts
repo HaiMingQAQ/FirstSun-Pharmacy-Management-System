@@ -1,12 +1,13 @@
 import request from '@/config/axios'
 
-// Existing baseline values only; proposed movement types are intentionally absent.
+// Inventory flow and source business types.
 export const FLOW_TYPES: Record<number, string> = {
   10: '采购入库',
   20: '销售出库',
   21: '销售退货',
   40: '盘点',
   50: '报损',
+  60: '同仓移位',
   70: '期初',
   80: '锁定',
   81: '释放',
@@ -19,7 +20,8 @@ export const BIZ_TYPES: Record<number, string> = {
   4: '盘点',
   5: '报损',
   6: '线上订单',
-  7: '期初'
+  7: '期初',
+  8: '库内移位'
 }
 
 export interface FlowVO {
