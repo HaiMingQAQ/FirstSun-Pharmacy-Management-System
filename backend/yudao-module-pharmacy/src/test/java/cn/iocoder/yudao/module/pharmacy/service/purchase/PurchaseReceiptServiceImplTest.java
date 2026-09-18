@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.PurchaseReceiptD
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.PurchaseReceiptLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptMapper;
+import cn.iocoder.yudao.module.pharmacy.enums.PurchaseDocSeqTypeEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseOrderStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseReceiptStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.service.base.EmployeeService;
@@ -67,6 +68,8 @@ class PurchaseReceiptServiceImplTest {
     private PurchaseReceiptMapper receiptMapper;
     @Mock
     private PurchaseReceiptLineMapper receiptLineMapper;
+    @Mock
+    private PurchaseDocSeqService seqService;
     @Mock
     private PurchaseOrderService purchaseOrderService;
     @Mock
@@ -206,17 +209,18 @@ class PurchaseReceiptServiceImplTest {
     }
 
     /**
-     * D6 回归：单号必须跳过「已被逻辑删除单据占用」的流水号。
+     * 取号改为序列表原子分配后的回归：单号必须由 allocateSeq 的返回值决定。
      *
-     * 背景：uk_receipt_no 唯一键不包含 deleted 列，逻辑删除的单据仍然占号；
-     * 而 MyBatis-Plus 的 selectCount 会自动过滤 deleted=1，两者口径不一致时
-     * 会算出一个已被占用的号，连续重试 5 次后报「收货单号已存在」，导致收货单完全无法创建。
-     * 这里模拟「前缀内最大号是 0023（其中 0019~0023 有已删除单据）」，断言新号取 0024。
+     * 背景（D6 → 并发取号重构）：原先用「前缀内 MAX(单号) + 1」取号，在逻辑删除单据占号时会算出
+     * 已被占用的号（D6），且在 REPEATABLE-READ 下重试读到固定快照、并发会撞唯一键与死锁。
+     * 现改为 {@code ph_po_doc_seq} 原子分配：序号由序列表推进，既不受 deleted 过滤影响，
+     * 也与隔离级别和重试无关。
      */
     @Test
-    void createReceipt_shouldSkipNumbersOccupiedBySoftDeletedReceipts() {
+    void createReceipt_shouldUseSeqAllocatorForReceiptNo() {
         mockCreatableReceipt();
-        when(receiptMapper.selectMaxReceiptNo("GR407-20260911-")).thenReturn("GR407-20260911-0023");
+        when(seqService.allocate(407L, "20260911", PurchaseDocSeqTypeEnum.RECEIPT.getType()))
+                .thenReturn(24L);
         mockInsertAssigningId(101L);
 
         receiptService.createReceipt(createReqVO());
@@ -224,20 +228,24 @@ class PurchaseReceiptServiceImplTest {
         ArgumentCaptor<PurchaseReceiptDO> captor = ArgumentCaptor.forClass(PurchaseReceiptDO.class);
         verify(receiptMapper).insert(captor.capture());
         assertEquals("GR407-20260911-0024", captor.getValue().getReceiptNo());
+        // 取号必须走序列表，而不是 MAX 推算
+        verify(receiptMapper, never()).selectMaxReceiptNo(anyString());
     }
 
     /**
-     * D6 回归（并发分支）：取号后仍被别人抢占时，必须重算单号重试，而不是直接失败。
+     * 并发回归（应用层）：即便 insert 抛唯一键冲突，也必须换号重试并最终成功，
+     * 绝不能直接抛「收货单号已存在」。
+     *
+     * 说明：数据库层面的并发唯一性由序列表 {@code ph_po_doc_seq} 的
+     * {@code ON DUPLICATE KEY UPDATE LAST_INSERT_ID(next_seq+1)} 保证；
+     * 本用例只验证「万一仍冲突」时应用层的兜底重试行为没有被破坏。
      */
     @Test
-    void createReceipt_shouldRetryWithNextNumberWhenNumberTakenConcurrently() {
+    void createReceipt_shouldRetryWithNextNumberWhenInsertConflicts() {
         mockCreatableReceipt();
-        // 第一次取号时库里最大是 0023 → 生成 0024；被并发抢走后重取号，此时库里已有 0024 → 生成 0025
-        String[] maxNo = {"GR407-20260911-0023", "GR407-20260911-0024"};
-        final int[] pick = {0};
-        when(receiptMapper.selectMaxReceiptNo("GR407-20260911-"))
-                .thenAnswer(inv -> maxNo[Math.min(pick[0]++, maxNo.length - 1)]);
-        // 第一次插入模拟被并发抢占（唯一键冲突），第二次成功。
+        // 两次分配分别给出 24、25（模拟并发下第一次插入被抢占）
+        when(seqService.allocate(407L, "20260911", PurchaseDocSeqTypeEnum.RECEIPT.getType()))
+                .thenReturn(24L, 25L);
         // 注意：这里不能用 ArgumentCaptor 记录单号——重试复用同一个 DO 对象，
         // captor 两次捕获到的是同一个引用，读出来都会是最后一次赋的值。
         final List<String> attemptedNos = new ArrayList<>();

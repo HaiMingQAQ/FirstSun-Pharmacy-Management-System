@@ -97,5 +97,17 @@ public class PurchaseOrderDO extends BaseDO {
      * 审批时间
      */
     private LocalDateTime auditAt;
+    /**
+     * 驳回原因（B-2 新增：仅「已提交 → 已驳回」时写入，必填且落库）
+     */
+    private String rejectReason;
+    /**
+     * 驳回人员工编号
+     */
+    private Long rejectBy;
+    /**
+     * 驳回时间
+     */
+    private LocalDateTime rejectAt;
 
 }
