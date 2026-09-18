@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMappe
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper.FlowCommand;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryFacadeMapper.Stock;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +33,26 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
  * Real write-side inventory facade. Source rows are the idempotency boundary: flow rows are
  * checked before any selection/locking, then the same unique event key is written in one local
  * transaction with the caller's document state.
+ *
+ * <p>库存门面实现（C 成员实现）：采购收货入账、销售扣库、退货回补，以及线上订单冻结生命周期。
+ *
+ * <p><b>为什么标 @Primary（需要 C/D 复核）</b>：合并 main 后工程里同时存在两个
+ * {@link InventoryFacade} 的 {@code @Service} 实现 —— 本类与
+ * {@code api/inventory/PharmacyInventoryFacadeImpl}（D 在「修复 POS 未开班销售拦截与部分退货退款」
+ * 提交中新增）。两个实现会让 Spring 报 "A component required a single bean, but 2 were found"，
+ * 应用无法启动。本类被标为 @Primary 是**最小化的解冲突手段**，理由：
+ * <ol>
+ *   <li>本类使用调用方传入的 {@code bizNo / bizLineId} 作为 {@code ph_inv_flow} 幂等键，
+ *       符合门面契约；{@code PharmacyInventoryFacadeImpl.deduct} 自行生成随机 bizNo，
+ *       重复回调会重复扣库；</li>
+ *   <li>本类执行 {@link InventoryReadAccess#requireScope} 门店隔离门禁，
+ *       另一个实现没有该门禁；</li>
+ *   <li>本类是本分支合并前唯一生效的实现，B/C/D/F 各成员此前的联调与自测均基于本类。</li>
+ * </ol>
+ * <b>建议</b>：由 C/D 确认后删除重复实现（推荐删除 {@code PharmacyInventoryFacadeImpl}），
+ * 届时本注解可一并去掉。本次不删除任何文件，以免覆盖其他成员的在途工作。
  */
+@Primary
 @Service
 @RequiredArgsConstructor
 public class InventoryFacadeAdapter implements InventoryFacade {
