@@ -213,5 +213,8 @@ public interface ErrorCodeConstants {
     ErrorCode PAY_ORDER_CREATE_FAIL = new ErrorCode(1_033_001_001, "支付单创建失败");
     ErrorCode PAY_REFUND_CREATE_FAIL = new ErrorCode(1_033_001_002, "退款单创建失败");
     ErrorCode PAY_STATUS_UNKNOWN = new ErrorCode(1_033_001_003, "支付单状态未知");
+    ErrorCode PAY_AMOUNT_INVALID = new ErrorCode(1_033_001_004, "支付/退款金额不合法：必须大于 0（单位分）");
+    ErrorCode PAY_REFUND_AMOUNT_EXCEED = new ErrorCode(1_033_001_005, "退款金额超过原支付金额，已拒绝");
+    ErrorCode PAY_REFUND_ORDER_NOT_FOUND = new ErrorCode(1_033_001_006, "原支付单不存在，无法退款");
 
 }

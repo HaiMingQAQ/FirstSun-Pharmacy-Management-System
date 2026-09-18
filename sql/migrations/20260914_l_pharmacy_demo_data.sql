@@ -42,7 +42,7 @@ INSERT INTO ph_location
    creator, updater, deleted, tenant_id)
 VALUES
   (163031, 163021, 'A-01-01', 0, 500, 1, NOW(), 'demo', 'demo', b'0', 163),
-  (163032, 163021, 'A-02-01', 1, 300, 1, NOW(), 'demo', 'demo', b'0', 163),
+  (163032, 163022, 'A-02-01', 1, 300, 1, NOW(), 'demo', 'demo', b'0', 163),
   (163033, 163021, 'A-03-01', 3, 200, 1, NOW(), 'demo', 'demo', b'0', 163),
   (163034, 163022, 'B-01-01', 4, 200, 1, NOW(), 'demo', 'demo', b'0', 163)
 ON DUPLICATE KEY UPDATE location_type = VALUES(location_type), max_capacity = VALUES(max_capacity),
