@@ -95,6 +95,15 @@ public class PurchaseOrderRespVO {
     @Schema(description = "审批时间")
     private LocalDateTime auditAt;
 
+    @Schema(description = "驳回原因（仅已驳回状态有值）", example = "供应商资质即将到期，请更换供应商")
+    private String rejectReason;
+
+    @Schema(description = "驳回人员工编号", example = "407")
+    private Long rejectBy;
+
+    @Schema(description = "驳回时间")
+    private LocalDateTime rejectAt;
+
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 

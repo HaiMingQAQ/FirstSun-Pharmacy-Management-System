@@ -196,6 +196,14 @@
                     审批通过
                   </el-dropdown-item>
                   <el-dropdown-item
+                    v-if="
+                      scope.row.status === 1 && checkPermi(['pharmacy:purchase:order:approve'])
+                    "
+                    command="reject"
+                  >
+                    驳回
+                  </el-dropdown-item>
+                  <el-dropdown-item
                     v-if="scope.row.status === 2 && checkPermi(['pharmacy:purchase:order:issue'])"
                     command="issue"
                   >
@@ -230,6 +238,34 @@
 
     <!-- 表单抽屉：添加/修改 -->
     <OrderForm ref="formRef" @success="getList" />
+
+    <!-- 驳回弹窗（B-2）：驳回原因必填 -->
+    <Dialog v-model="rejectVisible" title="驳回采购订单" width="520">
+      <el-form
+        ref="rejectFormRef"
+        :model="rejectForm"
+        :rules="rejectRules"
+        label-width="90px"
+        @submit.prevent
+      >
+        <el-form-item label="驳回原因" prop="rejectReason">
+          <el-input
+            v-model="rejectForm.rejectReason"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="请填写驳回原因（必填）"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="rejectVisible = false">取 消</el-button>
+        <el-button type="primary" :loading="rejectSubmitting" @click="submitReject">
+          确认驳回
+        </el-button>
+      </template>
+    </Dialog>
 
     <!-- 详情弹窗：订单头 + 明细 -->
     <Dialog v-model="detailVisible" :title="detailTitle" width="1000">
@@ -310,6 +346,18 @@ const exportLoading = ref(false) // 导出的加载中
 /** 查询区「更多筛选」展开状态：默认仅展示高频条件 */
 const expandQuery = ref(false)
 
+/** 驳回弹窗（B-2）：驳回原因必填，前端先拦一次，后端仍会再校验 */
+const rejectVisible = ref(false)
+const rejectSubmitting = ref(false)
+const rejectFormRef = ref()
+const rejectForm = reactive({ id: undefined as number | undefined, rejectReason: '' })
+const rejectRules = {
+  rejectReason: [
+    { required: true, message: '驳回原因不能为空', trigger: 'blur' },
+    { max: 500, message: '驳回原因长度不能超过 500 个字符', trigger: 'blur' }
+  ]
+}
+
 /** 下拉数据：门店与供应商 */
 const storeList = ref<StoreApi.StoreSimpleVO[]>([])
 const supplierList = ref<SupplierApi.SupplierSimpleVO[]>([])
@@ -366,9 +414,34 @@ const handleCommand = (command: string, row: OrderApi.PurchaseOrderVO) => {
   if (command === 'detail') openDetail(row.id)
   else if (command === 'submit') handleChangeStatus('submit', row.id)
   else if (command === 'approve') handleChangeStatus('approve', row.id)
+  else if (command === 'reject') openReject(row.id)
   else if (command === 'issue') handleChangeStatus('issue', row.id)
   else if (command === 'cancel') handleChangeStatus('cancel', row.id)
   else if (command === 'delete') handleDelete(row.id)
+}
+
+/** 打开驳回弹窗（仅「已提交」状态下由按钮控制可见） */
+const openReject = (id: number) => {
+  rejectForm.id = id
+  rejectForm.rejectReason = ''
+  rejectVisible.value = true
+  nextTick(() => rejectFormRef.value?.clearValidate?.())
+}
+
+/** 提交驳回：原因必填；成功与否都由后端状态机与权限二次裁决 */
+const submitReject = async () => {
+  const valid = await rejectFormRef.value?.validate?.()
+  if (!valid) return
+  if (rejectForm.id === undefined) return
+  rejectSubmitting.value = true
+  try {
+    await OrderApi.rejectPurchaseOrder(rejectForm.id, rejectForm.rejectReason.trim())
+    message.success('驳回成功')
+    rejectVisible.value = false
+    await getList()
+  } finally {
+    rejectSubmitting.value = false
+  }
 }
 
 /** 状态流转：提交/审批/发出/取消，均二次确认，权限由后端再校验 */

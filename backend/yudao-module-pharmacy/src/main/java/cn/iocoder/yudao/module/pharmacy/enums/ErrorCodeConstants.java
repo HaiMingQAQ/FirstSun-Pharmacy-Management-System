@@ -169,6 +169,9 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_ORDER_QTY_INVALID = new ErrorCode(1_031_003_008, "采购数量必须大于 0");
     ErrorCode PURCHASE_ORDER_DISCOUNT_INVALID = new ErrorCode(1_031_003_009, "折扣率非法：取值必须在 0 到 1 之间");
     ErrorCode PURCHASE_ORDER_APPROVE_DUP = new ErrorCode(1_031_003_010, "采购订单已审批，不能重复审批");
+    ErrorCode PURCHASE_ORDER_REJECT_REASON_REQUIRED = new ErrorCode(1_031_003_011, "驳回原因不能为空");
+    ErrorCode PURCHASE_ORDER_REJECT_STATUS_INVALID = new ErrorCode(1_031_003_012, "仅「已提交」状态的采购订单可以驳回");
+    ErrorCode PURCHASE_ORDER_REJECT_DUP = new ErrorCode(1_031_003_013, "采购订单已驳回，不能重复驳回");
 
     // ========== 采购收货 1-031-004-000（B 维护）==========
     ErrorCode PURCHASE_RECEIPT_NOT_EXISTS = new ErrorCode(1_031_004_000, "采购收货单不存在");
@@ -185,6 +188,7 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_RECEIPT_DRUG_INVALID = new ErrorCode(1_031_004_011, "收货明细中的药品不存在");
     ErrorCode PURCHASE_RECEIPT_RECEIVER_NOT_EMPLOYEE = new ErrorCode(1_031_004_012, "当前登录用户未绑定药店员工，无法收货");
     ErrorCode PURCHASE_RECEIPT_LOCATION_REQUIRED = new ErrorCode(1_031_004_013, "入账前必须填写入库货位");
+    ErrorCode PURCHASE_RECEIPT_DATE_INVALID = new ErrorCode(1_031_004_014, "收货时间非法：不能为空且必须是合理的业务日期（不能是 1970 等 Unix 起点时间）");
 
 
     // ========== 处方记录 1-032-001-000（E 维护）==========

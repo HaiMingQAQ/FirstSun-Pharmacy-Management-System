@@ -10,12 +10,16 @@ import java.util.Arrays;
 /**
  * 采购订单状态枚举
  *
- * 对应 {@code ph_po_order.status}（-1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成）。
+ * 对应 {@code ph_po_order.status}（-1取消/0草稿/1提交/2审批/3发出/4部分到货/5完成/6已驳回）。
  * 字典 type：{@link DictTypeConstants#PHARMACY_PO_STATUS}
  *
  * 状态流转：
  * 草稿 --提交--> 提交 --审批--> 审批 --发出--> 发出 --部分收货--> 部分到货 --收完--> 完成
+ * 提交 --驳回--> 已驳回（驳回原因必填，落库到 reject_reason）
  * 草稿/提交/审批 可取消（存在已提交收货单时禁止取消）
+ *
+ * 说明：已驳回(6) 未使用 -2，是为了与既有「取消(-1)」保持语义区分，
+ * 且不与任何历史状态冲突（历史数据只出现 -1/0/1/2/3/4/5）。
  *
  * @author B 成员
  */
@@ -29,7 +33,8 @@ public enum PurchaseOrderStatusEnum implements ArrayValuable<Integer> {
     APPROVED(2, "已审批"),
     ISSUED(3, "已发出"),
     PARTIAL_RECEIVED(4, "部分到货"),
-    FINISHED(5, "已完成");
+    FINISHED(5, "已完成"),
+    REJECTED(6, "已驳回");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(PurchaseOrderStatusEnum::getStatus).toArray(Integer[]::new);
@@ -70,6 +75,10 @@ public enum PurchaseOrderStatusEnum implements ArrayValuable<Integer> {
 
     public static boolean isFinished(Integer status) {
         return ObjUtil.equal(FINISHED.status, status);
+    }
+
+    public static boolean isRejected(Integer status) {
+        return ObjUtil.equal(REJECTED.status, status);
     }
 
     public static boolean isCancel(Integer status) {
