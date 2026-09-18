@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.pharmacy.api.payment;
 
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.pay.api.order.PayOrderApi;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderCreateReqDTO;
 import cn.iocoder.yudao.module.pay.api.order.dto.PayOrderRespDTO;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.pay.enums.ErrorCodeConstants.REFUND_EXISTS;
 
 /**
  * 统一支付门面适配实现（E 成员提供）。
@@ -54,6 +56,13 @@ public class PaymentFacadeAdapter implements PaymentFacade {
 
     @Override
     public String createPayOrder(PayOrderDTO req) {
+        // 金额校验：单位分，必须为正整数；业务单号必须非空（作为幂等键）
+        if (req.getPriceFen() == null || req.getPriceFen() <= 0) {
+            throw exception(ErrorCodeConstants.PAY_AMOUNT_INVALID);
+        }
+        if (req.getBizNo() == null || req.getBizNo().isEmpty()) {
+            throw exception(ErrorCodeConstants.PAY_AMOUNT_INVALID);
+        }
         String appKey = resolveAppKey();
         PayOrderCreateReqDTO createReq = new PayOrderCreateReqDTO();
         createReq.setAppKey(appKey);
@@ -76,18 +85,27 @@ public class PaymentFacadeAdapter implements PaymentFacade {
 
     @Override
     public void refund(Long channelPayOrderId, String refundNo, Integer refundFen, String reason) {
+        // 金额校验：单位分，必须为正整数
+        if (refundFen == null || refundFen <= 0) {
+            throw exception(ErrorCodeConstants.PAY_AMOUNT_INVALID);
+        }
         // 现金销售退货：无渠道支付单，无需真实渠道退款（状态层面已由调用方完成）
         if (channelPayOrderId == null) {
             log.info("[refund] 无渠道支付单（现金单），跳过渠道退款, refundNo={}, refundFen={}", refundNo, refundFen);
             return;
         }
-        // 1. 查原支付单，取商户订单号
+        // 1. 查原支付单，校验存在性与退款金额上限（部分退款允许，超退拒绝）
         PayOrderRespDTO order = payOrderApi.getOrder(channelPayOrderId);
         if (order == null) {
             log.error("[refund] 原支付单不存在, channelPayOrderId={}", channelPayOrderId);
-            throw exception(ErrorCodeConstants.PAY_REFUND_CREATE_FAIL);
+            throw exception(ErrorCodeConstants.PAY_REFUND_ORDER_NOT_FOUND);
         }
-        // 2. 创建退款单
+        if (refundFen > order.getPrice()) {
+            log.error("[refund] 退款金额超过原支付金额, channelPayOrderId={}, refundFen={}, payPrice={}",
+                    channelPayOrderId, refundFen, order.getPrice());
+            throw exception(ErrorCodeConstants.PAY_REFUND_AMOUNT_EXCEED);
+        }
+        // 2. 创建退款单（refundNo=merchantRefundId 作为幂等键：同号重复请求由 pay 模块唯一约束拦截，此处转为幂等放行）
         PayRefundCreateReqDTO refundReq = new PayRefundCreateReqDTO();
         refundReq.setAppKey(resolveAppKey());
         refundReq.setUserIp("127.0.0.1");
@@ -99,6 +117,15 @@ public class PaymentFacadeAdapter implements PaymentFacade {
             Long refundId = payRefundApi.createRefund(refundReq);
             log.info("[refund] 创建退款单成功, channelPayOrderId={}, refundNo={}, refundId={}",
                     channelPayOrderId, refundNo, refundId);
+        } catch (ServiceException ex) {
+            if (Objects.equals(REFUND_EXISTS.getCode(), ex.getCode())) {
+                // 幂等：相同 refundNo 已存在退款单（成功或处理中），不重复扣款
+                log.info("[refund] 退款单已存在，幂等放行, channelPayOrderId={}, refundNo={}", channelPayOrderId, refundNo);
+                return;
+            }
+            log.error("[refund] 创建退款单失败, channelPayOrderId={}, refundNo={}, code={}, msg={}",
+                    channelPayOrderId, refundNo, ex.getCode(), ex.getMessage());
+            throw exception(ErrorCodeConstants.PAY_REFUND_CREATE_FAIL);
         } catch (Exception ex) {
             log.error("[refund] 创建退款单失败, channelPayOrderId={}, refundNo={}", channelPayOrderId, refundNo, ex);
             throw exception(ErrorCodeConstants.PAY_REFUND_CREATE_FAIL);
@@ -107,6 +134,8 @@ public class PaymentFacadeAdapter implements PaymentFacade {
 
     @Override
     public Integer queryStatus(Long channelPayOrderId) {
+        // 状态同步入口：读取支付模块本地最新状态；渠道异步回调由 pay 模块 notify 接口
+        // （/admin-api/pay/notify/order|refund/{channelId}）接收并幂等更新，本门面不做重复处理
         PayOrderRespDTO order = payOrderApi.getOrder(channelPayOrderId);
         if (order == null) {
             throw exception(ErrorCodeConstants.PAY_STATUS_UNKNOWN);
