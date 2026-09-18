@@ -70,6 +70,9 @@ public interface DrugService {
      */
     List<DrugDO> getSimpleDrugList(String keyword);
 
+    /** AI/selection use: bounded fuzzy search over code, generic name, trade name and spell code. */
+    List<DrugDO> searchDrugs(String keyword, Integer status, int limit);
+
     /**
      * 批量获得药品（跨模块 DrugApi 使用）
      *

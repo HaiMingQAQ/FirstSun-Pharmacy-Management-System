@@ -103,12 +103,18 @@ const categoryTree = ref<any[]>([])
 
 /**
  * 构建上级分类树，递归排除当前编辑分类及其全部子孙，防止循环引用。
- * 数据源使用分页接口（pageSize=-1，后端 PageParam.PAGE_SIZE_NONE）取「启用+停用」完整平面列表，
+ * 数据源使用分页接口分批取「启用+停用」完整平面列表，
  * 不依赖 /simple-list（仅返回启用分类，无法识别停用分类的后代）。
  */
 const getCategoryTree = async (excludeId?: number) => {
-  const page = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize: -1 })
-  const all = (page.list || []) as CategoryApi.CategoryVO[]
+  const pageSize = 100
+  const firstPage = await CategoryApi.getCategoryPage({ pageNo: 1, pageSize })
+  const all = [...((firstPage.list || []) as CategoryApi.CategoryVO[])]
+  const pageCount = Math.ceil(firstPage.total / pageSize)
+  for (let pageNo = 2; pageNo <= pageCount; pageNo++) {
+    const page = await CategoryApi.getCategoryPage({ pageNo, pageSize })
+    all.push(...((page.list || []) as CategoryApi.CategoryVO[]))
+  }
   // 递归收集 excludeId 的全部后代 id
   const excludeSet = new Set<number>()
   if (excludeId) {

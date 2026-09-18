@@ -158,6 +158,11 @@ public class DrugServiceImpl implements DrugService {
     }
 
     @Override
+    public List<DrugDO> searchDrugs(String keyword, Integer status, int limit) {
+        return drugMapper.selectSearchList(keyword, status, Math.max(1, Math.min(limit, 20)));
+    }
+
+    @Override
     public List<DrugDO> getDrugList(Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return java.util.Collections.emptyList();

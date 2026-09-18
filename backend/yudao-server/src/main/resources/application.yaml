@@ -331,6 +331,8 @@ yudao:
       - /admin-api/system/user/profile/**
       - /admin-api/system/auth/**
     ignore-tables:
+      - ai_api_key # AI 供应商配置为系统级共享数据，不参与租户 SQL 改写
+      - ai_model # AI 模型配置为系统级共享数据，不参与租户 SQL 改写
     ignore-caches:
       - user_role_ids
       - permission_menu_ids
