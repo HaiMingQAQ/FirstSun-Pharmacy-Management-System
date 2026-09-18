@@ -21,10 +21,12 @@ public interface ErrorCodeConstants {
     ErrorCode SALE_ORDER_NO_DUPLICATE = new ErrorCode(1_029_001_005, "销售单号已存在");
     ErrorCode SALE_ORDER_AMOUNT_INVALID = new ErrorCode(1_029_001_006, "销售金额计算不合法");
     ErrorCode SALE_ORDER_RX_PRESC_REQUIRED = new ErrorCode(1_029_001_007, "处方药必须关联已审方通过的处方");
+    ErrorCode SALE_ORDER_CASHIER_REQUIRED = new ErrorCode(1_029_001_008, "收银员不能为空：柜台销售必须指定当前操作员工");
 
     // ========== 库存依赖 ==========
     ErrorCode INV_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_001, "库存服务未就绪，本次操作无法扣减/回补库存");
     ErrorCode INV_RETURN_BACK_FAILED = new ErrorCode(1_029_002_002, "库存回补失败");
+    ErrorCode INV_STOCK_NOT_ENOUGH = new ErrorCode(1_029_002_005, "库存不足，无法完成本次出库");
     ErrorCode PAY_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_003, "支付服务未就绪，退款失败");
     ErrorCode MEMBER_SERVICE_UNAVAILABLE = new ErrorCode(1_029_002_004, "会员积分服务未就绪，积分回退失败");
 
@@ -34,12 +36,16 @@ public interface ErrorCodeConstants {
     ErrorCode SALE_RETURN_NO_DUPLICATE = new ErrorCode(1_029_003_003, "退货单号已存在");
     ErrorCode SALE_RETURN_NOT_EXISTS = new ErrorCode(1_029_003_004, "退货单不存在");
     ErrorCode SALE_RETURN_NOT_ALLOW = new ErrorCode(1_029_003_005, "原销售单状态不允许退货");
+    ErrorCode SALE_RETURN_REFUND_AMOUNT_INVALID = new ErrorCode(1_029_003_006, "退款金额计算不合法：原单无有效支付明细或退款金额超过实付金额");
 
     // ========== 班次 ==========
     ErrorCode SHIFT_NOT_EXISTS = new ErrorCode(1_029_004_001, "班次不存在");
     ErrorCode SHIFT_ALREADY_CLOSED = new ErrorCode(1_029_004_002, "班次已交班，不能重复交班");
     ErrorCode SHIFT_DIFF_REASON_REQUIRED = new ErrorCode(1_029_004_003, "现金长款/短款必须填写原因");
     ErrorCode SHIFT_OPENING_EXISTS = new ErrorCode(1_029_004_004, "该收银台已有进行中的班次，请先交班");
+    ErrorCode SALE_ORDER_SHIFT_NOT_OPEN = new ErrorCode(1_029_004_005, "未开班：当前收银员在门店没有进行中的班次，请先开台");
+    ErrorCode SALE_ORDER_SHIFT_NOT_OWNER = new ErrorCode(1_029_004_006, "该班次不属于当前收银员，不能用于本次销售");
+    ErrorCode SALE_ORDER_SHIFT_CONFLICT = new ErrorCode(1_029_004_007, "当前收银员存在多个进行中班次，无法确定归属，请核对收银台号");
 
     // ========== 药品分类 1-030-001-000 ==========
     ErrorCode PHARMACY_CATEGORY_NOT_EXISTS = new ErrorCode(1_030_001_000, "药品分类不存在");
@@ -184,6 +190,9 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_ORDER_QTY_INVALID = new ErrorCode(1_031_003_008, "采购数量必须大于 0");
     ErrorCode PURCHASE_ORDER_DISCOUNT_INVALID = new ErrorCode(1_031_003_009, "折扣率非法：取值必须在 0 到 1 之间");
     ErrorCode PURCHASE_ORDER_APPROVE_DUP = new ErrorCode(1_031_003_010, "采购订单已审批，不能重复审批");
+    ErrorCode PURCHASE_ORDER_REJECT_REASON_REQUIRED = new ErrorCode(1_031_003_011, "驳回原因不能为空");
+    ErrorCode PURCHASE_ORDER_REJECT_STATUS_INVALID = new ErrorCode(1_031_003_012, "仅「已提交」状态的采购订单可以驳回");
+    ErrorCode PURCHASE_ORDER_REJECT_DUP = new ErrorCode(1_031_003_013, "采购订单已驳回，不能重复驳回");
 
     // ========== 采购收货 1-031-004-000（B 维护）==========
     ErrorCode PURCHASE_RECEIPT_NOT_EXISTS = new ErrorCode(1_031_004_000, "采购收货单不存在");
@@ -200,6 +209,7 @@ public interface ErrorCodeConstants {
     ErrorCode PURCHASE_RECEIPT_DRUG_INVALID = new ErrorCode(1_031_004_011, "收货明细中的药品不存在");
     ErrorCode PURCHASE_RECEIPT_RECEIVER_NOT_EMPLOYEE = new ErrorCode(1_031_004_012, "当前登录用户未绑定药店员工，无法收货");
     ErrorCode PURCHASE_RECEIPT_LOCATION_REQUIRED = new ErrorCode(1_031_004_013, "入账前必须填写入库货位");
+    ErrorCode PURCHASE_RECEIPT_DATE_INVALID = new ErrorCode(1_031_004_014, "收货时间非法：不能为空且必须是合理的业务日期（不能是 1970 等 Unix 起点时间）");
 
 
     // ========== 处方记录 1-032-001-000（E 维护）==========
@@ -224,5 +234,8 @@ public interface ErrorCodeConstants {
     ErrorCode PAY_ORDER_CREATE_FAIL = new ErrorCode(1_033_001_001, "支付单创建失败");
     ErrorCode PAY_REFUND_CREATE_FAIL = new ErrorCode(1_033_001_002, "退款单创建失败");
     ErrorCode PAY_STATUS_UNKNOWN = new ErrorCode(1_033_001_003, "支付单状态未知");
+    ErrorCode PAY_AMOUNT_INVALID = new ErrorCode(1_033_001_004, "支付/退款金额不合法：必须大于 0（单位分）");
+    ErrorCode PAY_REFUND_AMOUNT_EXCEED = new ErrorCode(1_033_001_005, "退款金额超过原支付金额，已拒绝");
+    ErrorCode PAY_REFUND_ORDER_NOT_FOUND = new ErrorCode(1_033_001_006, "原支付单不存在，无法退款");
 
 }

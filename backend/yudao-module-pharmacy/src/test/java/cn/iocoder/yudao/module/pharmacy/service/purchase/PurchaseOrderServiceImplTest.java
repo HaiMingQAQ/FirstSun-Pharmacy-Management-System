@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.SupplierDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseOrderLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptMapper;
+import cn.iocoder.yudao.module.pharmacy.enums.PurchaseDocSeqTypeEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseOrderStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.service.base.EmployeeService;
 import cn.iocoder.yudao.module.pharmacy.service.base.StoreService;
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -66,6 +68,8 @@ class PurchaseOrderServiceImplTest {
     private PurchaseOrderLineMapper orderLineMapper;
     @Mock
     private PurchaseReceiptMapper receiptMapper;
+    @Mock
+    private PurchaseDocSeqService seqService;
     @Mock
     private StoreService storeService;
     @Mock
@@ -102,14 +106,16 @@ class PurchaseOrderServiceImplTest {
         assertNotNull(saved.getOrderNo());
         assertTrue(saved.getOrderNo().startsWith("PO"));
 
+        // 取号必须走序列表原子分配，而不是 MAX(单号) 推算
+        verify(orderMapper, never()).selectMaxOrderNo(anyString());
+
         ArgumentCaptor<PurchaseOrderLineDO> lineCaptor = ArgumentCaptor.forClass(PurchaseOrderLineDO.class);
         verify(orderLineMapper, times(2)).insert(lineCaptor.capture());
         List<PurchaseOrderLineDO> lines = lineCaptor.getAllValues();
         assertEquals(1, lines.get(0).getLineNo());
         assertEquals(new BigDecimal("120.00"), lines.get(0).getLineAmount());
         assertEquals(2, lines.get(1).getLineNo());
-        assertEquals(new BigDecimal("10.00"), lines.get(1).getLineAmount());
-        // 行号由服务端生成、新建明细已收数量初始化为 0
+        assertEquals(new BigDecimal("10.00"), lines.get(1).getLineAmount());        // 行号由服务端生成、新建明细已收数量初始化为 0
         assertEquals(0, lines.get(0).getReceivedQty());
     }
 

@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.PurchaseReceiptD
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.purchase.PurchaseReceiptLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.purchase.PurchaseReceiptMapper;
+import cn.iocoder.yudao.module.pharmacy.enums.PurchaseDocSeqTypeEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseOrderStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.enums.PurchaseReceiptStatusEnum;
 import cn.iocoder.yudao.module.pharmacy.service.base.EmployeeService;
@@ -64,6 +65,15 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
     private static final int NO_MAX_RETRY = 5;
 
     /**
+     * 业务日期下限（B-3）。
+     *
+     * <p>用于拒绝「1970-01-01」这类由 {@code LocalDateTime} 被静默解析为 0（epoch）产生的脏日期。
+     * 取 2000-01-01 而非「今天」这类滚动值：药店系统的历史单据补录是合理场景，
+     * 但不可能有 2000 年之前的采购收货业务。
+     */
+    private static final LocalDate MIN_BUSINESS_DATE = LocalDate.of(2000, 1, 1);
+
+    /**
      * 库管员及以上岗位中，允许无单收货的岗位：店长(1)
      */
     private static final Integer POSITION_MANAGER = 1;
@@ -89,6 +99,12 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
 
     @Resource
     private PurchaseReceiptLineMapper receiptLineMapper;
+
+    /**
+     * 采购单号序列表：并发取号的原子分配入口
+     */
+    @Resource
+    private PurchaseDocSeqService seqService;
 
     @Resource
     private PurchaseOrderService purchaseOrderService;
@@ -117,6 +133,8 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
         storeService.validateStoreExistsAndOpen(createReqVO.getStoreId());
         EmployeeDO receiver = resolveReceiver();
         PurchaseOrderDO order = resolveOrder(createReqVO, receiver);
+        // B-3：先校验收货时间并解析业务日期，避免 1970 等非法日期进库/进单号
+        LocalDate businessDate = resolveBusinessDate(createReqVO.getReceiveDate());
 
         PurchaseReceiptDO receipt = new PurchaseReceiptDO();
         receipt.setOrderId(order == null ? null : order.getId());
@@ -129,7 +147,7 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
         fillTotalsAndFlags(receipt, order, createReqVO.getLines(), null);
 
         for (int attempt = 0; attempt < NO_MAX_RETRY; attempt++) {
-            receipt.setReceiptNo(generateReceiptNo(createReqVO.getStoreId(), createReqVO.getReceiveDate().toLocalDate()));
+            receipt.setReceiptNo(generateReceiptNo(createReqVO.getStoreId(), businessDate));
             try {
                 receiptMapper.insert(receipt);
                 insertLines(receipt.getId(), createReqVO.getLines());
@@ -425,7 +443,8 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
                 if (!Objects.equals(orderLine.getDrugId(), line.getDrugId())) {
                     throw exception(PURCHASE_RECEIPT_ORDER_LINE_MISMATCH);
                 }
-                // 剩余可收 = 订购数量 - 已入账数量 - 其他未作废收货单已占用数量
+                // 剩余可收 = 订购数量 - 已入账数量(receivedQty) - 在途占用数量(未入账的草稿/已提交单)
+                // 注意：occupied 已排除「已入账」单据，否则会与 receivedQty 重复计数（B-1 根因）
                 int occupied = occupiedMap.getOrDefault(orderLine.getId(), 0);
                 int received = orderLine.getReceivedQty() == null ? 0 : orderLine.getReceivedQty();
                 if (line.getQty() + occupied + received > orderLine.getOrderQty()) {
@@ -477,11 +496,26 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
     }
 
     /**
-     * 汇总同一订单下其他「未作废」收货单已占用的数量（按订单行）
+     * 汇总同一订单下「在途占用」的收货数量（按订单行）。
+     *
+     * <p>口径（B-1 修复）：剩余可收 = 订购数量 − 已入账数量 − 在途占用数量，三者的取值来源必须互不重叠。
+     * <ul>
+     *   <li><b>已入账（POSTED）不计入占用</b>：该批数量已由 {@code postReceipt} 通过
+     *       {@code applyReceiptPosted} 累加进 {@code ph_po_order_line.received_qty}，
+     *       若这里再统计一次就会<b>重复计数</b>，导致「已收 40 再收 60」被误判为
+     *       60+40(占用)+40(received_qty)=140&gt;100 而报超量。这是 B-1 的根因。</li>
+     *   <li><b>待提交（DRAFT）/已提交（SUBMITTED）计入占用</b>：属已录单但尚未入账的在途数量，
+     *       防止同一订单被超量录单。</li>
+     *   <li><b>已作废（VOIDED）不计入</b>：单据已失效，不再占用。</li>
+     * </ul>
+     *
+     * @param excludeReceiptId 编辑场景下需排除的本单 id（其自身占用不应算作「他人占用」）
      */
     private Map<Long, Integer> loadOccupiedQty(Long orderId, Long excludeReceiptId) {
         List<PurchaseReceiptDO> receipts = receiptMapper.selectListByOrderId(orderId).stream()
+                // 仅统计「在途」单据：排除已作废（失效）与已入账（已计入 received_qty，避免重复计数）
                 .filter(item -> !PurchaseReceiptStatusEnum.isVoided(item.getStatus()))
+                .filter(item -> !PurchaseReceiptStatusEnum.isPosted(item.getStatus()))
                 .filter(item -> !Objects.equals(item.getId(), excludeReceiptId))
                 .collect(Collectors.toList());
         if (receipts.isEmpty()) {
@@ -553,19 +587,55 @@ public class PurchaseReceiptServiceImpl implements PurchaseReceiptService {
     }
 
     /**
+     * 解析并校验收货时间，返回用于生成单号的业务日期（B-3）。
+     *
+     * <p>背景：yudao 全局把 {@code LocalDateTime} 映射为**毫秒时间戳**
+     * （{@code TimestampLocalDateTimeDeserializer} 使用 {@code getValueAsLong()}）。
+     * 若前端传的是日期字符串，会被**静默解析为 0**，即 {@code 1970-01-01T00:00}，
+     * 从而生成 {@code GR407-19700101-xxxx} 这类脏单号。历史上确实出现过该现象。
+     *
+     * <p>本方法做两层保护，明确拒绝而不是静默回退：
+     * <ol>
+     *   <li>为空（null）→ 直接报业务错误，绝不回退到 1970；</li>
+     *   <li>落在合理业务区间之外（早于 {@link #MIN_BUSINESS_DATE} 或晚于「明天」）→ 报业务错误。
+     *       「明天」容忍前端与服务端的时区/夏令时偏差，但不接受 1970 或明显错误的未来时间。</li>
+     * </ol>
+     *
+     * @param receiveDate 前端提交的收货时间
+     * @return 该时间对应的业务日期（服务器时区）
+     */
+    private LocalDate resolveBusinessDate(LocalDateTime receiveDate) {
+        if (receiveDate == null) {
+            throw exception(PURCHASE_RECEIPT_DATE_INVALID);
+        }
+        LocalDate date = receiveDate.toLocalDate();
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        if (date.isBefore(MIN_BUSINESS_DATE) || date.isAfter(tomorrow)) {
+            throw exception(PURCHASE_RECEIPT_DATE_INVALID);
+        }
+        return date;
+    }
+
+    /**
      * 生成收货单号：GR-门店-yyyyMMdd-流水
      * <p>
-     * 必须取「前缀内已有的最大流水 + 1」，不能用 count + 1：uk_receipt_no 唯一键不包含 deleted 列，
-     * 而 MyBatis-Plus 的 selectCount 会自动过滤逻辑删除行，两者口径不一致会导致算出来的号被
-     * 已删除单据占着，连续撞 5 次唯一键后报「收货单号已存在」。
+     * 日期段取自<b>真实收货时间对应的业务日期</b>（由 {@link #resolveBusinessDate} 校验），
+     * 因此不会出现 19700101；调用方必须已完成校验。
+     * <p>
+     * 流水号来自序列表 {@code ph_po_doc_seq} 的**原子分配**
+     * （{@link PurchaseDocSeqMapper#allocateSeq}），不再用 {@code MAX(单号) + 1} 推算。
+     * 原因：MySQL 默认 REPEATABLE-READ 下 MAX() 是不加锁的一致性读，
+     * 同一事务内重试读到的快照恒定不变，5 次重试会算出同一个号；
+     * 并发插入又争抢 uk_receipt_no 索引锁产生死锁（实测并发 5 张仅 1 张成功 + 3 个 500）。
+     * 序列表方案把取号下沉为数据库原子自增，与隔离级别和重试无关。
+     * <p>
+     * 该原子分配天然覆盖「已被逻辑删除单据占号」的历史问题（D6）：
+     * 序号由序列表推进，不再受 deleted 过滤影响。
      */
-    private String generateReceiptNo(Long storeId, LocalDate date) {
-        String prefix = "GR" + storeId + "-" + date.format(NO_DATE) + "-";
-        String maxNo = receiptMapper.selectMaxReceiptNo(prefix);
-        long seq = 1L;
-        if (maxNo != null) {
-            seq = Long.parseLong(maxNo.substring(prefix.length())) + 1;
-        }
+    private String generateReceiptNo(Long storeId, LocalDate businessDate) {
+        String prefix = "GR" + storeId + "-" + businessDate.format(NO_DATE) + "-";
+        long seq = seqService.allocate(storeId, businessDate.format(NO_DATE),
+                PurchaseDocSeqTypeEnum.RECEIPT.getType());
         return prefix + String.format(NO_SEQ_FORMAT, seq);
     }
 
