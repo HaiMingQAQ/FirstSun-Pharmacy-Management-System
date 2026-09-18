@@ -95,6 +95,9 @@ class WxOrderStockLifecycleTest {
     private MemberAddressService memberAddressService;
     @Mock
     private DrugApi drugApi;
+    /** F 的统一积分结算服务：库存生命周期用例只验证库存行为，积分用 mock 隔离 */
+    @Mock
+    private MemberPointSettlementService memberPointSettlementService;
 
     @InjectMocks
     private WxOrderServiceImpl wxOrderService;
@@ -217,6 +220,8 @@ class WxOrderStockLifecycleTest {
         assertEquals(WxOrderLineAllocDO.STATUS_SETTLED, allocCaptor.getValue().getStatus());
         // 已支付订单取消同时退回款项
         verify(paymentFacade).refund(eq(PAY_ORDER_ID), anyString(), anyInt(), anyString());
+        // 对接 F：取消即释放本单预扣的抵扣积分（幂等键 = 订单号）
+        verify(memberPointSettlementService).releaseSalePoints(eq(1L), eq(ORDER_NO));
     }
 
     /** 重复取消：已取消订单直接返回，不再回补库存 */
@@ -253,6 +258,8 @@ class WxOrderStockLifecycleTest {
 
         verify(inventoryFacade, never()).returnBack(anyLong(), anyList());
         verify(paymentFacade, never()).refund(any(), anyString(), anyInt(), anyString());
+        // 对接 F：会员取消同样释放预扣积分（幂等，未预扣时为无操作）
+        verify(memberPointSettlementService).releaseSalePoints(eq(1L), eq(ORDER_NO));
     }
 
     /** 退款：回补一次；重复退款回调不再回补 */
@@ -279,6 +286,8 @@ class WxOrderStockLifecycleTest {
         wxOrderService.refundWxOrder(ORDER_ID, "用户申请退款");
 
         verify(inventoryFacade, times(1)).returnBack(anyLong(), anyList());
+        // 对接 F：退款释放预扣积分，重复退款回调不再重复返还
+        verify(memberPointSettlementService, times(1)).releaseSalePoints(eq(1L), eq(ORDER_NO));
     }
 
     /** 已完成订单不允许退款，需走 D 的销售退货流程 */
@@ -426,6 +435,8 @@ class WxOrderStockLifecycleTest {
 
         assertEquals(2, closed);
         verify(wxOrderMapper, times(2)).update(any(), any());
+        // 对接 F：支付超时 = 支付失败，逐单向 F 释放预扣积分（幂等键 = 订单号）
+        verify(memberPointSettlementService, times(2)).releaseSalePoints(eq(1L), eq(ORDER_NO));
     }
 
     /** 批量释放：只释放仍冻结的分配，已出库的不动（避免未退款先回补） */

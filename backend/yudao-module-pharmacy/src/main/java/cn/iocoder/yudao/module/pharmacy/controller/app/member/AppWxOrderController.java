@@ -45,10 +45,11 @@ public class AppWxOrderController {
     private WxOrderLineService wxOrderLineService;
 
     @PostMapping("/create")
-    @Operation(summary = "从购物车已勾选商品下单（到店自提/同城配送）")
+    @Operation(summary = "从购物车已勾选商品下单（到店自提/同城配送）",
+            description = "usePoints 只表示希望使用的抵扣积分，实际可用值与赠送积分由后端按会员等级与积分规则计算")
     public CommonResult<Long> createOrder(@RequestBody @Valid AppWxOrderCreateReqVO reqVO) {
         Long id = wxOrderService.createOrderFromCart(getLoginUserId(), reqVO.getStoreId(), reqVO.getOrderType(),
-                reqVO.getAddressId(), reqVO.getPrescId(), reqVO.getRemark());
+                reqVO.getAddressId(), reqVO.getPrescId(), reqVO.getRemark(), reqVO.getUsePoints());
         return success(id);
     }
 

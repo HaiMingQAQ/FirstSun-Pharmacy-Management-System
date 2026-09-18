@@ -47,6 +47,10 @@ public class SaleOrderSaveReqVO {
     @Schema(description = "备注")
     private String remark;
 
+    @Schema(description = "希望使用的抵扣积分（0 或不传表示不使用；由 F 的积分服务按余额、"
+            + "抵扣比例与单笔上限校验后确定实际可用值，前端传值不被信任）", example = "100")
+    private Integer pointDeduct;
+
     @Schema(description = "商品行")
     @Data
     public static class Item {

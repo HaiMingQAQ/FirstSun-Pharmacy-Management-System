@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
+import cn.iocoder.yudao.module.pharmacy.api.member.MemberPointFacade;
+import cn.iocoder.yudao.module.pharmacy.api.member.dto.SalePointCalcDTO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderDetailRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderPageReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderSaveReqVO;
@@ -50,6 +52,12 @@ public class SaleOrderServiceImpl implements SaleOrderService {
     private SalePaymentMapper salePaymentMapper;
     @Resource
     private InventoryFacade inventoryFacade;
+    /**
+     * F 的统一积分服务：积分抵扣试算、赠送与退货回退全部经此门面，
+     * D 不直接写 member_point_record，也不自行折算积分金额。
+     */
+    @Resource
+    private MemberPointFacade memberPointFacade;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -103,9 +111,16 @@ public class SaleOrderServiceImpl implements SaleOrderService {
             lines.add(line);
         }
 
-        // 3. 金额：折扣/券/积分调用方传 0，服务端统一计算应付/实收/找零
+        // 3. 金额：折扣/券调用方传 0，服务端统一计算应付/实收/找零
+        // 3.1 积分抵扣：前端只表达「想用多少积分」，可用值 / 抵扣金额一律由 F 的积分服务
+        //     （MemberPointFacade）按会员等级、积分余额、抵扣比例与单笔上限校验后确定；
+        //     校验不通过（如积分不足、超出上限）抛业务异常，整笔销售事务回滚。
+        SalePointCalcDTO pointCalc = memberPointFacade.calcSalePoints(reqVO.getMemberId(),
+                subtotal, reqVO.getPointDeduct());
+        BigDecimal pointsDeduct = pointCalc.getDeductAmount() == null
+                ? BigDecimal.ZERO : pointCalc.getDeductAmount();
         BigDecimal payable = SaleAmountCalculator.calcPayable(subtotal, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, pointsDeduct);
         if (payable == null) {
             throw ServiceExceptionUtil.exception(SALE_ORDER_AMOUNT_INVALID);
         }
@@ -137,7 +152,7 @@ public class SaleOrderServiceImpl implements SaleOrderService {
         order.setSubtotal(subtotal);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setCouponAmount(BigDecimal.ZERO);
-        order.setPointsDeduct(BigDecimal.ZERO);
+        order.setPointsDeduct(pointsDeduct);
         order.setPayableAmount(payable);
         order.setPaidAmount(paid);
         order.setChangeAmount(change);
@@ -188,6 +203,17 @@ public class SaleOrderServiceImpl implements SaleOrderService {
         } catch (UnsupportedOperationException ex) {
             throw ServiceExceptionUtil.exception(INV_SERVICE_UNAVAILABLE);
         }
+
+        // 8. 积分结算（F 的统一积分服务，D 不直接写 member_point_record）：
+        //    - 扣减本单抵扣积分（幂等键 = 订单号）；
+        //    - 按「后端计算的赠送积分」加分：赠送基数 = 抵扣前金额 - 抵扣金额，上限规则由 F 决定，
+        //      D 不接受前端传入的任何积分值；
+        //    - 返回实际赠送积分并回写订单 points_earned，保证订单与积分流水汇总一致。
+        //    积分不足、库存失败等任何异常都会让本事务整体回滚，不会留下孤立积分流水或错误余额。
+        int earned = memberPointFacade.settleSalePoints(reqVO.getMemberId(), order.getOrderNo(),
+                subtotal, pointCalc.getDeductPoints());
+        order.setPointsEarned(earned);
+        saleOrderMapper.updateById(order);
         return order.getId();
     }
 

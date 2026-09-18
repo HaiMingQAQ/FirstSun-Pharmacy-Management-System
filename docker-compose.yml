@@ -48,6 +48,8 @@ services:
       - ./sql/migrations/20260916_f_wx_order_alloc_frozen_stage.sql:/docker-entrypoint-initdb.d/26-pharmacy-wx-alloc-frozen.sql:ro
       - ./sql/migrations/20260916_f_wx_order_alloc_out_ref.sql:/docker-entrypoint-initdb.d/27-pharmacy-wx-alloc-out-ref.sql:ro
       - ./sql/migrations/20260917_f_member_address_update_menu.sql:/docker-entrypoint-initdb.d/28-pharmacy-member-address-update.sql:ro
+      - ./sql/migrations/20260918_f_member_sms_code.sql:/docker-entrypoint-initdb.d/29-pharmacy-member-sms-code.sql:ro
+      - ./sql/migrations/20260918_f_wx_order_points.sql:/docker-entrypoint-initdb.d/30-pharmacy-wx-order-points.sql:ro
       - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/24-inventory-facade-flow-ref.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
@@ -82,6 +84,9 @@ services:
     environment:
       TZ: Asia/Shanghai
       PHARMACY_AI_API_KEY: ${PHARMACY_AI_API_KEY:-}
+      # 会员手机号快捷登录的「开发测试验证码」：仅 local/dev profile 生效，
+      # 生产环境不使用该变量；真实验证码值只写在本地 .env（已被 git 忽略）
+      PHARMACY_DEV_SMS_CODE: ${PHARMACY_DEV_SMS_CODE:-}
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
       ARGS: >-
         --spring.profiles.active=local

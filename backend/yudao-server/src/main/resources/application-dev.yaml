@@ -171,6 +171,10 @@ wx: # 参见 https://github.com/Wechat-Group/WxJava/blob/develop/spring-boot-sta
 
 # 芋道配置项，设置当前项目所有自定义的配置
 yudao:
+  pharmacy: # F 会员模块：dev 环境同样启用「手机号 + 验证码」快捷登录，验证码取自环境变量 PHARMACY_DEV_SMS_CODE
+    member-sms:
+      login-enabled: true
+      dev-code-enabled: true
   pay:
     order-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
     refund-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
