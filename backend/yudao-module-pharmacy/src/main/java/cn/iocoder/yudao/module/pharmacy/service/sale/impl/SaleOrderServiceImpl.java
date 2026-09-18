@@ -7,15 +7,19 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.DeductItem;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderDetailRespVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderPageReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.pos.vo.SaleOrderSaveReqVO;
+import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhPosShiftDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSaleOrderLineDO;
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.sale.PhSalePaymentDO;
+import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.PosShiftMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderLineMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SaleOrderMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.sale.SalePaymentMapper;
 import cn.iocoder.yudao.module.pharmacy.service.sale.SaleAmountCalculator;
 import cn.iocoder.yudao.module.pharmacy.service.sale.SaleOrderService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
@@ -30,7 +34,11 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORD
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_NOT_EXISTS;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_NO_DUPLICATE;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_PAYMENT_DUPLICATE;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_CASHIER_REQUIRED;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_RX_PRESC_REQUIRED;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_SHIFT_CONFLICT;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_SHIFT_NOT_OPEN;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_SHIFT_NOT_OWNER;
 
 /**
  * 销售单服务实现。
@@ -50,10 +58,15 @@ public class SaleOrderServiceImpl implements SaleOrderService {
     private SalePaymentMapper salePaymentMapper;
     @Resource
     private InventoryFacade inventoryFacade;
+    @Resource
+    private PosShiftMapper posShiftMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createSaleOrder(SaleOrderSaveReqVO reqVO) {
+        // 0. 后端解析有效班次：根据当前操作员工与门店查找营业中班次，不依赖前端传入 shiftId
+        PhPosShiftDO shift = resolveValidShift(reqVO);
+
         // 1. 幂等：订单号唯一
         if (saleOrderMapper.selectByOrderNo(reqVO.getOrderNo()) != null) {
             throw ServiceExceptionUtil.exception(SALE_ORDER_NO_DUPLICATE);
@@ -126,7 +139,7 @@ public class SaleOrderServiceImpl implements SaleOrderService {
         order.setOrderNo(reqVO.getOrderNo());
         order.setStoreId(reqVO.getStoreId());
         order.setPosNo(reqVO.getPosNo());
-        order.setShiftId(reqVO.getShiftId());
+        order.setShiftId(shift.getId());
         order.setCashierId(reqVO.getCashierId());
         order.setMemberId(reqVO.getMemberId());
         order.setCustomerName(reqVO.getCustomerName());
@@ -213,5 +226,39 @@ public class SaleOrderServiceImpl implements SaleOrderService {
         detail.setLines(saleOrderLineMapper.selectListByOrderId(id));
         detail.setPayments(salePaymentMapper.selectListByOrderId(id));
         return detail;
+    }
+
+    /**
+     * 解析本次销售的有效班次（D-1）：
+     * 1) 后端根据门店 + 收银台（无收银台时按收银员）查找营业中（status=0）班次，
+     *    已交班、已关闭的班次自然被排除，不依赖前端传入 shiftId；
+     * 2) 无有效班次时拒绝销售（未开班）；
+     * 3) 其他员工的班次不能用于本次销售。
+     */
+    private PhPosShiftDO resolveValidShift(SaleOrderSaveReqVO reqVO) {
+        if (reqVO.getCashierId() == null) {
+            throw ServiceExceptionUtil.exception(SALE_ORDER_CASHIER_REQUIRED);
+        }
+        LambdaQueryWrapper<PhPosShiftDO> wrapper = new LambdaQueryWrapper<PhPosShiftDO>()
+                .eq(PhPosShiftDO::getStoreId, reqVO.getStoreId())
+                .eq(PhPosShiftDO::getStatus, 0); // 0=营业中；已交班(1)不参与销售
+        if (StringUtils.hasText(reqVO.getPosNo())) {
+            wrapper.eq(PhPosShiftDO::getPosNo, reqVO.getPosNo());
+        } else {
+            wrapper.eq(PhPosShiftDO::getCashierId, reqVO.getCashierId());
+        }
+        List<PhPosShiftDO> shifts = posShiftMapper.selectList(wrapper);
+        if (shifts.isEmpty()) {
+            throw ServiceExceptionUtil.exception(SALE_ORDER_SHIFT_NOT_OPEN);
+        }
+        if (shifts.size() > 1) {
+            throw ServiceExceptionUtil.exception(SALE_ORDER_SHIFT_CONFLICT);
+        }
+        PhPosShiftDO shift = shifts.get(0);
+        // 其他员工的班次不能用于销售
+        if (!reqVO.getCashierId().equals(shift.getCashierId())) {
+            throw ServiceExceptionUtil.exception(SALE_ORDER_SHIFT_NOT_OWNER);
+        }
+        return shift;
     }
 }

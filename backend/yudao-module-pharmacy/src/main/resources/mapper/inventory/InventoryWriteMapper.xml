@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryWriteMapper">
+
+    <resultMap id="batchRow" type="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryWriteMapper$InvBatchRow">
+        <id property="id" column="id"/>
+        <result property="storeId" column="store_id"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="drugId" column="drug_id"/>
+        <result property="batchNo" column="batch_no"/>
+        <result property="manufactureDate" column="manufacture_date"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="supplierId" column="supplier_id"/>
+        <result property="sourceType" column="source_type"/>
+        <result property="sourceNo" column="source_no"/>
+        <result property="qtyTotal" column="qty_total"/>
+        <result property="qtyAvail" column="qty_avail"/>
+        <result property="qtyFrozen" column="qty_frozen"/>
+        <result property="qtySold" column="qty_sold"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="tenantId" column="tenant_id"/>
+    </resultMap>
+
+    <resultMap id="locationRow" type="cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryWriteMapper$InvLocationRow">
+        <result property="batchId" column="batch_id"/>
+        <result property="locationId" column="location_id"/>
+        <result property="drugId" column="drug_id"/>
+        <result property="qty" column="qty"/>
+        <result property="warehouseId" column="warehouse_id"/>
+        <result property="expiryDate" column="expiry_date"/>
+        <result property="costPrice" column="cost_price"/>
+        <result property="batchNo" column="batch_no"/>
+    </resultMap>
+
+    <select id="selectBatchById" resultMap="batchRow">
+        SELECT id, store_id, warehouse_id, drug_id, batch_no, manufacture_date, expiry_date,
+               supplier_id, source_type, source_no, qty_total, qty_avail, qty_frozen, qty_sold,
+               cost_price, tenant_id
+        FROM ph_inv_batch
+        WHERE tenant_id = #{tenantId} AND id = #{id} AND deleted = 0
+    </select>
+
+    <select id="selectBatchByUk" resultMap="batchRow">
+        SELECT id, store_id, warehouse_id, drug_id, batch_no, manufacture_date, expiry_date,
+               supplier_id, source_type, source_no, qty_total, qty_avail, qty_frozen, qty_sold,
+               cost_price, tenant_id
+        FROM ph_inv_batch
+        WHERE tenant_id = #{tenantId} AND warehouse_id = #{warehouseId} AND drug_id = #{drugId}
+          AND batch_no = #{batchNo} AND deleted = 0
+        ORDER BY id ASC LIMIT 1
+    </select>
+
+    <select id="selectAvailableStocks" resultMap="locationRow">
+        SELECT ls.batch_id, ls.location_id, ls.drug_id, ls.qty,
+               b.warehouse_id, b.expiry_date, b.cost_price, b.batch_no
+        FROM ph_inv_location_stock ls
+        JOIN ph_inv_batch b ON b.id = ls.batch_id AND b.deleted = 0
+        WHERE ls.tenant_id = #{tenantId} AND ls.drug_id = #{drugId}
+          AND b.store_id = #{storeId} AND b.quality_status = 0
+          AND ls.deleted = 0 AND ls.qty > 0
+        ORDER BY b.expiry_date ASC, b.id ASC, ls.location_id ASC
+    </select>
+
+    <select id="selectLocationStock" resultMap="locationRow">
+        SELECT ls.batch_id, ls.location_id, ls.drug_id, ls.qty, b.warehouse_id, b.expiry_date, b.cost_price, b.batch_no
+        FROM ph_inv_location_stock ls
+        JOIN ph_inv_batch b ON b.id = ls.batch_id AND b.deleted = 0
+        WHERE ls.tenant_id = #{tenantId} AND ls.batch_id = #{batchId} AND ls.location_id = #{locationId}
+          AND ls.deleted = 0
+        LIMIT 1
+    </select>
+
+    <select id="countFlowDup" resultType="int">
+        SELECT COUNT(*)
+        FROM ph_inv_flow
+        WHERE tenant_id = #{tenantId} AND biz_type = #{bizType} AND biz_no = #{bizNo}
+          AND biz_line_id = #{bizLineId} AND batch_id = #{batchId} AND location_id = #{locationId}
+          AND flow_type = #{flowType} AND deleted = 0
+    </select>
+
+    <update id="deductBatch">
+        UPDATE ph_inv_batch
+        SET qty_avail = qty_avail - #{qty}, qty_total = qty_total - #{qty},
+            qty_sold = qty_sold + #{qty}, version = version + 1, last_issue_at = NOW()
+        WHERE id = #{id} AND deleted = 0 AND qty_avail >= #{qty}
+    </update>
+
+    <update id="deductLocationStock">
+        UPDATE ph_inv_location_stock
+        SET qty = qty - #{qty}
+        WHERE batch_id = #{batchId} AND location_id = #{locationId} AND deleted = 0 AND qty >= #{qty}
+    </update>
+
+    <update id="restoreBatch">
+        UPDATE ph_inv_batch
+        SET qty_avail = qty_avail + #{qty}, qty_total = qty_total + #{qty},
+            qty_sold = GREATEST(qty_sold - #{qty}, 0), version = version + 1
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="restoreLocationStock">
+        UPDATE ph_inv_location_stock
+        SET qty = qty + #{qty}
+        WHERE batch_id = #{batchId} AND location_id = #{locationId} AND deleted = 0
+    </update>
+
+    <insert id="insertBatch" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO ph_inv_batch (store_id, warehouse_id, drug_id, batch_no, manufacture_date, expiry_date,
+                                  supplier_id, source_type, source_no, qty_total, qty_avail, qty_frozen, qty_sold,
+                                  cost_price, tenant_id, creator, updater)
+        VALUES (#{storeId}, #{warehouseId}, #{drugId}, #{batchNo}, #{manufactureDate}, #{expiryDate},
+                #{supplierId}, #{sourceType}, #{sourceNo}, #{qtyTotal}, #{qtyAvail}, #{qtyFrozen}, #{qtySold},
+                #{costPrice}, #{tenantId}, 'system', 'system')
+    </insert>
+
+    <update id="updateBatchAppend">
+        UPDATE ph_inv_batch
+        SET qty_total = qty_total + #{inQty}, qty_avail = qty_avail + #{inQty},
+            cost_price = #{newCost}, version = version + 1
+        WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <insert id="upsertLocationStock">
+        INSERT INTO ph_inv_location_stock (batch_id, location_id, drug_id, qty, qty_frozen, creator, updater)
+        VALUES (#{batchId}, #{locationId}, #{drugId}, #{qty}, 0, 'system', 'system')
+        ON DUPLICATE KEY UPDATE qty = qty + #{qty}
+    </insert>
+
+    <insert id="insertFlow">
+        INSERT INTO ph_inv_flow (store_id, batch_id, drug_id, batch_no, flow_type, in_qty, out_qty, balance_qty,
+                                 biz_type, biz_no, flow_time, operator, remark, tenant_id, location_id, biz_line_id,
+                                 frozen_delta, unit_cost, creator, updater)
+        VALUES (#{storeId}, #{batchId}, #{drugId}, #{batchNo}, #{flowType}, #{inQty}, #{outQty}, #{balanceQty},
+                #{bizType}, #{bizNo}, #{flowTime}, #{operator}, #{remark}, #{tenantId}, #{locationId}, #{bizLineId},
+                #{frozenDelta}, #{unitCost}, 'system', 'system')
+    </insert>
+
+</mapper>
