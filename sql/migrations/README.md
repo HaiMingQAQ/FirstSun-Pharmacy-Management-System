@@ -31,6 +31,8 @@
 | 21 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
 | 22 | `20260915_c_inventory_facade_flow_ref.sql` | C 库存门面：销售退货关联原销售出库流水，支持并发下的累计回补校验 |
 | 23 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
+| 24 | `20260917_o_pharmacy_ai_prototype.sql` | AI 助手原型：ai_api_key/ai_model/ph_ai_command 表、pharmacy:ai:chat 能力权限与角色授权（挂载于 docker-compose init 序列 29） |
+| 25 | `20260918_a_ai_menu_fix.sql` | A 纠正迁移：恢复 22300 为 B 采购管理目录，将 AI 助手权限迁移到新菜单 ID 22349（挂载于 docker-compose init 序列 30，必须在 29 之后执行） |
 
 ## 统一执行方法
 
@@ -61,7 +63,9 @@ $scripts = @(
   "20260914_m_pharmacy_rx_pay_menu.sql",
   "20260914_n_pay_app_init.sql",
   "20260915_c_inventory_facade_flow_ref.sql",
-  "20260916_c_inventory_movement_menu.sql"
+  "20260916_c_inventory_movement_menu.sql",
+  "20260917_o_pharmacy_ai_prototype.sql",
+  "20260918_a_ai_menu_fix.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql

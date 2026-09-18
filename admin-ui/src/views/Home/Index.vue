@@ -48,7 +48,7 @@
             <div
               v-if="hasApprovePermi && pendingDrugCount !== null"
               class="pharmacy-todo__item"
-              @click="goRoute('/pharmacy/base/drug')"
+              @click="goRoute(`${PHARMACY_BASE_PATH}/drug`)"
             >
               <el-tag type="warning" size="small" effect="plain">待审核</el-tag>
               <span class="pharmacy-todo__text">待审核药品</span>
@@ -119,6 +119,14 @@ const router = useRouter()
 const userStore = useUserStore()
 const username = computed(() => userStore.getUser.nickname || '')
 
+/**
+ * 药店基础资料动态路由前缀。
+ * 与 system_menu 实际配置一致：22000 path='/pharmacy-base' + 22010 path='base'，
+ * 页面路由为 /pharmacy-base/base/{drug|category|store|employee|barcode}。
+ * 不要使用旧地址 /pharmacy/base/*（会 404）。
+ */
+const PHARMACY_BASE_PATH = '/pharmacy-base/base'
+
 const loading = ref(true)
 
 /** 欢迎语：按当前时段返回，不使用假天气数据 */
@@ -150,21 +158,21 @@ interface KpiItem {
 
 /** 基础数据 KPI：来自真实分页接口 total（药品条码移入快捷入口，保持四列不悬空） */
 const baseKpis = reactive<KpiItem[]>([
-  { key: 'drug', label: '药品总数', value: null, error: false, route: '/pharmacy/base/drug' },
+  { key: 'drug', label: '药品总数', value: null, error: false, route: `${PHARMACY_BASE_PATH}/drug` },
   {
     key: 'category',
     label: '药品分类',
     value: null,
     error: false,
-    route: '/pharmacy/base/category'
+    route: `${PHARMACY_BASE_PATH}/category`
   },
-  { key: 'store', label: '门店数', value: null, error: false, route: '/pharmacy/base/store' },
+  { key: 'store', label: '门店数', value: null, error: false, route: `${PHARMACY_BASE_PATH}/store` },
   {
     key: 'employee',
     label: '员工数',
     value: null,
     error: false,
-    route: '/pharmacy/base/employee'
+    route: `${PHARMACY_BASE_PATH}/employee`
   }
 ])
 
@@ -178,31 +186,31 @@ const shortcuts = computed(() => {
     {
       label: '药品档案',
       icon: 'ep:first-aid-kit',
-      route: '/pharmacy/base/drug',
+      route: `${PHARMACY_BASE_PATH}/drug`,
       perm: 'pharmacy:base:drug:query'
     },
     {
       label: '药品分类',
       icon: 'ep:collection',
-      route: '/pharmacy/base/category',
+      route: `${PHARMACY_BASE_PATH}/category`,
       perm: 'pharmacy:base:category:query'
     },
     {
       label: '门店',
       icon: 'ep:shop',
-      route: '/pharmacy/base/store',
+      route: `${PHARMACY_BASE_PATH}/store`,
       perm: 'pharmacy:base:store:query'
     },
     {
       label: '员工',
       icon: 'ep:user',
-      route: '/pharmacy/base/employee',
+      route: `${PHARMACY_BASE_PATH}/employee`,
       perm: 'pharmacy:base:employee:query'
     },
     {
       label: '药品条码',
       icon: 'ep:barcode',
-      route: '/pharmacy/base/barcode',
+      route: `${PHARMACY_BASE_PATH}/barcode`,
       perm: 'pharmacy:base:barcode:query'
     }
   ]
