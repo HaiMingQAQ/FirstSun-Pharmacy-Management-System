@@ -31,6 +31,8 @@
 | 21 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
 | 22 | `20260915_c_inventory_facade_flow_ref.sql` | C 库存门面：销售退货关联原销售出库流水，支持并发下的累计回补校验 |
 | 23 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
+| 24 | `20260917_c_inventory_shared_role_menu.sql` | C-1：共享租户套餐、角色167与上架移位权限 |
+| 25 | `20260918_c_inventory_flow_comment_utf8.sql` | C-3：纠正库存流水原出库引用列中文注释 |
 
 ## 统一执行方法
 
@@ -61,7 +63,9 @@ $scripts = @(
   "20260914_m_pharmacy_rx_pay_menu.sql",
   "20260914_n_pay_app_init.sql",
   "20260915_c_inventory_facade_flow_ref.sql",
-  "20260916_c_inventory_movement_menu.sql"
+  "20260916_c_inventory_movement_menu.sql",
+  "20260917_c_inventory_shared_role_menu.sql",
+  "20260918_c_inventory_flow_comment_utf8.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
@@ -69,10 +73,10 @@ foreach ($s in $scripts) {
 }
 ```
 
-执行后清 Redis 菜单缓存使后端重新加载权限：
+执行 C-1 后，已有运行中的后端应只清理该按钮的 Redis 缓存，使后端重新加载角色授权；不要执行 `FLUSHDB`：
 
 ```powershell
-docker exec firstsun-pharmacy-redis redis-cli FLUSHDB
+docker exec firstsun-pharmacy-redis redis-cli DEL "menu_role_ids:163:22229" "permission_menu_ids:pharmacy:inventory-movement:execute"
 ```
 
 ## 权限标识清单

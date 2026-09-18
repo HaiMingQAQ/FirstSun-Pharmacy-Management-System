@@ -34,6 +34,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 public class InventoryStocktakeService {
     private static final DateTimeFormatter NO_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
+    private static final String FREEZE_STOCKTAKE_DEFERRED = "冻结式盘点本期延期：ph_inv_lock 归属仍待确认";
 
     private final InventoryReadAccess access;
     private final InventoryStocktakeMapper mapper;
@@ -63,7 +64,7 @@ public class InventoryStocktakeService {
     public long create(@NotNull @Valid InventoryStocktakeCreateReqVO request) {
         var scope = access.requireScope(null);
         if (request.getFreezeFlag() != null && request.getFreezeFlag() == 1) {
-            throw invalidParamException("盘点冻结策略尚未完成 ph_inv_lock 归属确认");
+            throw invalidParamException(FREEZE_STOCKTAKE_DEFERRED);
         }
         var warehouse = mapper.lockWarehouse(scope, request.getWarehouseId());
         if (warehouse == null) throw exception(NOT_FOUND);
@@ -92,7 +93,7 @@ public class InventoryStocktakeService {
         var scope = access.requireScope(null);
         var header = lockHeader(scope, id);
         if (header.getFreezeFlag() != null && header.getFreezeFlag() == 1) {
-            throw invalidParamException("盘点冻结策略尚未完成 ph_inv_lock 归属确认");
+            throw invalidParamException(FREEZE_STOCKTAKE_DEFERRED);
         }
         if (mapper.countLines(scope, id) <= 0) throw invalidParamException("盘点范围没有可盘库存");
         transition(scope, id, 0, 1);
@@ -137,7 +138,7 @@ public class InventoryStocktakeService {
             throw invalidParamException("只有已完成盘点可以审批调整");
         }
         if (header.getFreezeFlag() != null && header.getFreezeFlag() == 1) {
-            throw invalidParamException("盘点冻结策略尚未完成 ph_inv_lock 归属确认");
+            throw invalidParamException(FREEZE_STOCKTAKE_DEFERRED);
         }
         var warehouse = mapper.lockWarehouse(scope, header.getWarehouseId());
         if (warehouse == null || warehouse.getStatus() == null) throw exception(NOT_FOUND);
