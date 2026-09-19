@@ -51,6 +51,8 @@ services:
       - ./sql/migrations/20260918_f_member_sms_code.sql:/docker-entrypoint-initdb.d/29-pharmacy-member-sms-code.sql:ro
       - ./sql/migrations/20260918_f_wx_order_points.sql:/docker-entrypoint-initdb.d/30-pharmacy-wx-order-points.sql:ro
       - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/24-inventory-facade-flow-ref.sql:ro
+      - ./sql/migrations/20260917_c_inventory_shared_role_menu.sql:/docker-entrypoint-initdb.d/29-c-inventory-role-menu.sql:ro
+      - ./sql/migrations/20260918_c_inventory_flow_comment_utf8.sql:/docker-entrypoint-initdb.d/30-c-inventory-flow-comment.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
