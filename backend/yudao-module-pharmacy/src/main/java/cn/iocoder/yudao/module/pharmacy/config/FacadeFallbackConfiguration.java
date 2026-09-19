@@ -1,7 +1,5 @@
 package cn.iocoder.yudao.module.pharmacy.config;
 
-import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacade;
-import cn.iocoder.yudao.module.pharmacy.api.inventory.InventoryFacadeImpl;
 import cn.iocoder.yudao.module.pharmacy.api.member.MemberPointFacade;
 import cn.iocoder.yudao.module.pharmacy.api.member.MemberPointFacadeImpl;
 import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
@@ -19,12 +17,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class FacadeFallbackConfiguration {
-
-    @Bean
-    @ConditionalOnMissingBean(InventoryFacade.class)
-    public InventoryFacade inventoryFacade() {
-        return new InventoryFacadeImpl();
-    }
 
     @Bean
     @ConditionalOnMissingBean(PaymentFacade.class)

@@ -13,10 +13,18 @@ VALUES
   (22095, '地址更新', 'pharmacy:member:address:update', 3, 25, 22091, '', '', NULL, NULL,
    0, b'1', b'1', b'1', '1', NOW(), '1', NOW(), b'0');
 
+-- 授予租户 1（源码租户）管理员角色
 DELETE FROM `system_role_menu` WHERE `tenant_id` = 1 AND `role_id` = 1 AND `menu_id` = 22095;
 INSERT INTO `system_role_menu`
   (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
 VALUES
   (1, 22095, '1', NOW(), '1', NOW(), b'0', 1);
+
+-- 同时授予 FirstSun 演示租户 163 的管理员角色 167（与 C 迁移 22229 保持一致）
+DELETE FROM `system_role_menu` WHERE `tenant_id` = 163 AND `role_id` = 167 AND `menu_id` = 22095;
+INSERT INTO `system_role_menu`
+  (`role_id`, `menu_id`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+VALUES
+  (167, 22095, '1', NOW(), '1', NOW(), b'0', 163);
 
 -- 说明：只涉及 F 会员模块的菜单权限数据，不改动其它模块。

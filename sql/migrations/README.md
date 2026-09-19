@@ -1,5 +1,19 @@
 # 药店模块迁移脚本执行顺序（A 成员维护）
 
+## 采购与库存增量迁移顺序
+
+首次初始化时，`docker-compose.yml` 按以下依赖顺序挂载并执行：
+
+1. `20260912_b_purchase_supplier_menu.sql`
+2. `20260913_b_purchase_order_receipt_menu.sql`
+3. `20260917_b_purchase_order_reject.sql`
+4. `20260917_b_purchase_doc_seq.sql`
+5. `20260914_k_pharmacy_inventory_menu.sql` 及其后续库存基础迁移
+6. `20260914_l_pharmacy_demo_data.sql`
+7. `20260918_l_fix_demo_location_163032.sql`
+
+采购驳回迁移以信息_schema 检查列和约束后再变更，采购单号序列表使用单号中的业务日期回填，并以 `GREATEST` 保证重复执行只增不减。演示货位迁移只更新仍处于错误仓库且未删除的目标货位，重复执行无副作用。已有持久化数据库不会自动重跑 init 目录脚本，应按上述顺序手工执行尚未落地的幂等迁移。
+
 > 所有脚本均使用 `ON DUPLICATE KEY UPDATE` 或先删后插，**幂等可重复执行**。
 > 字典 type 已与后端 `DictTypeConstants.java`、前端 `utils/dict.ts` 保持一致。
 > 菜单 ID 段 22000+，字典类型 ID 300+，字典数据 ID 1500+，避免与 system 已有数据冲突。
