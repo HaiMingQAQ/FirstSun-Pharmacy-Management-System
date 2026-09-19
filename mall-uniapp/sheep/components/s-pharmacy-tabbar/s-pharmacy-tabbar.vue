@@ -1,73 +1,57 @@
-<!-- 药店小程序底部导航（自定义，避免依赖商城装修 tabbar） -->
 <template>
   <view class="pharmacy-tabbar">
-    <view
+    <button
       v-for="(item, index) in tabs"
       :key="item.path"
-      class="pharmacy-tabbar__item"
-      :class="{ 'is-active': index === current }"
-      @tap="handleSwitch(index, item)"
+      class="tab"
+      :class="{ active: index === current }"
+      @tap="switchTab(index, item)"
     >
-      <text class="pharmacy-tabbar__text">{{ item.text }}</text>
-    </view>
+      <uni-icons :type="item.icon" size="23" :color="index === current ? '#176b5b' : '#758078'" />
+      <text>{{ item.text }}</text>
+    </button>
   </view>
 </template>
-
 <script setup>
-  const props = defineProps({
-    // 当前选中的下标：0 首页 / 1 分类 / 2 购物车 / 3 我的
-    current: {
-      type: Number,
-      default: 0,
-    },
-  });
-
+  defineOptions({ options: { styleIsolation: 'apply-shared' } });
+  const props = defineProps({ current: Number });
   const tabs = [
-    { text: '首页', path: '/pages/pharmacy/index' },
-    { text: '分类', path: '/pages/pharmacy/category' },
-    { text: '购物车', path: '/pages/pharmacy/cart' },
-    { text: '我的', path: '/pages/pharmacy/user' },
+    { text: '首页', icon: 'home', path: 'index' },
+    { text: '分类', icon: 'list', path: 'category' },
+    { text: '购物车', icon: 'cart', path: 'cart' },
+    { text: '我的', icon: 'person', path: 'user' },
   ];
-
-  const handleSwitch = (index, item) => {
-    if (index === props.current) {
-      return;
-    }
-    uni.reLaunch({
-      url: item.path,
-    });
-  };
+  function switchTab(index, item) {
+    if (index !== props.current) uni.reLaunch({ url: `/pages/pharmacy/${item.path}` });
+  }
 </script>
-
-<style lang="scss" scoped>
+<style scoped>
   .pharmacy-tabbar {
     position: fixed;
+    bottom: 0;
     left: 0;
     right: 0;
-    bottom: 0;
-    z-index: 99;
+    z-index: 40;
     display: flex;
-    height: 100rpx;
-    background: #ffffff;
-    border-top: 1rpx solid #e4e7ec;
-    padding-bottom: constant(safe-area-inset-bottom);
+    background: #fff;
+    border-top: 1px solid #e5ebe8;
     padding-bottom: env(safe-area-inset-bottom);
-
-    &__item {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    &__text {
-      font-size: 28rpx;
-      color: #667085;
-    }
-
-    &__item.is-active &__text {
-      color: #176b5b;
-      font-weight: 600;
-    }
+  }
+  .pharmacy-tabbar .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 60px;
+    min-height: 60px;
+    padding: 5px 0;
+    background: #fff;
+    border-radius: 0;
+    color: #758078;
+    font-size: 12px;
+  }
+  .pharmacy-tabbar .active {
+    color: #176b5b;
+    font-weight: 600;
   }
 </style>

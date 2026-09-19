@@ -1,398 +1,144 @@
-<!-- 药店小程序 - 收货地址管理（真实接口：F 会员地址 CRUD） -->
 <template>
-  <view class="pharmacy-address">
-    <view v-if="!isLogin" class="empty">
-      <view class="empty__text">登录后管理收货地址</view>
-      <view class="empty__btn" @tap="goLogin">去登录</view>
-    </view>
-
-    <template v-else>
-      <!-- 地址列表 -->
-      <view v-if="list.length > 0" class="addr-list">
-        <view v-for="item in list" :key="item.id" class="addr">
-          <view class="addr__main">
-            <view class="addr__head">
-              <text class="addr__name">{{ item.name }}</text>
-              <text class="addr__mobile">{{ item.mobile }}</text>
-              <text v-if="item.defaultStatus" class="addr__badge">默认</text>
-            </view>
-            <view class="addr__detail">{{ item.detailAddress }}</view>
-          </view>
-          <view class="addr__ops">
-            <view class="addr__op" @tap="handleEdit(item)">编辑</view>
-            <view v-if="!item.defaultStatus" class="addr__op" @tap="handleSetDefault(item)">
-              设为默认
-            </view>
-            <view class="addr__op addr__op--danger" @tap="handleDelete(item)">删除</view>
-          </view>
+  <s-pharmacy-page dock>
+    <s-pharmacy-state
+      v-if="!loggedIn"
+      title="登录后管理地址"
+      action="去登录"
+      @retry="go('login')"
+    />
+    <template v-else-if="editing">
+      <view class="fs-section">
+        <view class="fs-title">{{ form.id ? '编辑收货地址' : '新增收货地址' }}</view>
+        <view class="fs-field">
+          <text class="fs-label">收货人</text>
+          <input
+            v-model="form.name"
+            class="fs-input"
+            maxlength="30"
+            placeholder="请输入收货人姓名"
+          />
+        </view>
+        <view class="fs-field">
+          <text class="fs-label">联系电话</text>
+          <input
+            v-model="form.mobile"
+            type="number"
+            maxlength="11"
+            class="fs-input"
+            placeholder="请输入 11 位手机号"
+          />
+          <text v-if="form.mobile && !validPhone" class="fs-danger fs-small">手机号格式不正确</text>
+        </view>
+        <view class="fs-field">
+          <text class="fs-label">完整收货地址</text>
+          <textarea v-model="form.detail" maxlength="150" placeholder="省、市、区、街道及门牌号" />
+        </view>
+        <view class="fs-between fs-field">
+          <text>设为默认地址</text>
+          <switch
+            :checked="form.isDefault"
+            color="#176b5b"
+            @change="form.isDefault = $event.detail.value"
+          />
         </view>
       </view>
-
-      <view v-else-if="!loading" class="empty">
-        <view class="empty__text">还没有收货地址</view>
-      </view>
-
-      <view class="footer">
-        <view class="footer__btn" @tap="handleAdd">新增收货地址</view>
-      </view>
-
-      <!-- 新增/编辑表单 -->
-      <view v-if="showForm" class="form-mask" @tap="closeForm">
-        <view class="form" @tap.stop>
-          <view class="form__title">{{ form.id ? '编辑收货地址' : '新增收货地址' }}</view>
-          <view class="form__field">
-            <text class="form__label">收件人</text>
-            <input v-model="form.name" class="form__input" placeholder="请输入收件人名称" maxlength="10" />
-          </view>
-          <view class="form__field">
-            <text class="form__label">手机号</text>
-            <input v-model="form.mobile" class="form__input" type="number" maxlength="11" placeholder="请输入手机号" />
-          </view>
-          <view class="form__field">
-            <text class="form__label">地区编码</text>
-            <input v-model="form.areaId" class="form__input" type="number" placeholder="如 110101" />
-          </view>
-          <view class="form__field">
-            <text class="form__label">详细地址</text>
-            <input v-model="form.detailAddress" class="form__input" placeholder="请输入详细地址" maxlength="250" />
-          </view>
-          <view class="form__field form__field--switch">
-            <text class="form__label">设为默认</text>
-            <switch :checked="form.defaultStatus" color="#176b5b" @change="handleDefaultChange" />
-          </view>
-          <view class="form__actions">
-            <view class="form__btn" @tap="closeForm">取消</view>
-            <view class="form__btn form__btn--primary" @tap="handleSubmit">保存</view>
-          </view>
-        </view>
+      <view class="fs-dock">
+        <button class="fs-outline" :disabled="busy" @tap="editing = false">取消</button>
+        <button
+          class="fs-primary fs-grow"
+          :disabled="busy || !validPhone || !form.name.trim() || !form.detail.trim()"
+          :loading="busy"
+          @tap="save"
+        >
+          保存地址
+        </button>
       </view>
     </template>
-  </view>
+    <template v-else>
+      <s-pharmacy-state
+        v-if="loading || error || !list.length"
+        :loading="loading"
+        :error="error"
+        title="还没有收货地址"
+        description="添加地址后，即可选择门店配送"
+        @retry="load"
+      />
+      <view v-else v-for="address in list" :key="address.id" class="fs-section">
+        <view @tap="choose(address)">
+          <view class="fs-title">
+            {{ address.name }}
+            <text class="fs-small">{{ address.mobile }}</text>
+          </view>
+          <view class="fs-gap">{{ address.detail }}</view>
+          <view v-if="address.isDefault" class="fs-gap"><text class="fs-tag">默认地址</text></view>
+          <view v-if="selecting" class="fs-muted fs-gap">点击选择此地址</view>
+        </view>
+        <view class="fs-between fs-gap">
+          <button class="fs-text-btn" @tap="edit(address)">编辑</button>
+          <button class="fs-text-btn fs-danger" :disabled="busy" @tap="remove(address)">
+            删除
+          </button>
+        </view>
+      </view>
+      <view v-if="loggedIn" class="fs-dock">
+        <button class="fs-primary fs-grow" @tap="edit()">
+          <uni-icons type="plus" size="18" color="#fff" />
+          新增收货地址
+        </button>
+      </view>
+    </template>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
-  import { onShow } from '@dcloudio/uni-app';
-  import sheep from '@/sheep';
-  import AddressApi from '@/sheep/api/member/address';
-
-  const isLogin = computed(() => sheep.$store('user').isLogin);
-  const list = ref([]);
-  const loading = ref(false);
-  const showForm = ref(false);
-  const form = ref(createDefaultForm());
-
-  function createDefaultForm() {
-    return {
-      id: null,
-      name: '',
-      mobile: '',
-      areaId: '',
-      detailAddress: '',
-      defaultStatus: false,
-    };
-  }
-
-  const loadList = async () => {
-    if (!isLogin.value) {
-      list.value = [];
-      return;
-    }
-    loading.value = true;
-    const { code, data } = await AddressApi.getAddressList();
-    loading.value = false;
-    if (code === 0) {
-      list.value = data || [];
-    }
-  };
-
-  const handleAdd = () => {
-    form.value = createDefaultForm();
-    showForm.value = true;
-  };
-
-  const handleEdit = (item) => {
-    form.value = {
-      id: item.id,
-      name: item.name,
-      mobile: item.mobile,
-      areaId: item.areaId,
-      detailAddress: item.detailAddress,
-      defaultStatus: !!item.defaultStatus,
-    };
-    showForm.value = true;
-  };
-
-  const closeForm = () => {
-    showForm.value = false;
-  };
-
-  const handleDefaultChange = (event) => {
-    form.value.defaultStatus = event.detail.value;
-  };
-
-  const validate = () => {
-    if (!form.value.name) {
-      uni.showToast({ title: '请输入收件人名称', icon: 'none' });
-      return false;
-    }
-    if (!/^\d{11}$/.test(form.value.mobile)) {
-      uni.showToast({ title: '请输入正确的 11 位手机号', icon: 'none' });
-      return false;
-    }
-    if (!form.value.areaId) {
-      uni.showToast({ title: '请输入地区编码', icon: 'none' });
-      return false;
-    }
-    if (!form.value.detailAddress) {
-      uni.showToast({ title: '请输入详细地址', icon: 'none' });
-      return false;
-    }
-    return true;
-  };
-
-  const handleSubmit = async () => {
-    if (!validate()) {
-      return;
-    }
-    const payload = {
-      name: form.value.name,
-      mobile: form.value.mobile,
-      areaId: Number(form.value.areaId),
-      detailAddress: form.value.detailAddress,
-      defaultStatus: form.value.defaultStatus,
-    };
-    const res = form.value.id
-      ? await AddressApi.updateAddress({ ...payload, id: form.value.id })
-      : await AddressApi.createAddress(payload);
-    if (res.code === 0) {
-      showForm.value = false;
-      loadList();
-    }
-  };
-
-  const handleSetDefault = async (item) => {
-    const { code } = await AddressApi.updateAddress({
-      id: item.id,
-      name: item.name,
-      mobile: item.mobile,
-      areaId: item.areaId,
-      detailAddress: item.detailAddress,
-      defaultStatus: true,
+  import { ref, computed } from 'vue';
+  import { onLoad, onShow } from '@dcloudio/uni-app';
+  import api from '@/sheep/api/pharmacy/client';
+  import { go, toast, confirm, useRequest, useAction } from './usePharmacy';
+  const list = ref([]),
+    editing = ref(false),
+    selecting = ref(false),
+    loggedIn = ref(false),
+    form = ref({ name: '', mobile: '', detail: '', isDefault: false });
+  const { loading, error, run } = useRequest();
+  const { busy, act } = useAction();
+  const validPhone = computed(() => /^1[3-9]\d{9}$/.test(form.value.mobile));
+  const load = () =>
+    run(async () => {
+      list.value = await api.addresses();
     });
-    if (code === 0) {
-      loadList();
+  const edit = (address) => {
+    form.value = address ? { ...address } : { name: '', mobile: '', detail: '', isDefault: false };
+    editing.value = true;
+  };
+  const choose = (address) => {
+    if (selecting.value) {
+      api.chooseAddress(address.id);
+      uni.navigateBack();
     }
   };
-
-  const handleDelete = (item) => {
-    uni.showModal({
-      title: '删除地址',
-      content: '确定要删除该收货地址吗？',
-      success: async (res) => {
-        if (!res.confirm) {
-          return;
-        }
-        const { code } = await AddressApi.deleteAddress(item.id);
-        if (code === 0) {
-          loadList();
-        }
-      },
+  const save = () =>
+    act(async () => {
+      const address = await api.saveAddress(form.value);
+      toast('地址已保存');
+      editing.value = false;
+      if (selecting.value) choose(address);
+      else await load();
     });
-  };
-
-  const goLogin = () => {
-    uni.navigateTo({
-      url: '/pages/pharmacy/login',
+  const remove = (address) =>
+    act(async () => {
+      if (await confirm('删除地址', '删除后不可恢复，确定删除此收货地址？')) {
+        await api.deleteAddress(address.id);
+        await load();
+        toast('地址已删除');
+      }
     });
-  };
-
+  onLoad((q) => (selecting.value = q.select === '1'));
   onShow(() => {
-    loadList();
+    loggedIn.value = !!api.session();
+    if (loggedIn.value) load();
+    else {
+      list.value = [];
+      editing.value = false;
+    }
   });
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-address {
-    min-height: 100vh;
-    padding-bottom: 160rpx;
-    background: #f5f7f8;
-  }
-
-  .addr-list {
-    padding: 16rpx 24rpx;
-  }
-
-  .addr {
-    padding: 24rpx;
-    margin-bottom: 16rpx;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__head {
-      display: flex;
-      align-items: center;
-    }
-
-    &__name {
-      font-size: 30rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
-
-    &__mobile {
-      margin-left: 16rpx;
-      font-size: 26rpx;
-      color: #667085;
-    }
-
-    &__badge {
-      margin-left: 16rpx;
-      padding: 2rpx 12rpx;
-      font-size: 20rpx;
-      color: #176b5b;
-      border: 1rpx solid #176b5b;
-      border-radius: 6rpx;
-    }
-
-    &__detail {
-      margin-top: 10rpx;
-      font-size: 26rpx;
-      color: #667085;
-      line-height: 1.6;
-    }
-
-    &__ops {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: 16rpx;
-      padding-top: 16rpx;
-      border-top: 1rpx solid #f0f2f5;
-    }
-
-    &__op {
-      margin-left: 28rpx;
-      font-size: 26rpx;
-      color: #176b5b;
-
-      &--danger {
-        color: #ef4444;
-      }
-    }
-  }
-
-  .footer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 16rpx 24rpx;
-    padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
-    background: #ffffff;
-    border-top: 1rpx solid #e4e7ec;
-
-    &__btn {
-      height: 80rpx;
-      line-height: 80rpx;
-      text-align: center;
-      font-size: 30rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
-  }
-
-  .form-mask {
-    position: fixed;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    z-index: 200;
-    background: rgba(0, 0, 0, 0.45);
-  }
-
-  .form {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 24rpx;
-    background: #ffffff;
-    border-radius: 16rpx 16rpx 0 0;
-
-    &__title {
-      font-size: 30rpx;
-      font-weight: 600;
-      color: #1f2933;
-      text-align: center;
-      padding-bottom: 16rpx;
-    }
-
-    &__field {
-      display: flex;
-      align-items: center;
-      padding: 16rpx 0;
-      border-bottom: 1rpx solid #f0f2f5;
-
-      &--switch {
-        justify-content: space-between;
-      }
-    }
-
-    &__label {
-      width: 180rpx;
-      font-size: 27rpx;
-      color: #667085;
-    }
-
-    &__input {
-      flex: 1;
-      font-size: 27rpx;
-      color: #1f2933;
-    }
-
-    &__actions {
-      display: flex;
-      margin-top: 32rpx;
-    }
-
-    &__btn {
-      flex: 1;
-      height: 80rpx;
-      line-height: 80rpx;
-      text-align: center;
-      font-size: 30rpx;
-      color: #1f2933;
-      border: 1rpx solid #e4e7ec;
-      border-radius: 40rpx;
-
-      &--primary {
-        margin-left: 24rpx;
-        color: #ffffff;
-        background: #176b5b;
-        border-color: #176b5b;
-      }
-    }
-  }
-
-  .empty {
-    padding: 160rpx 0;
-    text-align: center;
-
-    &__text {
-      font-size: 28rpx;
-      color: #98a2b3;
-    }
-
-    &__btn {
-      display: inline-block;
-      margin-top: 32rpx;
-      padding: 16rpx 56rpx;
-      font-size: 28rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
-  }
-</style>

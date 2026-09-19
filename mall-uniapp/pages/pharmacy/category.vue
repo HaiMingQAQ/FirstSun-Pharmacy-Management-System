@@ -1,236 +1,177 @@
-<!-- 药店小程序 - 分类页（真实接口：A 药品分类 + 商品） -->
 <template>
-  <view class="pharmacy-category">
-    <!-- 左侧分类 -->
-    <view class="side">
-      <view
-        class="side__item"
-        :class="{ 'is-active': activeCategoryId === null }"
-        @tap="handleCategory(null)"
-      >
-        全部
+  <s-pharmacy-page :tab="1">
+    <view class="fs-pad fs-white">
+      <view class="fs-search">
+        <uni-icons type="search" size="20" color="#64716c" />
+        <input
+          v-model="keyword"
+          placeholder="药品名称、通用名、条码"
+          confirm-type="search"
+          @confirm="search"
+        />
+        <button class="fs-text-btn" @tap="search">搜索</button>
       </view>
-      <view
-        v-for="item in categories"
-        :key="item.id"
-        class="side__item"
-        :class="{ 'is-active': activeCategoryId === item.id }"
-        @tap="handleCategory(item.id)"
-      >
-        {{ item.catName }}
+      <view v-if="history.length" class="history">
+        <text class="fs-muted">最近</text>
+        <text
+          v-for="word in history.slice(0, 3)"
+          :key="word"
+          @tap="
+            keyword = word;
+            search();
+          "
+        >
+          {{ word }}
+        </text>
+        <button class="fs-text-btn" aria-label="清空搜索历史" @tap="clearHistory">
+          <uni-icons type="trash" size="16" color="#758078" />
+        </button>
       </view>
     </view>
-
-    <!-- 右侧商品 -->
-    <view class="main">
-      <view class="main__title">{{ currentCategoryName }}</view>
-      <view v-for="item in list" :key="item.id" class="goods" @tap="goDetail(item.id)">
-        <view class="goods__name">
-          {{ item.genericName }}
-          <text v-if="item.isRx === 1" class="goods__rx">处方药</text>
-        </view>
-        <view class="goods__spec">{{ item.specification || '—' }}</view>
-        <view class="goods__price">
-          <text class="goods__price-now">￥{{ displayPrice(item) }}</text>
-          <text v-if="item.memberPrice" class="goods__price-old">￥{{ item.retailPrice }}</text>
-        </view>
+    <view class="category-layout">
+      <view class="category-nav">
+        <button
+          v-for="cat in api.categories"
+          :key="cat.id"
+          :class="{ active: category === cat.id }"
+          @tap="select(cat.id)"
+        >
+          {{ cat.name }}
+        </button>
       </view>
-
-      <view v-if="!loading && list.length === 0" class="empty">该分类下暂无商品</view>
-      <view v-if="loading" class="empty">加载中…</view>
-      <view v-if="!loading && finished && list.length > 0" class="empty">没有更多了</view>
+      <view class="category-results">
+        <view class="fs-between result-title">
+          <text class="fs-small">{{ keyword ? '搜索结果' : categoryName }}</text>
+          <text class="fs-muted">{{ list.length }} 件</text>
+        </view>
+        <s-pharmacy-state
+          v-if="loading || error || !list.length"
+          :loading="loading"
+          :error="error"
+          title="没有找到相关药品"
+          description="试试通用名，或切换其他分类"
+          action="查看全部"
+          @retry="retry"
+        />
+        <s-pharmacy-product
+          v-else
+          v-for="product in list"
+          :key="product.id"
+          :product="product"
+          compact
+          add
+          :busy="busy"
+          @add="add"
+        />
+        <view v-if="list.length && !loading && !error" class="fs-footer">已显示全部药品</view>
+      </view>
     </view>
-
-    <s-pharmacy-tabbar :current="1" />
-  </view>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
-  import { onShow, onReachBottom } from '@dcloudio/uni-app';
-  import DrugApi from '@/sheep/api/pharmacy/drug';
-
-  const categories = ref([]);
-  const activeCategoryId = ref(null);
-  const list = ref([]);
-  const pageNo = ref(1);
-  const pageSize = 10;
-  const total = ref(0);
-  const loading = ref(false);
-  const finished = ref(false);
-
-  const currentCategoryName = computed(() => {
-    if (activeCategoryId.value === null) {
-      return '全部商品';
-    }
-    const found = categories.value.find((item) => item.id === activeCategoryId.value);
-    return found ? found.catName : '全部商品';
-  });
-
-  const displayPrice = (item) => {
-    const price = item.memberPrice !== null && item.memberPrice !== undefined
-      ? item.memberPrice
-      : item.retailPrice;
-    return price === null || price === undefined ? '—' : price;
-  };
-
-  const loadCategories = async () => {
-    const { code, data } = await DrugApi.getCategoryList();
-    if (code === 0) {
-      categories.value = data || [];
-    }
-  };
-
-  const loadList = async (reset = false) => {
-    if (loading.value) {
-      return;
-    }
-    if (reset) {
-      pageNo.value = 1;
-      finished.value = false;
-    }
-    if (finished.value) {
-      return;
-    }
-    loading.value = true;
-    const params = {
-      pageNo: pageNo.value,
-      pageSize,
-    };
-    if (activeCategoryId.value !== null) {
-      params.categoryId = activeCategoryId.value;
-    }
-    const { code, data } = await DrugApi.getDrugPage(params);
-    loading.value = false;
-    if (code !== 0) {
-      return;
-    }
-    list.value = reset ? data.list || [] : list.value.concat(data.list || []);
-    total.value = data.total || 0;
-    finished.value = list.value.length >= total.value;
-    if (!finished.value) {
-      pageNo.value += 1;
-    }
-  };
-
-  const handleCategory = (categoryId) => {
-    activeCategoryId.value = categoryId;
-    loadList(true);
-  };
-
-  const loadMore = () => {
-    loadList(false);
-  };
-
-  const goDetail = (id) => {
-    uni.navigateTo({
-      url: `/pages/pharmacy/detail?id=${id}`,
+  import { ref, computed } from 'vue';
+  import { onLoad, onShow } from '@dcloudio/uni-app';
+  import api from '@/sheep/api/pharmacy/client';
+  import { toast, requireLogin, useRequest, useAction } from './usePharmacy';
+  const keyword = ref(''),
+    category = ref('all'),
+    list = ref([]),
+    history = ref(api.history());
+  const { loading, error, run } = useRequest();
+  const { busy, act } = useAction();
+  const categoryName = computed(
+    () => api.categories.find((c) => c.id === category.value)?.name || '全部药品',
+  );
+  const load = () =>
+    run(async () => {
+      list.value = await api.products({ keyword: keyword.value, category: category.value });
     });
-  };
-
-  onShow(() => {
-    if (categories.value.length === 0) {
-      loadCategories();
+  function search() {
+    if (loading.value) return;
+    api.remember(keyword.value);
+    history.value = api.history();
+    category.value = 'all';
+    load();
+  }
+  function select(id) {
+    if (loading.value) return;
+    category.value = id;
+    load();
+  }
+  function clearHistory() {
+    api.clearHistory();
+    history.value = [];
+  }
+  function retry() {
+    if (!error.value) {
+      keyword.value = '';
+      category.value = 'all';
     }
-    loadList(true);
+    load();
+  }
+  const add = (p) => {
+    if (requireLogin())
+      act(async () => {
+        await api.add(p.id);
+        toast('已加入购物车');
+      });
+  };
+  onLoad((q) => {
+    category.value = q.category || 'all';
   });
-
-  onReachBottom(() => {
-    loadMore();
-  });
+  onShow(load);
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-category {
+<style scoped>
+  .history {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .history > text:not(:first-child) {
+    max-width: 76px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .history button {
+    margin-left: auto;
+  }
+  .category-layout {
     display: flex;
     align-items: flex-start;
-    min-height: 100vh;
-    padding-bottom: 120rpx;
-    box-sizing: border-box;
-    background: #f5f7f8;
+    min-height: 70vh;
   }
-
-  .side {
-    width: 200rpx;
-    background: #ffffff;
-
-    &__item {
-      padding: 28rpx 16rpx;
-      font-size: 26rpx;
-      color: #667085;
-      text-align: center;
-
-      &.is-active {
-        color: #176b5b;
-        font-weight: 600;
-        background: #f5f7f8;
-        border-left: 6rpx solid #176b5b;
-      }
-    }
+  .category-nav {
+    width: 88px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    padding-top: 8px;
   }
-
-  .main {
+  .category-nav button {
+    font-size: 14px;
+    min-height: 58px;
+    background: transparent;
+    border-radius: 0;
+    padding: 10px 5px;
+    color: #69766e;
+  }
+  .category-nav button.active {
+    background: #fff;
+    color: #176b5b;
+    font-weight: 600;
+    border-left: 3px solid #176b5b;
+  }
+  .category-results {
     flex: 1;
-    padding: 16rpx;
-
-    &__title {
-      padding: 8rpx 8rpx 16rpx;
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
+    min-width: 0;
+    background: #fff;
+    padding: 0 12px;
+    min-height: 70vh;
   }
-
-  .goods {
-    padding: 24rpx;
-    margin-bottom: 16rpx;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__name {
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
-
-    &__rx {
-      margin-left: 12rpx;
-      padding: 2rpx 12rpx;
-      font-size: 20rpx;
-      font-weight: 400;
-      color: #ef4444;
-      border: 1rpx solid #ef4444;
-      border-radius: 6rpx;
-    }
-
-    &__spec {
-      margin-top: 8rpx;
-      font-size: 24rpx;
-      color: #667085;
-    }
-
-    &__price {
-      margin-top: 12rpx;
-    }
-
-    &__price-now {
-      font-size: 30rpx;
-      font-weight: 600;
-      color: #ef4444;
-    }
-
-    &__price-old {
-      margin-left: 12rpx;
-      font-size: 24rpx;
-      color: #98a2b3;
-      text-decoration: line-through;
-    }
-  }
-
-  .empty {
-    padding: 40rpx 0;
-    text-align: center;
-    font-size: 26rpx;
-    color: #98a2b3;
+  .result-title {
+    padding-top: 16px;
   }
 </style>

@@ -1,319 +1,168 @@
-<!-- 药店小程序 - 订单详情（真实接口：F 线上订单，含取货码） -->
 <template>
-  <view class="pharmacy-order-detail">
-    <template v-if="order">
-      <!-- 状态 -->
-      <view class="status">
-        <view class="status__text">{{ statusText(order.status) }}</view>
-        <view v-if="order.status === 3" class="status__tip">请到店出示取货码完成核销</view>
-        <view v-else-if="order.status === 0" class="status__tip">
-          请在 {{ formatTime(order.expireAt) }} 前完成支付
-        </view>
-      </view>
-
-      <!-- 取货码 -->
-      <view v-if="order.pickupCode && order.status === 3" class="pickup">
-        <view class="pickup__label">取货码</view>
-        <view class="pickup__code">{{ order.pickupCode }}</view>
-        <view class="pickup__store">履约门店编号：{{ order.storeId }}</view>
-      </view>
-
-      <!-- 商品明细 -->
-      <view class="panel">
-        <view class="panel__title">商品明细</view>
-        <view v-for="line in order.lines || []" :key="line.id" class="line">
-          <view class="line__main">
-            <view class="line__name">{{ line.drugName || '商品' }}</view>
-            <view class="line__spec">{{ line.specification || '—' }} × {{ line.qty }}</view>
+  <s-pharmacy-page>
+    <s-pharmacy-state
+      v-if="!loggedIn"
+      title="登录后查看订单"
+      action="去登录"
+      @retry="go('login')"
+    />
+    <s-pharmacy-state
+      v-else-if="loading || error || !order"
+      :loading="loading"
+      :error="error"
+      @retry="load"
+    />
+    <template v-else>
+      <view class="status-head">
+        <view class="fs-row">
+          <uni-icons
+            :type="order.status === 'completed' ? 'checkbox-filled' : 'info'"
+            size="30"
+            color="#176b5b"
+          />
+          <view>
+            <view class="fs-heading">{{ statusNames[order.status] }}</view>
+            <view class="fs-muted fs-gap">{{ statusDescription }}</view>
           </view>
-          <view class="line__amount">￥{{ line.lineAmount }}</view>
         </view>
       </view>
-
-      <!-- 金额 -->
-      <view class="panel">
-        <view class="panel__title">金额信息</view>
-        <view class="row">
-          <text class="row__label">商品金额</text>
-          <text class="row__value">￥{{ order.goodsAmount }}</text>
+      <view class="fs-section">
+        <view class="fs-between">
+          <text class="fs-title">{{ order.mode === 'pickup' ? '到店自提' : '门店配送' }}</text>
+          <text class="fs-tag">{{ order.paid ? '已支付（模拟）' : '未支付' }}</text>
         </view>
-        <view class="row">
-          <text class="row__label">配送费</text>
-          <text class="row__value">￥{{ order.freightAmount }}</text>
+        <view class="fs-gap">
+          {{
+            order.mode === 'pickup'
+              ? order.store.name
+              : order.address?.name + '  ' + order.address?.mobile
+          }}
         </view>
-        <view class="row">
-          <text class="row__label">优惠</text>
-          <text class="row__value">￥{{ order.discountAmount }}</text>
+        <view class="fs-muted fs-gap">
+          {{ order.mode === 'pickup' ? order.store.address : order.address?.detail }}
         </view>
-        <view class="row row--total">
-          <text class="row__label">应付金额</text>
-          <text class="row__amount">￥{{ order.payableAmount }}</text>
+        <view v-if="order.mode === 'pickup'" class="fs-muted">
+          营业时间 {{ order.store.hours }} · 凭订单号到店取药
         </view>
       </view>
-
-      <!-- 订单信息 -->
-      <view class="panel">
-        <view class="panel__title">订单信息</view>
-        <view class="row">
-          <text class="row__label">订单号</text>
-          <text class="row__value">{{ order.orderNo }}</text>
+      <view class="fs-section">
+        <view class="fs-title">{{ order.store.name }}</view>
+        <s-pharmacy-product
+          v-for="row in order.items"
+          :key="row.drugId"
+          :product="row.product"
+          hide-stock
+          :qty="row.qty"
+        />
+        <view class="fs-between fs-gap">
+          <text>商品金额</text>
+          <text>¥{{ money(order.subtotal) }}</text>
         </view>
-        <view class="row">
-          <text class="row__label">订单类型</text>
-          <text class="row__value">{{ order.orderType === 1 ? '同城配送' : '到店自提' }}</text>
+        <view class="fs-between fs-gap">
+          <text>配送费</text>
+          <text>¥{{ money(order.shipping) }}</text>
         </view>
-        <view class="row">
-          <text class="row__label">支付状态</text>
-          <text class="row__value">{{ payStatusText(order.payStatus) }}</text>
+        <view class="fs-between fs-gap">
+          <text>积分抵扣</text>
+          <text>− ¥{{ money(order.points) }}</text>
         </view>
-        <view v-if="order.addressSnapshot" class="row">
-          <text class="row__label">收货地址</text>
-          <text class="row__value">{{ order.addressSnapshot }}</text>
-        </view>
-        <view v-if="order.remark" class="row">
-          <text class="row__label">备注</text>
-          <text class="row__value">{{ order.remark }}</text>
-        </view>
-        <view class="row">
-          <text class="row__label">下单时间</text>
-          <text class="row__value">{{ formatTime(order.createTime) }}</text>
-        </view>
-        <view v-if="order.status === -1 && order.cancelReason" class="row">
-          <text class="row__label">取消原因</text>
-          <text class="row__value">{{ order.cancelReason }}</text>
+        <view class="fs-between fs-gap">
+          <text>{{ order.paid ? '实付金额' : '应付金额' }}</text>
+          <text class="fs-price">¥{{ money(order.total) }}</text>
         </view>
       </view>
-
-      <!-- 操作 -->
-      <view v-if="canCancel" class="footer">
-        <view class="footer__btn" @tap="handleCancel">取消订单</view>
+      <view class="fs-section">
+        <view class="fs-title">处方审核</view>
+        <view class="fs-gap">
+          <text class="fs-tag" :class="{ 'fs-tag-rx': order.prescriptions.length }">
+            {{
+              order.status === 'cancelled' && order.prescriptions.length
+                ? '订单已取消，审核已终止'
+                : order.review
+            }}
+          </text>
+        </view>
+        <view v-if="order.prescriptions.length" class="fs-muted fs-gap">
+          已提交
+          {{ order.prescriptions.length }}
+          张处方。需经药师审核，不承诺审核结果；测试环境不进行真实审核。
+        </view>
+      </view>
+      <view class="fs-section">
+        <view class="fs-title">订单信息</view>
+        <view class="meta-row">
+          <text>订单编号</text>
+          <text>{{ order.id }}</text>
+        </view>
+        <view class="meta-row">
+          <text>创建时间</text>
+          <text>{{ order.createdAt }}</text>
+        </view>
+        <view class="meta-row">
+          <text>支付方式</text>
+          <text>模拟支付（不会扣款）</text>
+        </view>
+        <view class="meta-row">
+          <text>订单备注</text>
+          <text>{{ order.remark || '无' }}</text>
+        </view>
+        <s-pharmacy-order-actions :order="order" @change="load" />
       </view>
     </template>
-
-    <view v-else class="empty">{{ loading ? '加载中…' : '订单不存在' }}</view>
-  </view>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
-  import { onLoad } from '@dcloudio/uni-app';
-  import OrderApi from '@/sheep/api/pharmacy/order';
-
-  const order = ref(null);
-  const loading = ref(true);
-
-  const STATUS_MAP = {
-    '-1': '已取消',
-    0: '待支付',
-    1: '待拣货',
-    2: '拣货中',
-    3: '待自提',
-    4: '已完成',
-  };
-
-  const PAY_STATUS_MAP = {
-    0: '待支付',
-    1: '已支付',
-    2: '已退款',
-  };
-
-  const statusText = (status) => STATUS_MAP[status] || '未知';
-
-  const payStatusText = (payStatus) => PAY_STATUS_MAP[payStatus] || '未知';
-
-  const canCancel = computed(() => order.value && (order.value.status === 0 || order.value.status === 1));
-
-  const formatTime = (value) => {
-    if (!value) {
-      return '—';
-    }
-    const date = new Date(value);
-    const pad = (num) => (num < 10 ? `0${num}` : `${num}`);
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-      date.getHours(),
-    )}:${pad(date.getMinutes())}`;
-  };
-
-  const loadOrder = async (id) => {
-    loading.value = true;
-    const { code, data } = await OrderApi.getOrder(id);
-    loading.value = false;
-    if (code === 0) {
-      order.value = data;
-    }
-  };
-
-  const handleCancel = () => {
-    uni.showModal({
-      title: '取消订单',
-      content: '确定要取消该订单吗？取消后不可恢复。',
-      success: async (res) => {
-        if (!res.confirm) {
-          return;
-        }
-        const { code } = await OrderApi.cancelOrder(order.value.id, '会员主动取消');
-        if (code === 0) {
-          loadOrder(order.value.id);
-        }
-      },
+  import { ref, computed } from 'vue';
+  import { onLoad, onShow } from '@dcloudio/uni-app';
+  import api, { money, statusNames } from '@/sheep/api/pharmacy/client';
+  import { go, useRequest } from './usePharmacy';
+  const id = ref(''),
+    order = ref(null),
+    loggedIn = ref(false);
+  const { loading, error, run } = useRequest();
+  const statusDescription = computed(
+    () =>
+      ({
+        unpaid: '订单已提交，请完成模拟支付',
+        review: '处方已提交，请等待药师审核',
+        ready:
+          order.value?.mode === 'pickup'
+            ? '模拟支付成功，等待门店备货'
+            : '模拟支付成功，等待门店配送',
+        completed: '感谢您的信任，请按说明书使用药品',
+        cancelled: '订单已取消，使用的测试积分已退回',
+      }[order.value?.status]),
+  );
+  const load = () =>
+    run(async () => {
+      order.value = await api.order(id.value);
     });
-  };
-
-  onLoad((options) => {
-    if (options.id) {
-      loadOrder(options.id);
-    } else {
-      loading.value = false;
-    }
+  onLoad((q) => (id.value = q.id));
+  onShow(() => {
+    loggedIn.value = !!api.session();
+    if (loggedIn.value) load();
+    else order.value = null;
   });
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-order-detail {
-    min-height: 100vh;
-    padding-bottom: 160rpx;
-    background: #f5f7f8;
+<style scoped>
+  .status-head {
+    padding: 28px 20px;
+    background: #eef5f0;
   }
-
-  .status {
-    padding: 40rpx 24rpx;
-    background: #176b5b;
-
-    &__text {
-      font-size: 36rpx;
-      font-weight: 700;
-      color: #ffffff;
-    }
-
-    &__tip {
-      margin-top: 12rpx;
-      font-size: 26rpx;
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
-
-  .pickup {
-    margin: 16rpx 24rpx 0;
-    padding: 32rpx 24rpx;
-    text-align: center;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__label {
-      font-size: 26rpx;
-      color: #98a2b3;
-    }
-
-    &__code {
-      margin-top: 12rpx;
-      font-size: 60rpx;
-      font-weight: 700;
-      letter-spacing: 8rpx;
-      color: #176b5b;
-    }
-
-    &__store {
-      margin-top: 12rpx;
-      font-size: 24rpx;
-      color: #98a2b3;
-    }
-  }
-
-  .panel {
-    margin: 16rpx 24rpx 0;
-    padding: 24rpx;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__title {
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1f2933;
-      padding-bottom: 16rpx;
-      border-bottom: 1rpx solid #f0f2f5;
-    }
-  }
-
-  .line {
+  .meta-row {
     display: flex;
-    align-items: center;
-    padding: 20rpx 0;
-    border-bottom: 1rpx solid #f0f2f5;
-
-    &__main {
-      flex: 1;
-    }
-
-    &__name {
-      font-size: 28rpx;
-      color: #1f2933;
-    }
-
-    &__spec {
-      margin-top: 6rpx;
-      font-size: 24rpx;
-      color: #98a2b3;
-    }
-
-    &__amount {
-      font-size: 28rpx;
-      color: #1f2933;
-    }
+    justify-content: space-between;
+    gap: 18px;
+    font-size: 13px;
+    padding-top: 16px;
   }
-
-  .row {
-    display: flex;
-    padding: 14rpx 0;
-    font-size: 26rpx;
-
-    &__label {
-      width: 200rpx;
-      color: #98a2b3;
-    }
-
-    &__value {
-      flex: 1;
-      color: #1f2933;
-    }
-
-    &__amount {
-      flex: 1;
-      font-size: 32rpx;
-      font-weight: 700;
-      color: #ef4444;
-    }
-
-    &--total {
-      padding-top: 20rpx;
-      border-top: 1rpx solid #f0f2f5;
-    }
+  .meta-row text:first-child {
+    width: 60px;
+    flex-shrink: 0;
+    color: #64716c;
   }
-
-  .footer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 16rpx 24rpx;
-    padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
-    background: #ffffff;
-    border-top: 1rpx solid #e4e7ec;
-
-    &__btn {
-      height: 80rpx;
-      line-height: 80rpx;
-      text-align: center;
-      font-size: 30rpx;
-      color: #ef4444;
-      border: 1rpx solid #ef4444;
-      border-radius: 40rpx;
-    }
-  }
-
-  .empty {
-    padding: 160rpx 0;
-    text-align: center;
-    font-size: 28rpx;
-    color: #98a2b3;
+  .meta-row text:last-child {
+    min-width: 0;
+    text-align: right;
   }
 </style>

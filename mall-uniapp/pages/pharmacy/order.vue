@@ -1,328 +1,113 @@
-<!-- 药店小程序 - 我的订单（真实接口：F 线上订单） -->
 <template>
-  <view class="pharmacy-order">
-    <!-- 状态筛选 -->
-    <view class="tabs">
-      <view
-        v-for="item in statusTabs"
-        :key="item.value === null ? 'all' : item.value"
-        class="tabs__item"
-        :class="{ 'is-active': activeStatus === item.value }"
-        @tap="handleStatus(item.value)"
-      >
-        {{ item.label }}
+  <s-pharmacy-page>
+    <scroll-view scroll-x class="order-tabs fs-white">
+      <view class="tabs-inner">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          :class="{ active: filter === tab.value }"
+          @tap="filter = tab.value"
+        >
+          {{ tab.label }}
+        </button>
       </view>
+    </scroll-view>
+    <s-pharmacy-state
+      v-if="!loggedIn"
+      title="登录后查看订单"
+      action="去登录"
+      @retry="go('login')"
+    />
+    <s-pharmacy-state
+      v-else-if="loading || error || !filtered.length"
+      :loading="loading"
+      :error="error"
+      title="暂无相关订单"
+      description="购买后的订单会显示在这里"
+      action="去选购药品"
+      @retry="error ? load() : go('category')"
+    />
+    <view v-else v-for="order in filtered" :key="order.id" class="fs-section">
+      <view class="fs-between">
+        <text class="fs-small">阳光店</text>
+        <text class="order-status">{{ statusNames[order.status] }}</text>
+      </view>
+      <view class="fs-muted fs-gap">订单号 {{ order.id }}</view>
+      <s-pharmacy-product
+        v-for="row in order.items"
+        :key="row.drugId"
+        :product="row.product"
+        compact
+        hide-stock
+        :qty="row.qty"
+      />
+      <view class="fs-between fs-gap">
+        <text class="fs-muted">{{ order.paid ? '已支付（模拟）' : '未支付' }}</text>
+        <text>
+          {{ order.paid ? '实付合计' : '应付合计' }}
+          <text class="fs-price">¥{{ money(order.total) }}</text>
+        </text>
+      </view>
+      <s-pharmacy-order-actions :order="order" detail @change="load" />
     </view>
-
-    <view v-if="!isLogin" class="empty">
-      <view class="empty__text">登录后查看订单</view>
-      <view class="empty__btn" @tap="goLogin">去登录</view>
-    </view>
-
-    <template v-else>
-      <view v-if="list.length > 0" class="order-list">
-        <view v-for="item in list" :key="item.id" class="order-card" @tap="goDetail(item.id)">
-          <view class="order-card__head">
-            <text class="order-card__no">{{ item.orderNo }}</text>
-            <text class="order-card__status">{{ statusText(item.status) }}</text>
-          </view>
-          <view class="order-card__body">
-            <view class="order-card__row">
-              <text class="order-card__label">类型</text>
-              <text class="order-card__value">{{ item.orderType === 1 ? '同城配送' : '到店自提' }}</text>
-            </view>
-            <view class="order-card__row">
-              <text class="order-card__label">金额</text>
-              <text class="order-card__amount">￥{{ item.payableAmount }}</text>
-            </view>
-            <view class="order-card__row">
-              <text class="order-card__label">下单时间</text>
-              <text class="order-card__value">{{ formatTime(item.createTime) }}</text>
-            </view>
-            <view v-if="item.pickupCode && item.status === 3" class="order-card__row">
-              <text class="order-card__label">取货码</text>
-              <text class="order-card__code">{{ item.pickupCode }}</text>
-            </view>
-          </view>
-          <view class="order-card__ops">
-            <view
-              v-if="canCancel(item.status)"
-              class="order-card__btn"
-              @tap.stop="handleCancel(item)"
-            >
-              取消订单
-            </view>
-            <view class="order-card__btn order-card__btn--primary" @tap.stop="goDetail(item.id)">
-              查看详情
-            </view>
-          </view>
-        </view>
-      </view>
-
-      <view v-else class="empty">
-        <view class="empty__text">{{ loading ? '加载中…' : '暂无订单' }}</view>
-      </view>
-    </template>
-  </view>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
-  import { onShow, onReachBottom } from '@dcloudio/uni-app';
-  import sheep from '@/sheep';
-  import OrderApi from '@/sheep/api/pharmacy/order';
-
-  const statusTabs = [
-    { label: '全部', value: null },
-    { label: '待支付', value: 0 },
-    { label: '待拣货', value: 1 },
-    { label: '待自提', value: 3 },
-    { label: '已完成', value: 4 },
-    { label: '已取消', value: -1 },
+  import { ref, computed } from 'vue';
+  import { onLoad, onShow, onPullDownRefresh } from '@dcloudio/uni-app';
+  import api, { money, statusNames } from '@/sheep/api/pharmacy/client';
+  import { go, useRequest } from './usePharmacy';
+  const orders = ref([]),
+    filter = ref('all'),
+    loggedIn = ref(false);
+  const { loading, error, run } = useRequest();
+  const tabs = [
+    { value: 'all', label: '全部' },
+    ...Object.entries(statusNames).map(([value, label]) => ({ value, label })),
   ];
-
-  const activeStatus = ref(null);
-  const list = ref([]);
-  const pageNo = ref(1);
-  const pageSize = 10;
-  const total = ref(0);
-  const loading = ref(false);
-  const finished = ref(false);
-
-  const isLogin = computed(() => sheep.$store('user').isLogin);
-
-  const STATUS_MAP = {
-    '-1': '已取消',
-    0: '待支付',
-    1: '待拣货',
-    2: '拣货中',
-    3: '待自提',
-    4: '已完成',
-  };
-
-  const statusText = (status) => STATUS_MAP[status] || '未知';
-
-  const canCancel = (status) => status === 0 || status === 1;
-
-  const formatTime = (value) => {
-    if (!value) {
-      return '';
-    }
-    const date = new Date(value);
-    const pad = (num) => (num < 10 ? `0${num}` : `${num}`);
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-      date.getHours(),
-    )}:${pad(date.getMinutes())}`;
-  };
-
-  const loadList = async (reset = false) => {
-    if (!isLogin.value) {
-      list.value = [];
-      return;
-    }
-    if (loading.value) {
-      return;
-    }
-    if (reset) {
-      pageNo.value = 1;
-      finished.value = false;
-    }
-    if (finished.value) {
-      return;
-    }
-    loading.value = true;
-    const params = {
-      pageNo: pageNo.value,
-      pageSize,
-    };
-    if (activeStatus.value !== null) {
-      params.status = activeStatus.value;
-    }
-    const { code, data } = await OrderApi.getOrderPage(params);
-    loading.value = false;
-    if (code !== 0) {
-      return;
-    }
-    list.value = reset ? data.list || [] : list.value.concat(data.list || []);
-    total.value = data.total || 0;
-    finished.value = list.value.length >= total.value;
-    if (!finished.value) {
-      pageNo.value += 1;
-    }
-  };
-
-  const handleStatus = (status) => {
-    activeStatus.value = status;
-    loadList(true);
-  };
-
-  const handleCancel = (item) => {
-    uni.showModal({
-      title: '取消订单',
-      content: '确定要取消该订单吗？取消后不可恢复。',
-      success: async (res) => {
-        if (!res.confirm) {
-          return;
-        }
-        const { code } = await OrderApi.cancelOrder(item.id, '会员主动取消');
-        if (code === 0) {
-          loadList(true);
-        }
-      },
+  const filtered = computed(() =>
+    orders.value.filter((o) => filter.value === 'all' || o.status === filter.value),
+  );
+  const load = () =>
+    run(async () => {
+      orders.value = await api.orders();
     });
-  };
-
-  const goDetail = (id) => {
-    uni.navigateTo({
-      url: `/pages/pharmacy/order-detail?id=${id}`,
-    });
-  };
-
-  const goLogin = () => {
-    uni.navigateTo({
-      url: '/pages/pharmacy/login',
-    });
-  };
-
+  onLoad((q) => (filter.value = q.status || 'all'));
   onShow(() => {
-    loadList(true);
+    loggedIn.value = !!api.session();
+    if (loggedIn.value) load();
+    else orders.value = [];
   });
-
-  onReachBottom(() => {
-    loadList(false);
+  onPullDownRefresh(async () => {
+    if (loggedIn.value) await load();
+    uni.stopPullDownRefresh();
   });
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-order {
-    min-height: 100vh;
-    padding-bottom: 40rpx;
-    background: #f5f7f8;
+<style scoped>
+  .order-tabs {
+    width: 100%;
+    white-space: nowrap;
   }
-
-  .tabs {
-    display: flex;
-    flex-wrap: wrap;
-    padding: 16rpx 24rpx;
-    background: #ffffff;
-
-    &__item {
-      margin: 0 16rpx 12rpx 0;
-      padding: 10rpx 28rpx;
-      font-size: 26rpx;
-      color: #667085;
-      background: #f5f7f8;
-      border-radius: 28rpx;
-
-      &.is-active {
-        color: #ffffff;
-        background: #176b5b;
-      }
-    }
+  .tabs-inner {
+    display: inline-flex;
+    min-width: 100%;
   }
-
-  .order-list {
-    padding: 16rpx 24rpx;
+  .tabs-inner button {
+    display: inline-flex;
+    padding: 14px 16px;
+    background: #fff;
+    flex-shrink: 0;
+    border-radius: 0;
+    font-size: 14px;
+    color: #64716c;
   }
-
-  .order-card {
-    padding: 24rpx;
-    margin-bottom: 16rpx;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 16rpx;
-      border-bottom: 1rpx solid #f0f2f5;
-    }
-
-    &__no {
-      font-size: 26rpx;
-      color: #667085;
-    }
-
-    &__status {
-      font-size: 26rpx;
-      font-weight: 600;
-      color: #176b5b;
-    }
-
-    &__body {
-      padding: 16rpx 0;
-    }
-
-    &__row {
-      display: flex;
-      padding: 6rpx 0;
-      font-size: 26rpx;
-    }
-
-    &__label {
-      width: 160rpx;
-      color: #98a2b3;
-    }
-
-    &__value {
-      flex: 1;
-      color: #1f2933;
-    }
-
-    &__amount {
-      flex: 1;
-      color: #ef4444;
-      font-weight: 600;
-    }
-
-    &__code {
-      flex: 1;
-      color: #176b5b;
-      font-weight: 700;
-      letter-spacing: 4rpx;
-    }
-
-    &__ops {
-      display: flex;
-      justify-content: flex-end;
-      padding-top: 16rpx;
-      border-top: 1rpx solid #f0f2f5;
-    }
-
-    &__btn {
-      margin-left: 16rpx;
-      padding: 10rpx 28rpx;
-      font-size: 26rpx;
-      color: #1f2933;
-      border: 1rpx solid #e4e7ec;
-      border-radius: 32rpx;
-
-      &--primary {
-        color: #ffffff;
-        background: #176b5b;
-        border-color: #176b5b;
-      }
-    }
+  .tabs-inner .active {
+    color: #176b5b;
+    border-bottom: 2px solid #176b5b;
+    font-weight: 600;
   }
-
-  .empty {
-    padding: 160rpx 0;
-    text-align: center;
-
-    &__text {
-      font-size: 28rpx;
-      color: #98a2b3;
-    }
-
-    &__btn {
-      display: inline-block;
-      margin-top: 32rpx;
-      padding: 16rpx 56rpx;
-      font-size: 28rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
+  .order-status {
+    color: #176b5b;
+    font-size: 14px;
   }
 </style>

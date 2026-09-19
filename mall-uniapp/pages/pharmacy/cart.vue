@@ -1,389 +1,163 @@
-<!-- 药店小程序 - 购物车（真实接口：F 购物车 + 下单） -->
 <template>
-  <view class="pharmacy-cart">
-    <view v-if="!isLogin" class="empty">
-      <view class="empty__text">登录后查看购物车</view>
-      <view class="empty__btn" @tap="goLogin">去登录</view>
+  <s-pharmacy-page :tab="2" dock>
+    <view class="fs-pad fs-white">
+      <view class="fs-heading">购物车</view>
+      <view class="fs-muted">{{ api.store.name }} · 下单前为您核对库存</view>
     </view>
-
+    <s-pharmacy-state
+      v-if="!loggedIn"
+      title="登录后查看购物车"
+      description="选好的药品会保存在您的测试账户中"
+      action="去登录"
+      @retry="go('login')"
+    />
+    <s-pharmacy-state
+      v-else-if="loading || error || !items.length"
+      :loading="loading"
+      :error="error"
+      title="购物车还是空的"
+      description="去挑选需要的药品吧"
+      action="去逛逛"
+      @retry="error ? load() : go('category')"
+    />
     <template v-else>
-      <view v-if="list.length > 0" class="cart-list">
-        <view v-for="item in list" :key="item.id" class="cart-item">
-          <view
-            class="cart-item__check"
-            :class="{ 'is-checked': item.selectedFlag === 1 }"
-            @tap="toggleSelected(item)"
-          />
-          <view class="cart-item__main" @tap="goDetail(item.drugId)">
-            <view class="cart-item__name">
-              {{ item.drugName || '商品' }}
-              <text v-if="item.isRx === 1" class="cart-item__rx">处方药</text>
+      <view class="fs-section">
+        <view v-for="row in items" :key="row.drugId" class="cart-item">
+          <view class="cart-main">
+            <button
+              class="fs-check"
+              :disabled="busy || invalid(row)"
+              :aria-label="row.checked ? '取消选择商品' : '选择商品'"
+              @tap="change(row, { checked: !row.checked })"
+            >
+              <uni-icons
+                :type="row.checked && !invalid(row) ? 'checkbox-filled' : 'circle'"
+                size="23"
+                :color="invalid(row) ? '#bcc5bf' : '#176b5b'"
+              />
+            </button>
+            <view class="fs-grow">
+              <s-pharmacy-product :product="row.product" compact />
+              <view v-if="invalid(row)" class="fs-danger fs-small">
+                {{
+                  !row.product.active
+                    ? '商品已失效，请删除'
+                    : row.qty > row.product.stock
+                    ? '库存不足，请减少数量或删除'
+                    : '暂时缺货'
+                }}
+              </view>
+              <view class="fs-between cart-actions">
+                <button class="fs-text-btn fs-danger" :disabled="busy" @tap="remove(row)">
+                  删除
+                </button>
+                <s-pharmacy-stepper
+                  :model-value="row.qty"
+                  :max="row.product.stock"
+                  :disabled="busy || !row.product.active"
+                  @update:model-value="change(row, { qty: $event })"
+                />
+              </view>
             </view>
-            <view class="cart-item__spec">{{ item.specification || '—' }}</view>
-            <view class="cart-item__price">￥{{ itemPrice(item) }}</view>
-          </view>
-          <view class="cart-item__ops">
-            <view class="cart-item__qty">
-              <view class="cart-item__qty-btn" @tap.stop="changeQty(item, -1)">-</view>
-              <text class="cart-item__qty-num">{{ item.qty }}</text>
-              <view class="cart-item__qty-btn" @tap.stop="changeQty(item, 1)">+</view>
-            </view>
-            <view class="cart-item__del" @tap.stop="handleDelete(item)">删除</view>
           </view>
         </view>
       </view>
-
-      <view v-else class="empty">
-        <view class="empty__text">购物车还是空的</view>
-        <view class="empty__btn" @tap="goHome">去逛逛</view>
-      </view>
-
-      <view v-if="list.length > 0" class="footer">
-        <view class="footer__total">
-          已选 <text class="footer__count">{{ selectedCount }}</text> 件 合计
-          <text class="footer__amount">￥{{ selectedAmount }}</text>
+      <view class="fs-footer">处方药需上传处方并经药师审核</view>
+      <view class="fs-dock above-tabs">
+        <button
+          class="fs-check cart-select-all"
+          :disabled="busy"
+          aria-label="全选商品"
+          @tap="selectAll"
+        >
+          <uni-icons :type="allSelected ? 'checkbox-filled' : 'circle'" size="23" color="#176b5b" />
+          <text>全选</text>
+        </button>
+        <view class="fs-grow">
+          <text class="fs-small">合计</text>
+          <text class="fs-price">¥{{ money(total) }}</text>
+          <view class="fs-muted">已选 {{ selected.length }} 种，不含配送费</view>
         </view>
-        <view class="footer__submit" @tap="handleCheckout">去结算</view>
+        <button class="fs-primary" :disabled="busy || !selected.length" @tap="checkout">
+          去结算
+        </button>
       </view>
     </template>
-
-    <s-pharmacy-tabbar :current="2" />
-  </view>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
+  import { ref, computed } from 'vue';
   import { onShow } from '@dcloudio/uni-app';
-  import sheep from '@/sheep';
-  import CartApi from '@/sheep/api/pharmacy/cart';
-  import OrderApi from '@/sheep/api/pharmacy/order';
-  import AddressApi from '@/sheep/api/member/address';
-
-  const list = ref([]);
-  const isLogin = computed(() => sheep.$store('user').isLogin);
-
-  const itemPrice = (item) => {
-    const price = item.memberPrice !== null && item.memberPrice !== undefined
-      ? item.memberPrice
-      : item.retailPrice;
-    return price === null || price === undefined ? '—' : price;
-  };
-
-  const selectedList = computed(() => list.value.filter((item) => item.selectedFlag === 1));
-
-  const selectedCount = computed(() =>
-    selectedList.value.reduce((sum, item) => sum + (item.qty || 0), 0),
+  import api, { money } from '@/sheep/api/pharmacy/client';
+  import { go, confirm, useRequest, useAction } from './usePharmacy';
+  const items = ref([]),
+    loggedIn = ref(false);
+  const { loading, error, run } = useRequest();
+  const { busy, act } = useAction();
+  const invalid = (r) => !r.product.active || !r.product.stock || r.qty > r.product.stock;
+  const selected = computed(() => items.value.filter((r) => r.checked && !invalid(r)));
+  const allSelected = computed(
+    () =>
+      selected.value.length > 0 &&
+      selected.value.length === items.value.filter((r) => !invalid(r)).length,
   );
-
-  const selectedAmount = computed(() => {
-    const total = selectedList.value.reduce((sum, item) => {
-      const price = item.memberPrice !== null && item.memberPrice !== undefined
-        ? item.memberPrice
-        : item.retailPrice;
-      return sum + Number(price || 0) * Number(item.qty || 0);
-    }, 0);
-    return total.toFixed(2);
-  });
-
-  const loadCart = async () => {
-    if (!isLogin.value) {
-      list.value = [];
-      return;
-    }
-    const { code, data } = await CartApi.getCartList();
-    if (code === 0) {
-      list.value = data || [];
-    }
-  };
-
-  const toggleSelected = async (item) => {
-    const next = item.selectedFlag === 1 ? 0 : 1;
-    const { code } = await CartApi.updateCartSelected(item.id, next);
-    if (code === 0) {
-      item.selectedFlag = next;
-    }
-  };
-
-  const changeQty = async (item, delta) => {
-    const next = (item.qty || 1) + delta;
-    if (next < 1) {
-      return;
-    }
-    const { code } = await CartApi.updateCartQty(item.id, next);
-    if (code === 0) {
-      item.qty = next;
-    }
-  };
-
-  const handleDelete = (item) => {
-    uni.showModal({
-      title: '提示',
-      content: '确定要从购物车删除该商品吗？',
-      success: async (res) => {
-        if (!res.confirm) {
-          return;
-        }
-        const { code } = await CartApi.deleteCart(item.id);
-        if (code === 0) {
-          loadCart();
-        }
-      },
+  const total = computed(() => selected.value.reduce((s, r) => s + r.product.price * r.qty, 0));
+  const load = () =>
+    run(async () => {
+      items.value = await api.cart();
     });
-  };
-
-  const handleCheckout = () => {
-    if (selectedList.value.length === 0) {
-      uni.showToast({
-        title: '请先勾选要结算的商品',
-        icon: 'none',
-      });
-      return;
-    }
-    const storeId = uni.getStorageSync('pharmacy-store-id');
-    if (!storeId) {
-      uni.showToast({
-        title: '请先在首页选择履约门店',
-        icon: 'none',
-      });
-      return;
-    }
-    uni.showActionSheet({
-      itemList: ['到店自提', '同城配送'],
-      success: async (res) => {
-        if (res.tapIndex === 0) {
-          await submitOrder(storeId, 0, null);
-        } else {
-          await submitDeliveryOrder(storeId);
-        }
-      },
+  const change = (row, patch) =>
+    act(async () => {
+      await api.updateCart(row.drugId, patch);
+      items.value = await api.cart();
     });
-  };
-
-  const submitOrder = async (storeId, orderType, addressId) => {
-    const { code, data, msg } = await OrderApi.createOrder({
-      storeId,
-      orderType,
-      addressId,
-      remark: '',
+  const remove = (row) =>
+    act(async () => {
+      if (await confirm('删除药品', `确定从购物车移除「${row.product.name}」？`)) {
+        await api.remove(row.drugId);
+        items.value = await api.cart();
+      }
     });
-    if (code !== 0) {
-      return;
-    }
-    uni.showModal({
-      title: '下单成功',
-      content: `订单号：${data}，可在「我的-我的订单」查看`,
-      showCancel: false,
+  const selectAll = () =>
+    act(async () => {
+      await api.selectAll(!allSelected.value);
+      items.value = await api.cart();
     });
-    loadCart();
-  };
-
-  const submitDeliveryOrder = async (storeId) => {
-    const { code, data } = await AddressApi.getAddressList();
-    if (code !== 0 || !data || data.length === 0) {
-      uni.showToast({
-        title: '请先在会员中心添加收货地址',
-        icon: 'none',
-      });
-      return;
-    }
-    // 只有一个地址时直接使用，多个地址由用户选择
-    if (data.length === 1) {
-      await submitOrder(storeId, 1, data[0].id);
-      return;
-    }
-    uni.showActionSheet({
-      itemList: data.slice(0, 6).map((item) => `${item.name} ${item.mobile}`),
-      success: async (res) => {
-        const picked = data[res.tapIndex];
-        if (picked) {
-          await submitOrder(storeId, 1, picked.id);
-        }
-      },
+  const checkout = () =>
+    act(async () => {
+      for (const r of items.value.filter((r) => r.checked && invalid(r)))
+        await api.updateCart(r.drugId, { checked: false });
+      api.beginCheckout();
+      go('checkout');
     });
-  };
-
-  const goLogin = () => {
-    uni.navigateTo({
-      url: '/pages/pharmacy/login',
-    });
-  };
-
-  const goHome = () => {
-    uni.reLaunch({
-      url: '/pages/pharmacy/index',
-    });
-  };
-
-  const goDetail = (drugId) => {
-    uni.navigateTo({
-      url: `/pages/pharmacy/detail?id=${drugId}`,
-    });
-  };
-
   onShow(() => {
-    loadCart();
+    loggedIn.value = !!api.session();
+    if (loggedIn.value) load();
+    else items.value = [];
   });
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-cart {
-    min-height: 100vh;
-    padding-bottom: 200rpx;
-    background: #f5f7f8;
+<style scoped>
+  .cart-select-all {
+    flex-direction: column;
+    font-size: 11px;
+    gap: 3px;
   }
-
-  .cart-list {
-    padding: 16rpx 24rpx;
+  .cart-item:last-child {
+    border-bottom: 0;
   }
-
+  .cart-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .cart-main > button {
+    margin-top: 38px;
+    margin-left: -8px;
+  }
+  .cart-actions {
+    padding: 10px 0 18px;
+  }
   .cart-item {
-    display: flex;
-    align-items: center;
-    padding: 24rpx;
-    margin-bottom: 16rpx;
-    background: #ffffff;
-    border-radius: 12rpx;
-
-    &__check {
-      width: 40rpx;
-      height: 40rpx;
-      margin-right: 20rpx;
-      border: 2rpx solid #e4e7ec;
-      border-radius: 50%;
-      box-sizing: border-box;
-
-      &.is-checked {
-        background: #176b5b;
-        border-color: #176b5b;
-      }
-    }
-
-    &__main {
-      flex: 1;
-    }
-
-    &__name {
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
-
-    &__rx {
-      margin-left: 12rpx;
-      padding: 2rpx 10rpx;
-      font-size: 20rpx;
-      font-weight: 400;
-      color: #ef4444;
-      border: 1rpx solid #ef4444;
-      border-radius: 6rpx;
-    }
-
-    &__spec {
-      margin-top: 6rpx;
-      font-size: 24rpx;
-      color: #667085;
-    }
-
-    &__price {
-      margin-top: 8rpx;
-      font-size: 28rpx;
-      color: #ef4444;
-      font-weight: 600;
-    }
-
-    &__ops {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    &__qty {
-      display: flex;
-      align-items: center;
-    }
-
-    &__qty-btn {
-      width: 52rpx;
-      height: 52rpx;
-      line-height: 48rpx;
-      text-align: center;
-      font-size: 28rpx;
-      color: #1f2933;
-      border: 1rpx solid #e4e7ec;
-      border-radius: 8rpx;
-    }
-
-    &__qty-num {
-      width: 64rpx;
-      text-align: center;
-      font-size: 28rpx;
-      color: #1f2933;
-    }
-
-    &__del {
-      margin-top: 16rpx;
-      font-size: 24rpx;
-      color: #98a2b3;
-    }
-  }
-
-  .footer {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 100rpx;
-    display: flex;
-    align-items: center;
-    height: 110rpx;
-    padding: 0 24rpx;
-    background: #ffffff;
-    border-top: 1rpx solid #e4e7ec;
-
-    &__total {
-      flex: 1;
-      font-size: 26rpx;
-      color: #667085;
-    }
-
-    &__count {
-      color: #176b5b;
-      font-weight: 600;
-    }
-
-    &__amount {
-      font-size: 32rpx;
-      color: #ef4444;
-      font-weight: 600;
-    }
-
-    &__submit {
-      padding: 0 48rpx;
-      height: 80rpx;
-      line-height: 80rpx;
-      font-size: 30rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
-  }
-
-  .empty {
-    padding: 160rpx 0;
-    text-align: center;
-
-    &__text {
-      font-size: 28rpx;
-      color: #98a2b3;
-    }
-
-    &__btn {
-      display: inline-block;
-      margin-top: 32rpx;
-      padding: 16rpx 56rpx;
-      font-size: 28rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
+    border-bottom: 1px solid #e5ebe8;
   }
 </style>

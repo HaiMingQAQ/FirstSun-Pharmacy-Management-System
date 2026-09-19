@@ -1,309 +1,152 @@
-<!-- 药店小程序 - 商品详情（真实接口：A 商品详情） -->
 <template>
-  <view class="pharmacy-detail">
-    <view v-if="drug" class="detail">
-      <view class="detail__head">
-        <view class="detail__name">
-          {{ drug.genericName }}
-          <text v-if="drug.isRx === 1" class="detail__rx">处方药</text>
+  <s-pharmacy-page dock>
+    <s-pharmacy-state
+      v-if="loading || error || !product"
+      :loading="loading"
+      :error="error"
+      @retry="load"
+    />
+    <template v-else>
+      <view class="detail-hero">
+        <image
+          :src="
+            failed || !product.image ? '/static/pharmacy/medicine-placeholder.png' : product.image
+          "
+          mode="aspectFit"
+          @error="failed = true"
+          @tap="preview"
+        />
+        <text class="image-caption">包装图仅供识别，请以实物为准</text>
+      </view>
+      <view class="fs-section">
+        <view class="fs-between">
+          <text class="fs-price">¥{{ money(product.price) }}</text>
+          <text class="fs-muted">
+            {{ product.stock ? `库存 ${product.stock} 件` : '暂时缺货' }}
+          </text>
         </view>
-        <view v-if="drug.tradeName" class="detail__trade">{{ drug.tradeName }}</view>
-        <view class="detail__price">
-          <text class="detail__price-now">￥{{ displayPrice }}</text>
-          <text v-if="drug.memberPrice" class="detail__price-old">￥{{ drug.retailPrice }}</text>
+        <view class="fs-title fs-gap">
+          <text class="fs-tag" :class="{ 'fs-tag-rx': product.rx }">
+            {{ product.device ? '器械' : product.rx ? '处方药' : 'OTC' }}
+          </text>
+          {{ product.name }}
+        </view>
+        <view class="fs-muted">通用名：{{ product.genericName }}</view>
+        <view class="fs-gap fs-small">{{ product.specification }}</view>
+      </view>
+      <view v-if="product.rx" class="fs-notice">
+        需上传处方并经药师审核。审核通过后方可继续购买，不保证审核结果。
+      </view>
+      <view class="fs-section">
+        <view class="fs-title">药品信息</view>
+        <view class="detail-field">
+          <text>规格</text>
+          <text>{{ product.specification }}</text>
+        </view>
+        <view class="detail-field">
+          <text>生产厂家</text>
+          <text>{{ product.manufacturer }}</text>
+        </view>
+        <view class="detail-field">
+          <text>{{ product.device ? '备案信息' : '批准文号' }}</text>
+          <text>{{ product.approval }}</text>
+        </view>
+        <view class="detail-field">
+          <text>履约门店</text>
+          <text>{{ api.store.name }}</text>
         </view>
       </view>
-
-      <view class="detail__rows">
-        <view class="detail__row">
-          <text class="detail__row-label">规格</text>
-          <text class="detail__row-value">{{ drug.specification || '—' }}</text>
-        </view>
-        <view class="detail__row">
-          <text class="detail__row-label">剂型</text>
-          <text class="detail__row-value">{{ drug.dosageForm || '—' }}</text>
-        </view>
-        <view class="detail__row">
-          <text class="detail__row-label">生产厂家</text>
-          <text class="detail__row-value">{{ drug.manufacturer || '—' }}</text>
-        </view>
-        <view class="detail__row">
-          <text class="detail__row-label">销售单位</text>
-          <text class="detail__row-value">{{ drug.unit || '—' }}</text>
-        </view>
-        <view class="detail__row">
-          <text class="detail__row-label">所属分类</text>
-          <text class="detail__row-value">{{ drug.categoryName || '—' }}</text>
+      <view class="fs-section">
+        <view class="fs-title">用药提示</view>
+        <view class="fs-muted fs-gap">
+          请仔细阅读药品说明书，按说明书或在药师指导下使用。处方药请遵医嘱；本页面不提供诊断或个体化用药建议。
         </view>
       </view>
-
-      <view v-if="drug.description" class="detail__desc">
-        <view class="detail__desc-title">药品说明</view>
-        <view class="detail__desc-text">{{ drug.description }}</view>
+      <view class="fs-section fs-between">
+        <text>购买数量</text>
+        <s-pharmacy-stepper v-model="qty" :max="product.stock" :disabled="!product.stock || busy" />
       </view>
-
-      <view class="store-tip">
-        履约门店：{{ storeName || '未选择' }}
+      <view class="fs-dock">
+        <button class="fs-text-btn" aria-label="查看购物车" @tap="go('cart')">
+          <uni-icons type="cart" size="24" color="#176b5b" />
+        </button>
+        <button class="fs-secondary fs-grow" :disabled="busy || !product.stock" @tap="add">
+          加入购物车
+        </button>
+        <button class="fs-primary fs-grow" :disabled="busy || !product.stock" @tap="buy">
+          {{ product.stock ? '立即购买' : '暂时缺货' }}
+        </button>
       </view>
-
-      <!-- 数量与加购 -->
-      <view class="buy-bar">
-        <view class="buy-bar__qty">
-          <view class="buy-bar__qty-btn" @tap="changeQty(-1)">-</view>
-          <text class="buy-bar__qty-num">{{ qty }}</text>
-          <view class="buy-bar__qty-btn" @tap="changeQty(1)">+</view>
-        </view>
-        <view class="buy-bar__add" @tap="handleAddCart">加入购物车</view>
-      </view>
-    </view>
-
-    <view v-else-if="!loading" class="empty">商品不存在或不可线上销售</view>
-    <view v-else class="empty">加载中…</view>
-  </view>
+    </template>
+  </s-pharmacy-page>
 </template>
-
 <script setup>
-  import { computed, ref } from 'vue';
-  import { onLoad } from '@dcloudio/uni-app';
-  import sheep from '@/sheep';
-  import DrugApi from '@/sheep/api/pharmacy/drug';
-  import StoreApi from '@/sheep/api/pharmacy/store';
-  import CartApi from '@/sheep/api/pharmacy/cart';
-
-  const drug = ref(null);
-  const loading = ref(true);
-  const qty = ref(1);
-  const storeId = ref(null);
-  const storeName = ref('');
-
-  const displayPrice = computed(() => {
-    if (!drug.value) {
-      return '—';
-    }
-    const price = drug.value.memberPrice !== null && drug.value.memberPrice !== undefined
-      ? drug.value.memberPrice
-      : drug.value.retailPrice;
-    return price === null || price === undefined ? '—' : price;
-  });
-
-  const loadStore = async () => {
-    const savedId = uni.getStorageSync('pharmacy-store-id');
-    const { code, data } = await StoreApi.getStoreList();
-    if (code !== 0) {
-      return;
-    }
-    const stores = data || [];
-    const found = stores.find((item) => item.id === savedId) || stores[0] || null;
-    if (found) {
-      storeId.value = found.id;
-      storeName.value = found.storeName;
-      uni.setStorageSync('pharmacy-store-id', found.id);
-    }
-  };
-
-  const loadDrug = async (id) => {
-    loading.value = true;
-    const { code, data } = await DrugApi.getDrug(id);
-    loading.value = false;
-    if (code === 0) {
-      drug.value = data;
-    }
-  };
-
-  const changeQty = (delta) => {
-    const next = qty.value + delta;
-    if (next < 1) {
-      return;
-    }
-    qty.value = next;
-  };
-
-  const handleAddCart = async () => {
-    if (!sheep.$store('user').isLogin) {
-      uni.navigateTo({
-        url: '/pages/pharmacy/login',
-      });
-      return;
-    }
-    if (!storeId.value) {
-      uni.showToast({
-        title: '请先选择履约门店',
-        icon: 'none',
-      });
-      return;
-    }
-    await CartApi.addCart({
-      drugId: drug.value.id,
-      qty: qty.value,
-      storeId: storeId.value,
+  import { ref } from 'vue';
+  import { onLoad, onShow } from '@dcloudio/uni-app';
+  import api, { money } from '@/sheep/api/pharmacy/client';
+  import { go, toast, requireLogin, useRequest, useAction } from './usePharmacy';
+  const id = ref(),
+    product = ref(null),
+    qty = ref(1),
+    failed = ref(false);
+  const { loading, error, run } = useRequest();
+  const { busy, act } = useAction();
+  const load = () =>
+    run(async () => {
+      product.value = await api.product(id.value);
+      qty.value = Math.max(1, Math.min(qty.value, product.value.stock));
     });
+  const add = () => {
+    if (requireLogin())
+      act(async () => {
+        await api.add(product.value.id, qty.value);
+        toast('已加入购物车');
+      });
   };
-
-  onLoad((options) => {
-    loadStore();
-    if (options.id) {
-      loadDrug(options.id);
-    } else {
-      loading.value = false;
+  const buy = () => {
+    if (requireLogin()) {
+      act(async () => {
+        api.beginCheckout({ id: product.value.id, qty: qty.value });
+        await go('checkout');
+      });
     }
+  };
+  const preview = () =>
+    uni.previewImage({ urls: [product.value.image || '/static/pharmacy/medicine-placeholder.png'] });
+  onLoad((q) => {
+    id.value = q.id;
   });
+  onShow(load);
 </script>
-
-<style lang="scss" scoped>
-  .pharmacy-detail {
-    min-height: 100vh;
-    padding-bottom: 140rpx;
-    background: #f5f7f8;
-  }
-
-  .detail {
-    &__head {
-      padding: 32rpx 24rpx;
-      background: #ffffff;
-    }
-
-    &__name {
-      font-size: 34rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
-
-    &__rx {
-      margin-left: 12rpx;
-      padding: 2rpx 12rpx;
-      font-size: 20rpx;
-      font-weight: 400;
-      color: #ef4444;
-      border: 1rpx solid #ef4444;
-      border-radius: 6rpx;
-    }
-
-    &__trade {
-      margin-top: 8rpx;
-      font-size: 26rpx;
-      color: #667085;
-    }
-
-    &__price {
-      margin-top: 16rpx;
-    }
-
-    &__price-now {
-      font-size: 44rpx;
-      font-weight: 600;
-      color: #ef4444;
-    }
-
-    &__price-old {
-      margin-left: 16rpx;
-      font-size: 26rpx;
-      color: #98a2b3;
-      text-decoration: line-through;
-    }
-
-    &__rows {
-      margin-top: 16rpx;
-      padding: 8rpx 24rpx;
-      background: #ffffff;
-    }
-
-    &__row {
-      display: flex;
-      padding: 20rpx 0;
-      border-bottom: 1rpx solid #f0f2f5;
-      font-size: 28rpx;
-    }
-
-    &__row-label {
-      width: 180rpx;
-      color: #98a2b3;
-    }
-
-    &__row-value {
-      flex: 1;
-      color: #1f2933;
-    }
-
-    &__desc {
-      margin-top: 16rpx;
-      padding: 24rpx;
-      background: #ffffff;
-    }
-
-    &__desc-title {
-      font-size: 28rpx;
-      font-weight: 600;
-      color: #1f2933;
-    }
-
-    &__desc-text {
-      margin-top: 12rpx;
-      font-size: 26rpx;
-      color: #667085;
-      line-height: 1.7;
-    }
-  }
-
-  .store-tip {
-    margin-top: 16rpx;
-    padding: 20rpx 24rpx;
-    font-size: 26rpx;
-    color: #667085;
-    background: #ffffff;
-  }
-
-  .buy-bar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    height: 110rpx;
-    padding: 0 24rpx;
-    background: #ffffff;
-    border-top: 1rpx solid #e4e7ec;
-
-    &__qty {
-      display: flex;
-      align-items: center;
-    }
-
-    &__qty-btn {
-      width: 60rpx;
-      height: 60rpx;
-      line-height: 56rpx;
-      text-align: center;
-      font-size: 32rpx;
-      color: #1f2933;
-      border: 1rpx solid #e4e7ec;
-      border-radius: 8rpx;
-    }
-
-    &__qty-num {
-      width: 80rpx;
-      text-align: center;
-      font-size: 30rpx;
-      color: #1f2933;
-    }
-
-    &__add {
-      flex: 1;
-      margin-left: 32rpx;
-      height: 80rpx;
-      line-height: 80rpx;
-      text-align: center;
-      font-size: 30rpx;
-      color: #ffffff;
-      background: #176b5b;
-      border-radius: 40rpx;
-    }
-  }
-
-  .empty {
-    padding: 120rpx 0;
+<style scoped>
+  .detail-hero {
+    background: #fff;
+    padding: 22px;
     text-align: center;
-    font-size: 28rpx;
-    color: #98a2b3;
+  }
+  .detail-hero image {
+    width: 100%;
+    height: 215px;
+  }
+  .image-caption {
+    display: block;
+    color: #829086;
+    font-size: 11px;
+    margin-top: 8px;
+  }
+  .detail-field {
+    display: flex;
+    gap: 20px;
+    padding-top: 16px;
+    font-size: 14px;
+  }
+  .detail-field text:first-child {
+    color: #64716c;
+    width: 64px;
+    flex-shrink: 0;
+  }
+  .detail-field text:last-child {
+    min-width: 0;
+    flex: 1;
   }
 </style>
