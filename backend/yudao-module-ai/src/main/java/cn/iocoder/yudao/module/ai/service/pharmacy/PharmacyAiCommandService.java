@@ -41,6 +41,18 @@ public class PharmacyAiCommandService {
             "tenantId", "deleted", "creator", "createTime", "updater", "updateTime");
     private static final Set<String> BOOLEAN_AS_INTEGER = Set.of("isRx", "isSpecial", "isPseudoephedrine",
             "isColdChain", "needExpiry", "saleableOnline", "status");
+    /**
+     * 并发确认业务字段白名单：仅比较这些允许影响“目标药品是否在预览后被他人修改”的业务字段。
+     * 不比较时间、审计、审核、租户等系统字段，也不比较与并发确认无关的派生字段。
+     */
+    private static final Set<String> CONCURRENCY_FIELDS = Set.of(
+            "drugCode", "categoryId", "genericName", "tradeName", "spellCode", "specification",
+            "dosageForm", "manufacturer", "approvalNo", "drugType", "isRx", "isSpecial",
+            "isPseudoephedrine", "isColdChain", "unit", "conversionRatio",
+            "retailPrice", "memberPrice", "costPrice", "minSalePrice", "taxRate",
+            "insuranceType", "minStock", "maxStock", "storageCond", "needExpiry",
+            "defaultLocationId", "saleableOnline", "status",
+            "remark", "imageUrl", "images", "description", "instructionsUrl");
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final PharmacyAiCommandMapper mapper;
@@ -86,7 +98,9 @@ public class PharmacyAiCommandService {
         }
         String requestJson = json(normalized);
         String beforeJson = before == null ? null : json(before);
-        String requestHash = snapshotHash(tool, normalized, before);
+        // 快照哈希基于`落库快照文本反序列化后的树`计算，与 confirm 阶段的复算输入完全同构，
+        // 避免 BigDecimal 数值（如 20.00 被序列化为 2E+1）在 prepare/confirm 两侧表示不一致导致校验失败。
+        String requestHash = snapshotHash(tool, read(requestJson), readNullable(beforeJson));
         String token = randomToken();
         PharmacyAiCommandDO command = new PharmacyAiCommandDO();
         command.setTenantId(context.tenantId());
@@ -168,14 +182,76 @@ public class PharmacyAiCommandService {
         return mapper.selectRecentByUser(context.userId()).stream().map(v -> toPreview(v, null)).toList();
     }
 
+    /**
+     * 并发确认检测：预览后若目标药品确实被其他请求修改（业务字段变化），确认必须拒绝。
+     * 比较方式：将 beforeJson 与当前快照各自提取业务白名单字段后，解析为统一规范化 JsonNode，
+     * 使用数值语义比较（BigDecimal 统一 stripTrailingZeros 后再 compareTo），
+     * 不依赖 JSON 字符串全等，避免 19.80 / 19.8 / 1.98E+1 等数值表示差异导致的误判。
+     */
     private void verifyTargetUnchanged(PharmacyAiCommandDO command) {
         if ("CREATE_DRUG".equals(command.getToolName())) return;
         long id = read(command.getRequestJson()).get("id").asLong();
         DrugDO current = drugService.getDrug(id);
-        if (current == null || !json(objectMapper.valueToTree(BeanUtils.toBean(current, DrugSaveReqVO.class)))
-                .equals(command.getBeforeJson())) {
+        if (current == null) {
+            throw new IllegalStateException("目标药品已不存在，请重新生成预览");
+        }
+        JsonNode before = readNullable(command.getBeforeJson());
+        JsonNode now = objectMapper.valueToTree(BeanUtils.toBean(current, DrugSaveReqVO.class));
+        if (before == null || !snapshotsEqual(pick(before), pick(now))) {
             throw new IllegalStateException("目标药品已发生变化，请重新生成预览");
         }
+    }
+
+    /** 仅保留并发确认业务白名单字段。 */
+    private JsonNode pick(JsonNode full) {
+        ObjectNode result = objectMapper.createObjectNode();
+        CONCURRENCY_FIELDS.stream().sorted().forEach(key -> {
+            if (full.has(key)) {
+                result.set(key, full.get(key));
+            }
+        });
+        return result;
+    }
+
+    /**
+     * 规范化语义比较：
+     * - 对象按键名查找子节点（字段顺序无关）；
+     * - 数值统一 decimalValue().stripTrailingZeros() 后 compareTo（19.80、19.8、1.98E+1 视为相同）；
+     * - 数组按顺序逐项比较；其他类型按 JsonNode 相等语义比较。
+     */
+    boolean snapshotsEqual(JsonNode a, JsonNode b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        if (a.isNumber() && b.isNumber()) {
+            return a.decimalValue().stripTrailingZeros().compareTo(b.decimalValue().stripTrailingZeros()) == 0;
+        }
+        if (a.isObject() && b.isObject()) {
+            if (a.size() != b.size()) {
+                return false;
+            }
+            java.util.Iterator<Map.Entry<String, JsonNode>> fields = a.fields();
+            while (fields.hasNext()) {
+                Map.Entry<String, JsonNode> entry = fields.next();
+                JsonNode other = b.get(entry.getKey());
+                if (other == null || !snapshotsEqual(entry.getValue(), other)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        if (a.isArray() && b.isArray()) {
+            if (a.size() != b.size()) {
+                return false;
+            }
+            for (int i = 0; i < a.size(); i++) {
+                if (!snapshotsEqual(a.get(i), b.get(i))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return a.equals(b);
     }
 
     private PharmacyAiCommandDO requireOwned(Long id) {

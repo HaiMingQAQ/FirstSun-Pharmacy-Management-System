@@ -36,17 +36,28 @@
 | 12 | `fix_pos_menu_name.sql` | 修正 POS 菜单中文名称 |
 | 13 | `20260912_b_purchase_supplier_menu.sql` | B 模块采购管理、供应商与供应商证照菜单及字典 |
 | 14 | `20260913_b_purchase_order_receipt_menu.sql` | B 模块采购订单、采购收货菜单及字典 |
-| 15 | `20260914_k_pharmacy_inventory_menu.sql` | C 模块库存管理菜单与全部库存按钮权限 |
-| 16 | `20260911_f_pharmacy_member_menu.sql` | F 模块会员管理菜单、按钮权限与字典 |
-| 17 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
-| 18 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
-| 19 | `20260914_l_pharmacy_demo_data.sql` | 为 FirstSun 租户写入覆盖基础资料、采购、库存、POS 与会员页面的关联演示数据 |
-| 20 | `20260914_m_pharmacy_rx_pay_menu.sql` | E 模块处方登记/审核/台账、支付单/退款单查询菜单与按钮权限 |
-| 21 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
-| 22 | `20260915_c_inventory_facade_flow_ref.sql` | C 库存门面：销售退货关联原销售出库流水，支持并发下的累计回补校验 |
-| 23 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
-| 24 | `20260917_c_inventory_shared_role_menu.sql` | C-1：共享租户套餐、角色167与上架移位权限 |
-| 25 | `20260918_c_inventory_flow_comment_utf8.sql` | C-3：纠正库存流水原出库引用列中文注释 |
+| 15 | `20260917_b_purchase_order_reject.sql` | B：采购订单驳回字段、状态约束与字典 |
+| 16 | `20260917_b_purchase_doc_seq.sql` | B：采购订单与收货单并发流水序列表 |
+| 17 | `20260914_k_pharmacy_inventory_menu.sql` | C 模块库存管理菜单与全部库存按钮权限 |
+| 18 | `20260911_f_pharmacy_member_menu.sql` | F 模块会员管理菜单、按钮权限与字典 |
+| 19 | `20260910_i_firstsun_shared_account.sql` | 创建 FirstSun 药店测试租户与共享账号，并汇总药店菜单权限 |
+| 20 | `20260911_j_pos_menu_path_fix.sql` | 将 POS 一级菜单改为 `/pharmacy-pos`，避免与药店业务路由冲突 |
+| 21 | `20260914_l_pharmacy_demo_data.sql` | 为 FirstSun 租户写入覆盖基础资料、采购、库存、POS 与会员页面的关联演示数据 |
+| 22 | `20260914_m_pharmacy_rx_pay_menu.sql` | E 模块处方登记/审核/台账、支付单/退款单查询菜单与按钮权限 |
+| 23 | `20260914_n_pay_app_init.sql` | E 模块支付应用（app_key=firstsun）与模拟渠道（mock）初始化 |
+| 24 | `20260915_c_inventory_facade_flow_ref.sql` | C 库存门面：销售退货关联原销售出库流水，支持并发下的累计回补校验 |
+| 25 | `20260916_f_wx_order_line_alloc.sql` | F：小程序订单行分配信息 |
+| 26 | `20260916_f_wx_order_alloc_frozen_stage.sql` | F：小程序订单冻结分配阶段 |
+| 27 | `20260916_f_wx_order_alloc_out_ref.sql` | F：小程序订单出库引用 |
+| 28 | `20260917_f_member_address_update_menu.sql` | F：会员地址更新菜单与权限 |
+| 29 | `20260918_f_member_sms_code.sql` | F：会员短信验证码表 |
+| 30 | `20260918_f_wx_order_points.sql` | F：小程序订单积分字段与约束 |
+| 31 | `20260917_c_inventory_shared_role_menu.sql` | C-1：共享租户套餐、角色167与上架移位权限 |
+| 32 | `20260918_c_inventory_flow_comment_utf8.sql` | C-3：纠正库存流水原出库引用列中文注释 |
+| 33 | `20260918_l_fix_demo_location_163032.sql` | E：修复演示数据货位关联 |
+| 34 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
+| 35 | `20260917_o_pharmacy_ai_prototype.sql` | AI 助手原型表、权限与角色授权 |
+| 36 | `20260918_a_ai_menu_fix.sql` | A：恢复采购管理目录并迁移 AI 权限 |
 
 ## 统一执行方法
 
@@ -78,8 +89,19 @@ $scripts = @(
   "20260914_n_pay_app_init.sql",
   "20260915_c_inventory_facade_flow_ref.sql",
   "20260916_c_inventory_movement_menu.sql",
+  "20260917_b_purchase_order_reject.sql",
+  "20260917_b_purchase_doc_seq.sql",
   "20260917_c_inventory_shared_role_menu.sql",
-  "20260918_c_inventory_flow_comment_utf8.sql"
+  "20260918_c_inventory_flow_comment_utf8.sql",
+  "20260916_f_wx_order_line_alloc.sql",
+  "20260916_f_wx_order_alloc_frozen_stage.sql",
+  "20260916_f_wx_order_alloc_out_ref.sql",
+  "20260917_f_member_address_update_menu.sql",
+  "20260918_f_member_sms_code.sql",
+  "20260918_f_wx_order_points.sql",
+  "20260918_l_fix_demo_location_163032.sql",
+  "20260917_o_pharmacy_ai_prototype.sql",
+  "20260918_a_ai_menu_fix.sql"
 )
 foreach ($s in $scripts) {
   docker cp "sql/migrations/$s" firstsun-pharmacy-mysql:/tmp/mig.sql
