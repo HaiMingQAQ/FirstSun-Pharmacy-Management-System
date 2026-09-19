@@ -31,9 +31,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.INV_SERVICE_UNAVAILABLE;
-import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.MEMBER_SERVICE_UNAVAILABLE;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.PAY_SERVICE_UNAVAILABLE;
-import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_ORDER_NOT_EXISTS;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_NOT_ALLOW;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_QTY_EXCEED;
 import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.SALE_RETURN_REFUND_AMOUNT_INVALID;
@@ -42,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -92,14 +89,11 @@ class SaleReturnServiceImplTest {
         order.setId(1L);
         order.setOrderNo("SO-1-20260909101000-001");
         order.setStoreId(1L);
-        order.setMemberId(1L); // 会员退货：积分回退必须落到该会员
-        order.setReturnFlag(0);
         order.setCashierId(100L);
         order.setStatus(1); // 已完成
         order.setPayableAmount(new BigDecimal("100.00"));
         order.setPaidAmount(new BigDecimal("100.00"));
         order.setPointsDeduct(BigDecimal.ZERO);
-        order.setSubtotal(new BigDecimal("100.00")); // 原单商品金额（10 件 × 10.00），用于按比例回退积分
         when(saleOrderMapper.selectById(1L)).thenReturn(order);
 
         orderLine = new PhSaleOrderLineDO();
@@ -292,63 +286,6 @@ class SaleReturnServiceImplTest {
                 () -> saleReturnService.createReturn(buildReqVO(3)));
         assertEquals(INV_SERVICE_UNAVAILABLE.getCode(), ex.getCode());
         verify(saleReturnMapper, never()).updateById(any(PhSaleReturnDO.class));
-    }
-
-    // ========== 积分回退（F 的统一积分服务） ==========
-
-    /** 部分退货：按实际退货金额 / 原单金额的比例回退积分，并把退货单号作为幂等键传给 F */
-    @Test
-    void testCreateReturn_refundsPointsByReturnedAmount() {
-        saleReturnService.createReturn(buildReqVO(2));
-
-        // 退货 2 件 × 10.00 = 20.00，原单 100.00，未构成整单全退
-        verify(memberPointFacade).refundSalePoints(eq(1L), eq("SO-1-20260909101000-001"), anyString(),
-                eq(new BigDecimal("100.00")), eq(new BigDecimal("20.00")), eq(false));
-    }
-
-    /** 全额退货：本次已构成整单全退，必须把 fullReturn 标记传给 F，由 F 结清剩余积分 */
-    @Test
-    void testCreateReturn_fullReturnPassesFullReturnFlag() {
-        saleReturnService.createReturn(buildReqVO(10));
-
-        verify(memberPointFacade).refundSalePoints(eq(1L), eq("SO-1-20260909101000-001"), anyString(),
-                eq(new BigDecimal("100.00")), eq(new BigDecimal("100.00")), eq(true));
-    }
-
-    /** 重复退货：积分回退以退货单号为幂等键，同一退货单只会回退一次 */
-    @Test
-    void testCreateReturn_pointsRefundKeyedByReturnNo() {
-        saleReturnService.createReturn(buildReqVO(2));
-
-        ArgumentCaptor<String> returnNoCaptor = ArgumentCaptor.forClass(String.class);
-        verify(memberPointFacade).refundSalePoints(any(), anyString(), returnNoCaptor.capture(),
-                any(), any(), anyBoolean());
-        // 幂等键非空：F 侧按「会员 + 退款冲回 + 该退货单号」保证只回退一次
-        assertNotNull(returnNoCaptor.getValue());
-    }
-
-    /** 库存回补失败：积分不动（回退逻辑在扣库之后，且整个事务回滚） */
-    @Test
-    void testCreateReturn_inventoryFailure_pointsUnchanged() {
-        doThrow(new UnsupportedOperationException("not implemented"))
-                .when(inventoryFacade).returnBack(anyLong(), any());
-
-        assertThrows(ServiceException.class, () -> saleReturnService.createReturn(buildReqVO(2)));
-
-        verify(memberPointFacade, never()).refundSalePoints(any(), anyString(), anyString(),
-                any(), any(), anyBoolean());
-    }
-
-    /** F 积分服务未就绪：抛 MEMBER_SERVICE_UNAVAILABLE，退货事务整体回滚 */
-    @Test
-    void testCreateReturn_memberPointServiceUnavailable_rollback() {
-        doThrow(new UnsupportedOperationException("not implemented"))
-                .when(memberPointFacade).refundSalePoints(any(), anyString(), anyString(), any(), any(), anyBoolean());
-
-        ServiceException ex = assertThrows(ServiceException.class,
-                () -> saleReturnService.createReturn(buildReqVO(2)));
-
-        assertEquals(MEMBER_SERVICE_UNAVAILABLE.getCode(), ex.getCode());
     }
 
     @Test

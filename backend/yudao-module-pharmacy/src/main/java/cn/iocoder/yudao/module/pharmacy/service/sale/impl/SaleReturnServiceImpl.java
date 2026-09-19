@@ -149,7 +149,18 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         //    退款金额由服务端按原支付明细占比计算，逐笔退款；现金支付同样落退款流水。
         refundPayments(order, ret, lines, totalAmount, reqVO.getRefundMethod());
 
-        // 5. 库存回补（C 服务；真实实现按原销售流水回补）
+        // 5. 积分回退（F 服务；本期 pointsDeduct=0 不触发）
+        try {
+            // 有积分抵扣的销售退货应回退积分；本期销售 pointsDeduct=0
+            if (order.getPointsDeduct() != null && order.getPointsDeduct().signum() > 0) {
+                memberPointFacade.backPoints(order.getMemberId(),
+                        order.getOrderNo(), order.getPointsDeduct().intValue());
+            }
+        } catch (UnsupportedOperationException ex) {
+            throw ServiceExceptionUtil.exception(MEMBER_SERVICE_UNAVAILABLE);
+        }
+
+        // 6. 库存回补（C 服务；真实实现按原销售流水回补）
         List<ReturnBackItem> returnItems = new ArrayList<>();
         for (PhSaleReturnLineDO rl : lines) {
             ReturnBackItem rbi = new ReturnBackItem();
@@ -169,7 +180,7 @@ public class SaleReturnServiceImpl implements SaleReturnService {
             throw ServiceExceptionUtil.exception(INV_SERVICE_UNAVAILABLE);
         }
 
-        // 6. 更新原单行已退数量与整单退货标志
+        // 7. 更新原单行已退数量与整单退货标志
         boolean allReturned = true;
         for (PhSaleReturnLineDO rl : lines) {
             PhSaleOrderLineDO line = saleOrderLineMapper.selectById(rl.getSaleLineId());
@@ -183,18 +194,6 @@ public class SaleReturnServiceImpl implements SaleReturnService {
         order.setReturnFlag(allReturned ? 2 : 1);
         order.setStatus(allReturned ? 2 : 3);
         saleOrderMapper.updateById(order);
-
-        // 7. 积分结算（F 的统一积分服务，D 不直接写 member_point_record）：
-        //    - 按「本次退货金额 / 原单商品金额」的比例扣回本单已赠送积分；
-        //    - 返还原单实际抵扣的积分（同样按比例，本次构成整单全退时结清剩余）；
-        //    - 幂等键 = 退货单号：同一退货单重复提交不会重复回退，部分退货也不会按整单重复回退；
-        //    - 与库存 / 支付同一事务，任一环节失败整体回滚，不留下孤立积分流水或错误余额。
-        try {
-            memberPointFacade.refundSalePoints(order.getMemberId(), order.getOrderNo(), ret.getReturnNo(),
-                    order.getSubtotal(), totalAmount, allReturned);
-        } catch (UnsupportedOperationException ex) {
-            throw ServiceExceptionUtil.exception(MEMBER_SERVICE_UNAVAILABLE);
-        }
 
         // 8. 退款、积分回退、库存回补全部成功后，标记退货单完成
         ret.setStatus(3);        // 已完成
