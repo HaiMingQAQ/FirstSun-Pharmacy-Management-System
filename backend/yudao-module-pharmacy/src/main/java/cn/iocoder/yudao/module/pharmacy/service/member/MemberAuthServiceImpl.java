@@ -45,6 +45,9 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     @Resource
     private LoginLogApi loginLogApi;
 
+    @Resource
+    private MemberSmsCodeService memberSmsCodeService;
+
     @Override
     public AppMemberAuthLoginRespVO login(AppMemberAuthLoginReqVO reqVO) {
         // 1. 校验会员是否存在
@@ -63,7 +66,10 @@ public class MemberAuthServiceImpl implements MemberAuthService {
     }
 
     @Override
-    public AppMemberAuthLoginRespVO loginOrRegister(String mobile) {
+    public AppMemberAuthLoginRespVO loginOrRegister(String mobile, String code) {
+        // 1. 先校验并消费手机验证码：未通过校验时不做任何账号创建（避免用手机号冒用会员身份）
+        memberSmsCodeService.verifyAndConsumeLoginCode(mobile, code);
+        // 2. 产品规则：验证码校验通过后，手机号不存在则自动注册（沿用快捷登录既有规则）
         MemberUserDO user = memberUserService.createMemberUserIfAbsent(mobile, getClientIP());
         return createTokenAfterLoginSuccess(user, mobile);
     }

@@ -27,13 +27,18 @@ const AuthUtil = {
       },
     });
   },
-  // 手机号快捷登录（不存在则自动注册）
-  loginOrRegister: (mobile) => {
+  // 手机号 + 验证码快捷登录（不存在则自动注册）
+  // 验证码由后端校验，必须与手机号一起提交；
+  // 验证码放在请求头 X-Sms-Code（而不是 params / data），避免被框架的请求日志打印出来
+  loginOrRegister: (mobile, code) => {
     return request({
       url: '/member/auth/login-or-register',
       method: 'POST',
       params: {
         mobile,
+      },
+      header: {
+        'X-Sms-Code': code,
       },
       custom: {
         showSuccess: true,
@@ -42,19 +47,18 @@ const AuthUtil = {
       },
     });
   },
-  // 发送手机验证码
-  sendSmsCode: (mobile, scene) => {
+  // 发送手机验证码（后端不返回验证码内容，验证码取自后端配置的开发测试值）
+  sendSmsCode: (mobile) => {
     return request({
       url: '/member/auth/send-sms-code',
       method: 'POST',
-      data: {
+      params: {
         mobile,
-        scene,
       },
       custom: {
         loadingMsg: '发送中',
         showSuccess: true,
-        successMsg: '发送成功',
+        successMsg: '验证码已发送',
       },
     });
   },

@@ -236,6 +236,10 @@ wx:
 yudao:
   captcha:
     enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
+  pharmacy: # F 会员模块：local 环境启用「手机号 + 验证码」快捷登录，验证码取自环境变量 PHARMACY_DEV_SMS_CODE
+    member-sms:
+      login-enabled: true
+      dev-code-enabled: true
   security:
     mock-enable: true
   pay:

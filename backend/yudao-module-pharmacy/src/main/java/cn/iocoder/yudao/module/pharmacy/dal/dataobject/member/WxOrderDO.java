@@ -66,6 +66,22 @@ public class WxOrderDO extends BaseDO {
      */
     private BigDecimal discountAmount;
     /**
+     * 积分抵扣使用的积分
+     *
+     * 由 F 的积分结算服务按会员等级与积分规则计算，不接受前端传值
+     */
+    private Integer pointDeduct;
+    /**
+     * 积分抵扣金额
+     */
+    private BigDecimal pointDeductAmount;
+    /**
+     * 赠送积分
+     *
+     * 完成 / 核销后由 F 的积分结算服务写入，与积分流水汇总一致
+     */
+    private Integer pointEarned;
+    /**
      * 应付金额
      */
     private BigDecimal payableAmount;

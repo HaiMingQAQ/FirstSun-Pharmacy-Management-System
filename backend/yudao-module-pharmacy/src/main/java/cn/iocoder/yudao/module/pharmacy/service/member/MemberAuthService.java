@@ -17,9 +17,14 @@ public interface MemberAuthService {
     AppMemberAuthLoginRespVO login(AppMemberAuthLoginReqVO reqVO);
 
     /**
-     * 手机号首次登录时自动注册并登录（小程序快捷登录）
+     * 手机号 + 验证码快捷登录（小程序），验证码校验通过后不存在则自动注册
+     *
+     * <p>验证码先于账号创建校验：验证码为空/错误/过期/已使用时直接失败，不会创建任何会员账号。
+     *
+     * @param mobile 手机号
+     * @param code   手机验证码
      */
-    AppMemberAuthLoginRespVO loginOrRegister(String mobile);
+    AppMemberAuthLoginRespVO loginOrRegister(String mobile, String code);
 
     /**
      * 登出，删除访问令牌

@@ -218,3 +218,53 @@ http://localhost:5173/
 - 提交前检查是否包含测试账号、密码、临时截图、本地启动脚本或构建产物。
 
 管理后台 Docker 容器使用 `admin-ui/.env.docker`，不要把个人 `admin-ui/.env.local` 提交到仓库。
+
+## 环境变量说明
+
+除 `docker-compose.yml` 中带默认值的变量外，以下变量需要按需填写到本机 `.env`（`.env` 已被 Git 忽略）：
+
+| 变量名 | 是否必填 | 用途 | 说明 |
+| --- | --- | --- | --- |
+| `PHARMACY_DEV_SMS_CODE` | 使用小程序手机号登录时必填 | 会员手机号快捷登录的**开发测试验证码**（F 模块） | 只写在本地 `.env`，禁止写入代码/前端/SQL/Dockerfile，也禁止提交到 Git；仅 `local`/`dev` profile 生效 |
+
+### 手机号快捷登录（小程序）
+
+会员手机号快捷登录需要「手机号 + 验证码」，验证码由后端校验：
+
+```text
+POST /app-api/member/auth/send-sms-code?mobile=13800138000     # 获取验证码（不返回验证码内容）
+POST /app-api/member/auth/login-or-register?mobile=13800138000 # 登录（不存在则自动注册）
+     Header: X-Sms-Code: <验证码>
+```
+
+> 验证码走请求头 `X-Sms-Code` 而不是 query 参数或 JSON body：yudao 框架的访问日志拦截器在非 prod 环境会把请求参数与 body 原样打印，走请求头可以确保验证码不会出现在后端日志里。
+
+- 本地开发自行在 `.env` 里设置 `PHARMACY_DEV_SMS_CODE`（任意 4-8 位数字/字母即可，团队各人可不同），然后 `docker compose up -d backend` 让变量生效；调用发码接口后，用 `.env` 里配置的这个值登录。
+- 验证码与「手机号 + 登录用途」绑定，10 分钟内有效，且**一次性使用**：用过一次、过期、错误或不匹配当前手机号都会被拒绝。
+- 生产环境（无 `local`/`dev` 覆盖）默认**关闭**手机号快捷登录，接口返回「当前环境未启用短信登录」，开发测试验证码在 prod 无效。手机号 + 密码登录不受影响。
+
+### 会员积分规则（F 模块）
+
+积分赠送、抵扣、退货回退与取消返还**全部由后端**按配置 + 会员等级计算，前端传入的积分值只表示「希望使用多少抵扣积分」，实际可用值由后端校验后确定。规则配置在 `backend/yudao-server/src/main/resources/application.yaml` 的 `yudao.pharmacy.member-point` 下：
+
+| 配置项 | 默认值 | 含义 |
+| --- | --- | --- |
+| `earn-enabled` | true | 是否启用积分赠送 |
+| `earn-per-yuan` | 1 | 每消费 1 元获得的基础积分 |
+| `level-multiplier` | 1→1.0 / 2→1.2 / 3→1.5 / 4→2.0 | 按 `member_level.level` 的赠送倍率，未配置的等级按 1.0 |
+| `deduct-enabled` | true | 是否启用积分抵扣 |
+| `points-per-yuan` | 100 | 多少积分抵扣 1 元 |
+| `max-deduct-percent` | 50 | 单笔订单最高抵扣比例（占应付金额的百分比） |
+| `min-deduct-points` / `max-deduct-points` | 1 / 0 | 单笔最少使用积分 / 单笔上限（0 表示不额外限制） |
+
+计算口径：`赠送积分 = ⌊实付金额 × earn-per-yuan × 等级倍率⌋`，`可用抵扣积分 = min(会员余额, 订单金额 × max-deduct-percent, 单笔上限)`，退货按「实际退货金额 ÷ 原单金额」比例回退，整单全退时结清剩余。
+
+积分入口（小程序端，会员编号取自登录令牌）：
+
+```text
+GET  /app-api/member/point/summary                      # 积分余额 + 当前生效规则
+POST /app-api/member/point/deduct-preview               # 抵扣试算（不传 usePoints 时返回本单最多可用积分）
+POST /app-api/member/wx-order/create                    # 下单，请求体可带 usePoints 使用积分抵扣
+```
+
+所有积分变动都带业务幂等键（会员 + 业务类型 + 业务编码，对应唯一键 `uk_point_event`），重复支付回调、重复核销、重复退货、重复取消都不会重复变动积分；`member_point_record` 只允许由 F 的积分服务写入，D（POS）、E（支付）通过 `MemberPointFacade` 调用。

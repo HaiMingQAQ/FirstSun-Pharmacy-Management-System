@@ -7,8 +7,10 @@ import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginRespVO;
 import cn.iocoder.yudao.module.pharmacy.service.member.MemberAuthService;
+import cn.iocoder.yudao.module.pharmacy.service.member.MemberSmsCodeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.annotation.security.PermitAll;
@@ -37,6 +39,9 @@ public class AppMemberAuthController {
     private MemberAuthService memberAuthService;
 
     @Resource
+    private MemberSmsCodeService memberSmsCodeService;
+
+    @Resource
     private SecurityProperties securityProperties;
 
     @PostMapping("/login")
@@ -46,11 +51,36 @@ public class AppMemberAuthController {
         return success(memberAuthService.login(reqVO));
     }
 
+    /**
+     * 验证码请求头。
+     *
+     * <p>验证码刻意放在<b>请求头</b>而不是 query 参数 / JSON body：yudao 框架的
+     * {@code ApiAccessLogInterceptor} 在非 prod 环境会把请求参数与 JSON body 原样打进日志，
+     * 走请求头可以保证「验证码不出现在后端日志里」（对应 F-1 要求 2）。
+     */
+    private static final String SMS_CODE_HEADER = "X-Sms-Code";
+
     @PostMapping("/login-or-register")
-    @Operation(summary = "手机号快捷登录（不存在则自动注册）")
+    @Operation(summary = "手机号 + 验证码快捷登录（不存在则自动注册）",
+            description = "验证码通过请求头 X-Sms-Code 提交，由后端校验；接口不返回验证码")
+    @Parameter(name = "mobile", description = "手机号", required = true)
+    @Parameter(name = SMS_CODE_HEADER, in = ParameterIn.HEADER, required = true,
+            description = "手机验证码（先调用 /member/auth/send-sms-code 获取）")
     @PermitAll
-    public CommonResult<AppMemberAuthLoginRespVO> loginOrRegister(@RequestParam("mobile") String mobile) {
-        return success(memberAuthService.loginOrRegister(mobile));
+    public CommonResult<AppMemberAuthLoginRespVO> loginOrRegister(
+            @RequestParam("mobile") String mobile,
+            @RequestHeader(value = SMS_CODE_HEADER, required = false) String code) {
+        return success(memberAuthService.loginOrRegister(mobile, code));
+    }
+
+    @PostMapping("/send-sms-code")
+    @Operation(summary = "发送手机验证码",
+            description = "仅 local/dev 环境可用，验证码取自环境变量 PHARMACY_DEV_SMS_CODE，接口不返回验证码")
+    @Parameter(name = "mobile", description = "手机号", required = true)
+    @PermitAll
+    public CommonResult<Boolean> sendSmsCode(@RequestParam("mobile") String mobile) {
+        memberSmsCodeService.sendLoginCode(mobile);
+        return success(true);
     }
 
     @PostMapping("/logout")

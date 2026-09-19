@@ -108,4 +108,39 @@ public interface MemberPointRecordService {
      */
     void returnPoints(Long userId, String bizId, Integer point, String title);
 
+    // ========== 积分变动统一入口（F 内部积分结算服务调用） ==========
+
+    /**
+     * 积分变动统一入口：由业务方指定业务类型与业务编码，保证「一业务一流水、一流水一幂等键」。
+     *
+     * <p>幂等键与 {@code member_point_record.uk_point_event(tenant_id,user_id,biz_type,biz_id)}
+     * 完全一致：同一会员 + 同一业务类型 + 同一业务编码只处理一次，重复调用直接返回 0，
+     * 从而保证「重复销售回调不重复赠送」「重复核销不重复赠送」「重复退货不重复回退」
+     * 「重复取消不重复返还」。
+     *
+     * @param userId           会员用户编号
+     * @param bizType          业务类型（与字典 pharmacy_member_point_biz_type 一致）
+     * @param bizId            业务编码（幂等键）
+     * @param point            积分绝对值（<=0 视为无需处理）
+     * @param title            积分标题
+     * @param description      积分描述（可空）
+     * @param sign             +1 增加 / -1 扣减
+     * @param rejectInsufficient 扣减时积分不足是否抛业务异常（抛异常则调用方事务整体回滚）
+     * @return 实际变动的积分绝对值（0 表示幂等跳过或无需处理）
+     */
+    int changePoints(Long userId, Integer bizType, String bizId, Integer point, String title,
+                     String description, int sign, boolean rejectInsufficient);
+
+    /**
+     * 查询某业务单号产生的积分流水（用于退货按比例回退、幂等校验）
+     */
+    MemberPointRecordDO getPointRecord(Long userId, Integer bizType, String bizId);
+
+    /**
+     * 汇总「业务编码前缀」下已产生的积分绝对值合计
+     *
+     * <p>用于同一原单多次部分退货的累计回退计算，避免超出原单已赠送 / 已抵扣的积分。
+     */
+    int sumAbsPointByBizIdPrefix(Long userId, Integer bizType, String bizIdPrefix);
+
 }

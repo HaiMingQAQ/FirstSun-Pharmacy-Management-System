@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.MemberPointRecordD
 import cn.iocoder.yudao.module.pharmacy.dal.dataobject.member.MemberUserDO;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.member.MemberPointRecordMapper;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.member.MemberUserMapper;
+import cn.iocoder.yudao.module.pharmacy.enums.member.MemberPointBizTypeEnum;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -27,11 +28,11 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.*;
 public class MemberPointRecordServiceImpl implements MemberPointRecordService {
 
     /** 积分业务类型：消费获得（与字典 pharmacy_member_point_biz_type 对应） */
-    private static final Integer BIZ_TYPE_CONSUME_EARN = 2;
+    private static final Integer BIZ_TYPE_CONSUME_EARN = MemberPointBizTypeEnum.CONSUME_EARN.getBizType();
     /** 积分业务类型：消费抵扣（订单使用积分抵扣现金） */
-    private static final Integer BIZ_TYPE_CONSUME_DEDUCT = 3;
+    private static final Integer BIZ_TYPE_CONSUME_DEDUCT = MemberPointBizTypeEnum.CONSUME_DEDUCT.getBizType();
     /** 积分业务类型：退款冲回（退货扣回奖励积分 / 取消返还抵扣积分） */
-    private static final Integer BIZ_TYPE_REFUND = 6;
+    private static final Integer BIZ_TYPE_REFUND = MemberPointBizTypeEnum.REFUND.getBizType();
 
     @Resource
     private MemberPointRecordMapper memberPointRecordMapper;
@@ -104,19 +105,19 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void addPoints(Long userId, String bizId, Integer point, String title) {
-        changePoints(userId, bizId, point, title, BIZ_TYPE_CONSUME_EARN, 1, false);
+        changePoints(userId, BIZ_TYPE_CONSUME_EARN, bizId, point, title, null, 1, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void backPoints(Long userId, String bizId, Integer point) {
-        changePoints(userId, bizId, point, "退货积分回退", BIZ_TYPE_REFUND, -1, false);
+        changePoints(userId, BIZ_TYPE_REFUND, bizId, point, "退货积分回退", null, -1, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void deductPoints(Long userId, String bizId, Integer point, String title) {
-        changePoints(userId, bizId, point, title, BIZ_TYPE_CONSUME_DEDUCT, -1, true);
+        changePoints(userId, BIZ_TYPE_CONSUME_DEDUCT, bizId, point, title, null, -1, true);
     }
 
     @Override
@@ -137,33 +138,24 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         }
         int amount = Math.min(point, Math.abs(deducted.getPoint()));
         // 幂等键为 (会员, 退款冲回, 业务单号)，同一单号重复返还只会成功一次
-        changePoints(userId, bizId, amount, title, BIZ_TYPE_REFUND, 1, false);
+        changePoints(userId, BIZ_TYPE_REFUND, bizId, amount, title, null, 1, false);
     }
 
-    /**
-     * 积分变动统一入口
-     *
-     * 1. 幂等：同一会员 + 同一业务类型 + 同一业务编码只处理一次（与 uk_point_event 一致）
-     * 2. 原子增减：通过 UPDATE ... SET point = point + delta 避免并发覆盖
-     * 3. 记录变动后积分，保证流水与会员积分一致
-     * 4. 扣减类：{@code rejectInsufficient=true} 时积分不足直接抛业务异常，使调用方事务回滚
-     *
-     * @param sign               +1=增加，-1=扣减
-     * @param rejectInsufficient 扣减时积分不足是否抛业务异常
-     */
-    private void changePoints(Long userId, String bizId, Integer point, String title,
-                              Integer bizType, int sign, boolean rejectInsufficient) {
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int changePoints(Long userId, Integer bizType, String bizId, Integer point, String title,
+                            String description, int sign, boolean rejectInsufficient) {
         // 积分为 0 视为无需处理（如销售未产生奖励积分）
         if (point == null || point <= 0) {
-            return;
+            return 0;
         }
         // 入参校验
-        if (userId == null || bizId == null || bizId.trim().isEmpty()) {
+        if (userId == null || bizType == null || bizId == null || bizId.trim().isEmpty()) {
             throw exception(PHARMACY_MEMBER_POINT_BIZ_INVALID);
         }
         // 幂等校验：同一业务类型 + 同一业务编码已处理过，直接返回，避免重复积分
         if (memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType, bizId) != null) {
-            return;
+            return 0;
         }
         // 会员必须存在
         MemberUserDO user = memberUserMapper.selectById(userId);
@@ -171,7 +163,7 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
             throw exception(PHARMACY_MEMBER_USER_NOT_EXISTS);
         }
         int current = user.getPoint() == null ? 0 : user.getPoint();
-        int delta = sign * point;
+        int delta = sign >= 0 ? point : -point;
         if (delta < 0 && current + delta < 0) {
             if (rejectInsufficient) {
                 // 积分不足：抛业务异常，保证「订单成功但积分未扣减」不会出现
@@ -181,7 +173,7 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
             delta = -current;
         }
         if (delta == 0) {
-            return;
+            return 0;
         }
         memberUserMapper.updatePointIncr(userId, delta);
         // 读取变动后的积分，保证流水 totalPoint 与会员积分一致
@@ -191,9 +183,27 @@ public class MemberPointRecordServiceImpl implements MemberPointRecordService {
         record.setBizId(bizId);
         record.setBizType(bizType);
         record.setTitle(title);
+        record.setDescription(description);
         record.setPoint(delta);
         record.setTotalPoint(after == null || after.getPoint() == null ? 0 : after.getPoint());
         memberPointRecordMapper.insert(record);
+        return Math.abs(delta);
+    }
+
+    @Override
+    public MemberPointRecordDO getPointRecord(Long userId, Integer bizType, String bizId) {
+        return memberPointRecordMapper.selectByUserIdAndBizTypeAndBizId(userId, bizType, bizId);
+    }
+
+    @Override
+    public int sumAbsPointByBizIdPrefix(Long userId, Integer bizType, String bizIdPrefix) {
+        return memberPointRecordMapper
+                .selectListByUserIdAndBizTypeAndBizIdPrefix(userId, bizType, bizIdPrefix)
+                .stream()
+                .map(MemberPointRecordDO::getPoint)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(Math::abs)
+                .sum();
     }
 
 }
