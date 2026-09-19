@@ -163,15 +163,20 @@ public interface WxOrderService {
      * 业务校验：购物车不能为空、药品必须可销售、处方药必须关联处方、同城配送必须有地址。
      * 下单成功后清空本次结算的购物车记录。
      *
+     * <p>积分：{@code usePoints} 只表示「希望使用的抵扣积分」，可用值、抵扣金额与后续赠送积分
+     * 全部由 F 的积分结算服务按会员等级与积分规则计算；下单时预扣抵扣积分，
+     * 积分不足则整笔下单失败，取消 / 支付超时 / 退款时释放。
+     *
      * @param memberId  会员编号（取自登录令牌）
      * @param storeId   履约门店编号
      * @param orderType 订单类型 0到店自提/1同城配送
      * @param addressId 收货地址编号（同城配送必填）
      * @param prescId   处方案编号（含处方药时必填）
      * @param remark    备注
+     * @param usePoints 希望使用的抵扣积分（可为空，表示不使用积分抵扣）
      * @return 订单编号
      */
     Long createOrderFromCart(Long memberId, Long storeId, Integer orderType,
-                             Long addressId, Long prescId, String remark);
+                             Long addressId, Long prescId, String remark, Integer usePoints);
 
 }

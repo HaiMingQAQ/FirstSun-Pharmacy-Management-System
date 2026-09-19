@@ -35,6 +35,15 @@ public class AppWxOrderRespVO {
     @Schema(description = "促销优惠", example = "5.00")
     private BigDecimal discountAmount;
 
+    @Schema(description = "本单使用的抵扣积分", example = "100")
+    private Integer pointDeduct;
+
+    @Schema(description = "本单积分抵扣金额", example = "1.00")
+    private BigDecimal pointDeductAmount;
+
+    @Schema(description = "本单赠送积分（完成/核销后写入）", example = "88")
+    private Integer pointEarned;
+
     @Schema(description = "应付金额", requiredMode = Schema.RequiredMode.REQUIRED, example = "90.00")
     private BigDecimal payableAmount;
 

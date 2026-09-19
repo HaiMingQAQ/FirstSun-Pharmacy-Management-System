@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.pharmacy.api.member;
 
+import cn.iocoder.yudao.module.pharmacy.api.member.dto.SalePointCalcDTO;
+
+import java.math.BigDecimal;
 
 /**
  * 会员积分门面【临时降级实现】。
@@ -11,24 +14,49 @@ package cn.iocoder.yudao.module.pharmacy.api.member;
  */
 public class MemberPointFacadeImpl implements MemberPointFacade {
 
+    private static UnsupportedOperationException notImplemented() {
+        return new UnsupportedOperationException("F 会员积分服务未实现");
+    }
+
+    @Override
+    public SalePointCalcDTO calcSalePoints(Long memberId, BigDecimal orderAmount, Integer wantDeductPoints) {
+        throw notImplemented();
+    }
+
+    @Override
+    public int settleSalePoints(Long memberId, String orderNo, BigDecimal orderAmount, Integer deductPoints) {
+        throw notImplemented();
+    }
+
+    @Override
+    public void refundSalePoints(Long memberId, String orderNo, String returnNo, BigDecimal orderAmount,
+                                 BigDecimal returnAmount, boolean fullReturn) {
+        throw notImplemented();
+    }
+
+    @Override
+    public void releaseSalePoints(Long memberId, String orderNo) {
+        throw notImplemented();
+    }
+
     @Override
     public void addPoints(Long memberId, String bizNo, Integer point, String title) {
-        throw new UnsupportedOperationException("F 会员积分服务未实现");
+        throw notImplemented();
     }
 
     @Override
     public void backPoints(Long memberId, String bizNo, Integer point) {
-        throw new UnsupportedOperationException("F 会员积分服务未实现");
+        throw notImplemented();
     }
 
     @Override
     public void deductPoints(Long memberId, String bizNo, Integer point, String title) {
-        throw new UnsupportedOperationException("F 会员积分服务未实现");
+        throw notImplemented();
     }
 
     @Override
     public void returnPoints(Long memberId, String bizNo, Integer point, String title) {
-        throw new UnsupportedOperationException("F 会员积分服务未实现");
+        throw notImplemented();
     }
 
 }

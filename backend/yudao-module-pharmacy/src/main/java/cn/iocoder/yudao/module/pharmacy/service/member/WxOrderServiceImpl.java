@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReserveResult;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReturnBackItem;
+import cn.iocoder.yudao.module.pharmacy.api.member.dto.SalePointCalcDTO;
 import cn.iocoder.yudao.module.pharmacy.api.payment.PaymentFacade;
 import cn.iocoder.yudao.module.pharmacy.api.payment.dto.PayOrderDTO;
 import cn.iocoder.yudao.module.pharmacy.controller.admin.member.vo.order.WxOrderPageReqVO;
@@ -116,6 +117,10 @@ public class WxOrderServiceImpl implements WxOrderService {
     /** A 的商品查询接口：下单时校验药品并获取价格/名称/规格快照 */
     @Resource
     private DrugApi drugApi;
+
+    /** F 的统一积分结算服务：抵扣预扣 / 赠送 / 取消释放全部走这里，本类不直接写积分流水 */
+    @Resource
+    private MemberPointSettlementService memberPointSettlementService;
 
     @Override
     public Long createWxOrder(WxOrderSaveReqVO createReqVO) {
@@ -292,6 +297,8 @@ public class WxOrderServiceImpl implements WxOrderService {
         }
         // 对接 C：关闭订单时结算库存 —— 仍冻结的释放，已出库的按原批次、原货位回补
         settleStockOnClose(wxOrder, CANCEL_BIZ_PREFIX, false);
+        // 对接 F：取消 / 退款即释放本单预扣的抵扣积分（幂等键 = 订单号，重复取消不重复返还）
+        memberPointSettlementService.releaseSalePoints(wxOrder.getMemberId(), wxOrder.getOrderNo());
     }
 
     @Override
@@ -317,9 +324,16 @@ public class WxOrderServiceImpl implements WxOrderService {
         WxOrderDO updateObj = new WxOrderDO();
         updateObj.setStatus(WxOrderStatusEnum.CANCELED.getStatus());
         updateObj.setCancelReason(cancelReason);
-        wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
+        int rows = wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
                 .eq(WxOrderDO::getId, id)
                 .in(WxOrderDO::getStatus, WxOrderStatusEnum.WAIT_PAY.getStatus(), WxOrderStatusEnum.WAIT_PICK.getStatus()));
+        if (rows == 0) {
+            // 并发下已被其他请求取消，视为幂等成功
+            return;
+        }
+        // 对接 F：订单已关闭即释放本单预扣的抵扣积分（幂等键 = 订单号）；
+        // 未预扣积分时内部直接跳过，不产生孤立流水。库存仍由门店节点释放 / 回补。
+        memberPointSettlementService.releaseSalePoints(wxOrder.getMemberId(), wxOrder.getOrderNo());
     }
 
     @Override
@@ -334,9 +348,15 @@ public class WxOrderServiceImpl implements WxOrderService {
             updateObj.setStatus(WxOrderStatusEnum.CANCELED.getStatus());
             updateObj.setCancelReason("支付超时自动关闭");
             // 条件更新保证并发下只关闭一次
-            closed += wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
+            int updated = wxOrderMapper.update(updateObj, new LambdaUpdateWrapper<WxOrderDO>()
                     .eq(WxOrderDO::getId, order.getId())
                     .eq(WxOrderDO::getStatus, WxOrderStatusEnum.WAIT_PAY.getStatus()));
+            if (updated == 0) {
+                continue;
+            }
+            closed += updated;
+            // 对接 F：支付超时 = 支付失败，不赠送积分，并释放本单预扣的抵扣积分（幂等）
+            memberPointSettlementService.releaseSalePoints(order.getMemberId(), order.getOrderNo());
         }
         return closed;
     }
@@ -386,6 +406,8 @@ public class WxOrderServiceImpl implements WxOrderService {
         refundChannelPayOrder(wxOrder);
         // 对接 C：结算库存 —— 仍冻结的释放，已出库的按原批次、原货位回补（同事务，失败整体回滚）
         settleStockOnClose(wxOrder, REFUND_BIZ_PREFIX, false);
+        // 对接 F：退款即释放本单预扣的抵扣积分（幂等键 = 订单号，重复退款不重复返还）
+        memberPointSettlementService.releaseSalePoints(wxOrder.getMemberId(), wxOrder.getOrderNo());
     }
 
     @Override
@@ -449,6 +471,16 @@ public class WxOrderServiceImpl implements WxOrderService {
         // 对接 D：核销即自提完成，触发线上订单转销售。
         // 扣库已在支付时由 C 完成，转销售不重复扣库（约定：不能在支付与核销各扣一次）。
         transferToSale(wxOrder);
+        // 对接 F：完成 / 核销即赠送积分（幂等键 = 订单号，重复核销不重复赠送）。
+        // 赠送基数 = 实际成交金额（应付金额，已扣除积分抵扣），积分规则见 yudao.pharmacy.member-point。
+        int earned = memberPointSettlementService.earnSalePoints(wxOrder.getMemberId(), wxOrder.getOrderNo(),
+                wxOrder.getPayableAmount());
+        if (earned > 0) {
+            WxOrderDO pointUpdate = new WxOrderDO();
+            pointUpdate.setId(wxOrder.getId());
+            pointUpdate.setPointEarned(earned);
+            wxOrderMapper.updateById(pointUpdate);
+        }
     }
 
     @Override
@@ -465,7 +497,7 @@ public class WxOrderServiceImpl implements WxOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createOrderFromCart(Long memberId, Long storeId, Integer orderType,
-                                    Long addressId, Long prescId, String remark) {
+                                    Long addressId, Long prescId, String remark, Integer usePoints) {
         // 1. 校验订单类型
         if (!Objects.equals(orderType, ORDER_TYPE_PICKUP) && !Objects.equals(orderType, ORDER_TYPE_DELIVERY)) {
             throw exception(PHARMACY_WX_ORDER_TYPE_INVALID);
@@ -539,8 +571,19 @@ public class WxOrderServiceImpl implements WxOrderService {
         // 6. 服务端精确计算金额（元），不接受前端传入金额
         BigDecimal couponAmount = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
-        BigDecimal payableAmount = goodsAmount.add(freightAmount)
+        BigDecimal payableBase = goodsAmount.add(freightAmount)
                 .subtract(couponAmount).subtract(discountAmount);
+        if (payableBase.signum() < 0) {
+            payableBase = BigDecimal.ZERO;
+        }
+        // 6.1 积分抵扣：前端只表达「想用多少积分」，可用值由 F 的积分结算服务按
+        //     会员余额、抵扣比例、单笔上限与订单金额校验后确定；校验不通过整笔下单失败
+        SalePointCalcDTO pointCalc = memberPointSettlementService
+                .calcSalePoints(memberId, payableBase, usePoints);
+        int pointDeduct = pointCalc.getDeductPoints() == null ? 0 : pointCalc.getDeductPoints();
+        BigDecimal pointDeductAmount = pointCalc.getDeductAmount() == null
+                ? BigDecimal.ZERO : pointCalc.getDeductAmount();
+        BigDecimal payableAmount = payableBase.subtract(pointDeductAmount);
         if (payableAmount.signum() < 0) {
             payableAmount = BigDecimal.ZERO;
         }
@@ -555,6 +598,9 @@ public class WxOrderServiceImpl implements WxOrderService {
         order.setCouponAmount(couponAmount);
         order.setFreightAmount(freightAmount);
         order.setDiscountAmount(discountAmount);
+        order.setPointDeduct(pointDeduct);
+        order.setPointDeductAmount(pointDeductAmount);
+        order.setPointEarned(0);
         order.setPayableAmount(payableAmount);
         order.setPayStatus(PAY_STATUS_WAIT);
         order.setStatus(WxOrderStatusEnum.WAIT_PAY.getStatus());
@@ -570,6 +616,8 @@ public class WxOrderServiceImpl implements WxOrderService {
             line.setWxOrderId(order.getId());
             wxOrderLineMapper.insert(line);
         }
+        // 8.1 预扣抵扣积分：幂等键 = 订单号；积分不足抛业务异常，下单事务整体回滚
+        memberPointSettlementService.deductSalePoints(memberId, order.getOrderNo(), pointDeduct);
         // 9. 清空本次已结算的购物车记录
         for (WxCartDO cart : checkedList) {
             wxCartService.deleteWxCart(cart.getId());

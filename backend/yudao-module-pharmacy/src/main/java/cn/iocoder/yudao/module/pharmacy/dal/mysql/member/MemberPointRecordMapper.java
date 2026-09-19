@@ -50,4 +50,22 @@ public interface MemberPointRecordMapper extends BaseMapperX<MemberPointRecordDO
                 .eq(MemberPointRecordDO::getBizId, bizId));
     }
 
+    /**
+     * 按会员 + 业务类型 + 业务编码前缀查询积分记录。
+     *
+     * <p>用于「同一原单多次部分退货」的累计回退计算：业务编码形如
+     * {@code 原单号#EARN#退货单号} / {@code 原单号#DEDUCT#退货单号}，
+     * 每一张退货单各自幂等，同时可按原单号前缀汇总已回退的积分。
+     */
+    default List<MemberPointRecordDO> selectListByUserIdAndBizTypeAndBizIdPrefix(
+            Long userId, Integer bizType, String bizIdPrefix) {
+        if (userId == null || bizType == null || bizIdPrefix == null || bizIdPrefix.isEmpty()) {
+            return java.util.Collections.emptyList();
+        }
+        return selectList(new LambdaQueryWrapperX<MemberPointRecordDO>()
+                .eq(MemberPointRecordDO::getUserId, userId)
+                .eq(MemberPointRecordDO::getBizType, bizType)
+                .likeRight(MemberPointRecordDO::getBizId, bizIdPrefix));
+    }
+
 }

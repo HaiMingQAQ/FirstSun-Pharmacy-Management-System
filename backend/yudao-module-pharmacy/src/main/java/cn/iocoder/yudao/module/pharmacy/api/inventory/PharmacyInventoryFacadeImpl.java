@@ -13,7 +13,6 @@ import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ReleaseItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.ConsumeItem;
 import cn.iocoder.yudao.module.pharmacy.api.inventory.dto.AvailableQty;
 import cn.iocoder.yudao.module.pharmacy.dal.mysql.inventory.InventoryWriteMapper;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
@@ -33,7 +32,6 @@ import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.INV_STOC
  * 数据守恒：ph_inv_batch.qty_total = qty_avail + qty_frozen；每笔变更同步货位
  * ph_inv_location_stock 并写 ph_inv_flow 流水；收货入账以 uk_flow_event 幂等。
  */
-@Service
 public class PharmacyInventoryFacadeImpl implements InventoryFacade {
 
     private static final int FLOW_TYPE_RECEIVE = 10;      // 采购入

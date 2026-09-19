@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.order;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -27,5 +28,10 @@ public class AppWxOrderCreateReqVO {
     @Schema(description = "备注", example = "请尽快发货")
     @Size(max = 500, message = "备注长度不能超过 500 个字符")
     private String remark;
+
+    @Schema(description = "希望使用的抵扣积分（0 或不传表示不使用；实际可用值由后端按余额、抵扣比例与单笔上限校验）",
+            example = "100")
+    @Min(value = 0, message = "抵扣积分不能为负数")
+    private Integer usePoints;
 
 }

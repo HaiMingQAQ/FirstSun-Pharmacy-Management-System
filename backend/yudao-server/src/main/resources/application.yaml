@@ -349,6 +349,27 @@ yudao:
     send-maximum-quantity-per-day: 10
     begin-code: 9999 # 这里配置 9999 的原因是，测试方便。
     end-code: 9999 # 这里配置 9999 的原因是，测试方便。
+  pharmacy: # F 会员模块配置
+    member-sms: # 手机号 + 验证码快捷登录
+      # 基础配置默认关闭：prod 环境没有 local/dev 覆盖，会落到这里 => 手机号快捷登录整体禁用，
+      # 开发验证码在 prod 不可能生效（对应 F-1 要求 3、4）
+      login-enabled: false
+      dev-code-enabled: false
+      dev-code: ${PHARMACY_DEV_SMS_CODE:} # 开发测试验证码，仅来自环境变量，代码/前端/SQL/Dockerfile 均不硬编码
+      expire-time: 10m # 验证码有效期
+    member-point: # 会员积分规则（赠送 / 抵扣全部由后端按本配置 + 会员等级计算，前端传值不被信任）
+      earn-enabled: true # 是否启用积分赠送
+      deduct-enabled: true # 是否启用积分抵扣
+      earn-per-yuan: 1 # 每消费 1 元获得的基础积分
+      points-per-yuan: 100 # 多少积分抵扣 1 元
+      max-deduct-percent: 50 # 单笔订单最高抵扣比例（占应付金额的百分比，0-100）
+      min-deduct-points: 1 # 单笔最少使用的抵扣积分
+      max-deduct-points: 0 # 单笔最多使用的抵扣积分（0 表示不额外限制）
+      level-multiplier: # 等级倍率，key = member_level.level；未配置的等级按 1.0 计算
+        1: 1.0
+        2: 1.2
+        3: 1.5
+        4: 2.0
   trade:
     order:
       pay-expire-time: 2h # 支付的过期时间

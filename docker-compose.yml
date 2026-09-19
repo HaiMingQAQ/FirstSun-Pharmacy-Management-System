@@ -37,20 +37,27 @@ services:
       - ./sql/migrations/fix_pos_menu_name.sql:/docker-entrypoint-initdb.d/14-pos-menu-name-fix.sql:ro
       - ./sql/migrations/20260912_b_purchase_supplier_menu.sql:/docker-entrypoint-initdb.d/15-purchase-supplier-menu.sql:ro
       - ./sql/migrations/20260913_b_purchase_order_receipt_menu.sql:/docker-entrypoint-initdb.d/16-purchase-order-receipt-menu.sql:ro
-      - ./sql/migrations/20260914_k_pharmacy_inventory_menu.sql:/docker-entrypoint-initdb.d/17-pharmacy-inventory-menu.sql:ro
-      - ./sql/migrations/20260911_f_pharmacy_member_menu.sql:/docker-entrypoint-initdb.d/18-pharmacy-member-menu.sql:ro
-      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/19-firstsun-shared-account.sql:ro
-      - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/20-pos-menu-path-fix.sql:ro
-      - ./sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/21-pharmacy-demo-data.sql:ro
-      - ./sql/migrations/20260914_m_pharmacy_rx_pay_menu.sql:/docker-entrypoint-initdb.d/22-pharmacy-rx-pay-menu.sql:ro
-      - ./sql/migrations/20260914_n_pay_app_init.sql:/docker-entrypoint-initdb.d/23-pay-app-init.sql:ro
-      - ./sql/migrations/20260916_f_wx_order_line_alloc.sql:/docker-entrypoint-initdb.d/25-pharmacy-wx-alloc.sql:ro
-      - ./sql/migrations/20260916_f_wx_order_alloc_frozen_stage.sql:/docker-entrypoint-initdb.d/26-pharmacy-wx-alloc-frozen.sql:ro
-      - ./sql/migrations/20260916_f_wx_order_alloc_out_ref.sql:/docker-entrypoint-initdb.d/27-pharmacy-wx-alloc-out-ref.sql:ro
-      - ./sql/migrations/20260917_f_member_address_update_menu.sql:/docker-entrypoint-initdb.d/28-pharmacy-member-address-update.sql:ro
-      - ./sql/migrations/20260917_o_pharmacy_ai_prototype.sql:/docker-entrypoint-initdb.d/29-pharmacy-ai-prototype.sql:ro
-      - ./sql/migrations/20260918_a_ai_menu_fix.sql:/docker-entrypoint-initdb.d/30-pharmacy-ai-menu-fix.sql:ro
-      - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/24-inventory-facade-flow-ref.sql:ro
+      - ./sql/migrations/20260917_b_purchase_order_reject.sql:/docker-entrypoint-initdb.d/17-purchase-order-reject.sql:ro
+      - ./sql/migrations/20260917_b_purchase_doc_seq.sql:/docker-entrypoint-initdb.d/18-purchase-doc-seq.sql:ro
+      - ./sql/migrations/20260914_k_pharmacy_inventory_menu.sql:/docker-entrypoint-initdb.d/19-pharmacy-inventory-menu.sql:ro
+      - ./sql/migrations/20260911_f_pharmacy_member_menu.sql:/docker-entrypoint-initdb.d/20-pharmacy-member-menu.sql:ro
+      - ./sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/21-firstsun-shared-account.sql:ro
+      - ./sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/22-pos-menu-path-fix.sql:ro
+      - ./sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/23-pharmacy-demo-data.sql:ro
+      - ./sql/migrations/20260914_m_pharmacy_rx_pay_menu.sql:/docker-entrypoint-initdb.d/24-pharmacy-rx-pay-menu.sql:ro
+      - ./sql/migrations/20260914_n_pay_app_init.sql:/docker-entrypoint-initdb.d/25-pay-app-init.sql:ro
+      - ./sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/26-inventory-facade-flow-ref.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_line_alloc.sql:/docker-entrypoint-initdb.d/27-pharmacy-wx-alloc.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_alloc_frozen_stage.sql:/docker-entrypoint-initdb.d/28-pharmacy-wx-alloc-frozen.sql:ro
+      - ./sql/migrations/20260916_f_wx_order_alloc_out_ref.sql:/docker-entrypoint-initdb.d/29-pharmacy-wx-alloc-out-ref.sql:ro
+      - ./sql/migrations/20260917_f_member_address_update_menu.sql:/docker-entrypoint-initdb.d/30-pharmacy-member-address-update.sql:ro
+      - ./sql/migrations/20260918_f_member_sms_code.sql:/docker-entrypoint-initdb.d/31-pharmacy-member-sms-code.sql:ro
+      - ./sql/migrations/20260918_f_wx_order_points.sql:/docker-entrypoint-initdb.d/32-pharmacy-wx-order-points.sql:ro
+      - ./sql/migrations/20260917_c_inventory_shared_role_menu.sql:/docker-entrypoint-initdb.d/33-c-inventory-role-menu.sql:ro
+      - ./sql/migrations/20260918_c_inventory_flow_comment_utf8.sql:/docker-entrypoint-initdb.d/34-c-inventory-flow-comment.sql:ro
+      - ./sql/migrations/20260918_l_fix_demo_location_163032.sql:/docker-entrypoint-initdb.d/35-fix-demo-location-163032.sql:ro
+      - ./sql/migrations/20260917_o_pharmacy_ai_prototype.sql:/docker-entrypoint-initdb.d/36-pharmacy-ai-prototype.sql:ro
+      - ./sql/migrations/20260918_a_ai_menu_fix.sql:/docker-entrypoint-initdb.d/37-pharmacy-ai-menu-fix.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
@@ -84,6 +91,9 @@ services:
     environment:
       TZ: Asia/Shanghai
       PHARMACY_AI_API_KEY: ${PHARMACY_AI_API_KEY:-}
+      # 会员手机号快捷登录的「开发测试验证码」：仅 local/dev profile 生效，
+      # 生产环境不使用该变量；真实验证码值只写在本地 .env（已被 git 忽略）
+      PHARMACY_DEV_SMS_CODE: ${PHARMACY_DEV_SMS_CODE:-}
       JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
       ARGS: >-
         --spring.profiles.active=local

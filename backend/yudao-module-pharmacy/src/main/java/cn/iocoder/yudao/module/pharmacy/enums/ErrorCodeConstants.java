@@ -101,6 +101,14 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_MEMBER_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_030_006_002, "账号或密码错误");
     ErrorCode PHARMACY_MEMBER_USER_DISABLED = new ErrorCode(1_030_006_003, "会员账号已被禁用");
     ErrorCode PHARMACY_MEMBER_USER_MOBILE_INVALID = new ErrorCode(1_030_006_004, "手机号格式不正确");
+    ErrorCode PHARMACY_MEMBER_SMS_LOGIN_DISABLED = new ErrorCode(1_030_006_005, "当前环境未启用短信登录");
+    ErrorCode PHARMACY_MEMBER_SMS_CODE_REQUIRED = new ErrorCode(1_030_006_006, "请输入手机验证码");
+    ErrorCode PHARMACY_MEMBER_SMS_CODE_INVALID = new ErrorCode(1_030_006_007, "验证码错误，请重新输入");
+    ErrorCode PHARMACY_MEMBER_SMS_CODE_EXPIRED = new ErrorCode(1_030_006_008, "验证码已过期，请重新获取");
+    ErrorCode PHARMACY_MEMBER_SMS_CODE_USED = new ErrorCode(1_030_006_009, "验证码已被使用，请重新获取");
+    ErrorCode PHARMACY_MEMBER_SMS_CODE_NOT_EXISTS = new ErrorCode(1_030_006_010, "请先获取该手机号的验证码");
+    ErrorCode PHARMACY_MEMBER_SMS_DEV_CODE_NOT_CONFIGURED = new ErrorCode(1_030_006_011,
+            "开发环境未配置测试验证码，请通过环境变量 PHARMACY_DEV_SMS_CODE 配置");
 
     // ========== 会员等级 1-030-007-000 ==========
     ErrorCode PHARMACY_MEMBER_LEVEL_NOT_EXISTS = new ErrorCode(1_030_007_000, "会员等级不存在");
@@ -113,6 +121,13 @@ public interface ErrorCodeConstants {
     ErrorCode PHARMACY_MEMBER_POINT_BIZ_INVALID = new ErrorCode(1_030_008_001, "积分业务参数非法：会员编号与业务编码不能为空");
     ErrorCode PHARMACY_MEMBER_POINT_NOT_ENOUGH = new ErrorCode(1_030_008_002, "会员积分不足：当前可用积分 {}，本次需要 {}");
     ErrorCode PHARMACY_MEMBER_POINT_RETURN_EXCEED = new ErrorCode(1_030_008_003, "返还积分超过该业务单号已扣减的积分");
+    ErrorCode PHARMACY_MEMBER_POINT_DEDUCT_DISABLED = new ErrorCode(1_030_008_004, "当前环境未启用积分抵扣");
+    ErrorCode PHARMACY_MEMBER_POINT_DEDUCT_MEMBER_REQUIRED = new ErrorCode(1_030_008_005, "散客不能使用积分抵扣，请先选择会员");
+    ErrorCode PHARMACY_MEMBER_POINT_DEDUCT_TOO_SMALL = new ErrorCode(1_030_008_006, "使用积分不能少于 {} 分");
+    ErrorCode PHARMACY_MEMBER_POINT_DEDUCT_EXCEED = new ErrorCode(1_030_008_007, "使用积分超出上限：本单最多可使用 {} 分");
+    ErrorCode PHARMACY_MEMBER_POINT_DEDUCT_AMOUNT_EXCEED = new ErrorCode(1_030_008_008, "抵扣金额不能大于订单应付金额：本单最多抵扣 {} 元");
+    ErrorCode PHARMACY_MEMBER_POINT_EARN_DISABLED = new ErrorCode(1_030_008_009, "当前环境未启用积分赠送");
+    ErrorCode PHARMACY_MEMBER_POINT_ORDER_AMOUNT_INVALID = new ErrorCode(1_030_008_010, "积分结算参数非法：订单金额不能为空或小于 0");
 
     // ========== 会员收件地址 1-030-009-000 ==========
     ErrorCode PHARMACY_MEMBER_ADDRESS_NOT_EXISTS = new ErrorCode(1_030_009_000, "会员收件地址不存在");
