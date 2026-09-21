@@ -263,8 +263,10 @@
     border-radius: 6px;
   }
 }
+/* #ifdef H5 */
 @media (prefers-reduced-motion: reduce) {
   .fs-page * {
     transition: none !important;
   }
 }
+/* #endif */
