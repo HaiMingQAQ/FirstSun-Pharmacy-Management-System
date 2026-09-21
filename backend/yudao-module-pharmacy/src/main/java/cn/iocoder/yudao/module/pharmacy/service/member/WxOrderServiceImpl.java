@@ -414,6 +414,42 @@ public class WxOrderServiceImpl implements WxOrderService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void notifyWxOrderPaid(String merchantOrderId, Long payOrderId) {
+        WxOrderPaymentAccess.tenantId(); // Fail closed before even looking up the order.
+        if (merchantOrderId == null || merchantOrderId.isBlank() || payOrderId == null || payOrderId <= 0) {
+            throw exception(PAY_STATUS_UNKNOWN);
+        }
+        var candidate = wxOrderMapper.selectByOrderNo(merchantOrderId);
+        if (candidate == null) throw exception(PHARMACY_WX_ORDER_NOT_EXISTS);
+        var order = orderPaymentAccess.lockOrder(candidate.getId());
+        if (!Objects.equals(order.getOrderNo(), merchantOrderId)) throw exception(PAY_STATUS_UNKNOWN);
+        var payment = orderPaymentAccess.lockPayment(order, payOrderId);
+        boolean success = cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.isSuccess(payment.getStatus());
+        boolean refunded = Objects.equals(payment.getStatus(),
+                cn.iocoder.yudao.module.pay.enums.order.PayOrderStatusEnum.REFUND.getStatus());
+        if ((!success && !refunded) || payment.getSuccessTime() == null || payment.getRefundPrice() == null
+                || payment.getRefundPrice() < 0 || payment.getRefundPrice() > payment.getPrice()) {
+            throw exception(PAY_STATUS_UNKNOWN);
+        }
+        // A late success notification must never undo picking, completion, cancellation or refund.
+        if (Objects.equals(order.getPayNo(), payOrderId.toString())
+                && (Objects.equals(order.getPayStatus(), PAY_STATUS_PAID)
+                    || Objects.equals(order.getPayStatus(), PAY_STATUS_REFUNDED))
+                && WxOrderStatusEnum.isValid(order.getStatus())
+                && !Objects.equals(order.getStatus(), WxOrderStatusEnum.WAIT_PAY.getStatus())) {
+            return;
+        }
+        if (!success || payment.getRefundPrice() != 0 || !Objects.equals(order.getPayStatus(), PAY_STATUS_WAIT)
+                || !Objects.equals(order.getStatus(), WxOrderStatusEnum.WAIT_PAY.getStatus())
+                || (order.getPayNo() != null && !order.getPayNo().isBlank()
+                    && !Objects.equals(order.getPayNo(), payOrderId.toString()))) {
+            throw exception(PHARMACY_WX_ORDER_STATUS_FLOW_ERROR);
+        }
+        completePayment(order, payOrderId.toString(), payOrderId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void confirmReceiveWxOrderByMember(Long id) {
         WxOrderDO wxOrder = validateWxOrderOwner(cn.iocoder.yudao.module.pharmacy.service.member.AppMemberAccess.requireMember(), id);
         if (!Objects.equals(wxOrder.getOrderType(), ORDER_TYPE_DELIVERY)

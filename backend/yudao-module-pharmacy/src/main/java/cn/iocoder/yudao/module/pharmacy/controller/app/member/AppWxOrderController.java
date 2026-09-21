@@ -44,6 +44,15 @@ public class AppWxOrderController {
     @Resource
     private WxOrderLineService wxOrderLineService;
 
+    @PostMapping("/payment-notify")
+    @jakarta.annotation.security.PermitAll // Pay module sends no member token; service verifies persisted records.
+    @Operation(summary = "接收支付业务通知")
+    public CommonResult<Boolean> paymentNotify(@RequestBody @Valid
+            cn.iocoder.yudao.module.pay.api.notify.dto.PayOrderNotifyReqDTO request) {
+        wxOrderService.notifyWxOrderPaid(request.getMerchantOrderId(), request.getPayOrderId());
+        return success(true);
+    }
+
     @PostMapping("/create")
     @Operation(summary = "从购物车已勾选商品下单（到店自提/同城配送）",
             description = "usePoints 只表示希望使用的抵扣积分，实际可用值与赠送积分由后端按会员等级与积分规则计算")

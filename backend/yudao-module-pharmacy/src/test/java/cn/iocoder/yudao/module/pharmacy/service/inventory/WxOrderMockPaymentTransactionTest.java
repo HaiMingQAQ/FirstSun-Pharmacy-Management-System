@@ -85,6 +85,10 @@ class WxOrderMockPaymentTransactionTest {
         ReflectionTestUtils.setField(access, "appKey", "firstsun");
         access = transactional(access);
         var orders = mock(WxOrderMapper.class);
+        when(orders.selectByOrderNo(anyString())).thenAnswer(a -> db.query(
+                "SELECT * FROM ph_wx_order WHERE order_no=? AND tenant_id=? AND deleted=0",
+                new BeanPropertyRowMapper<>(WxOrderDO.class), a.getArgument(0), TenantContextHolder.getTenantId())
+                .stream().findFirst().orElse(null));
         when(orders.update(any(), any())).thenAnswer(a -> {
             WxOrderDO update = a.getArgument(0);
             return db.update("UPDATE ph_wx_order SET pay_no=?,pay_status=?,status=? WHERE id=100 AND status=0",
@@ -124,8 +128,9 @@ class WxOrderMockPaymentTransactionTest {
         when(worker.deduct(any(InventoryReadAccess.Scope.class), anyList(), anyLong())).thenAnswer(a -> {
             assertEquals(new InventoryReadAccess.Scope(7,4), a.getArgument(0));
             assertEquals(0L, (Long) a.getArgument(2));
-            assertEquals(UserTypeEnum.MEMBER.getValue(),
-                    ((LoginUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal()).getUserType());
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null) assertEquals(UserTypeEnum.MEMBER.getValue(),
+                    ((LoginUser) authentication.getPrincipal()).getUserType());
             db.update("UPDATE stock SET qty=qty-2 WHERE id=1");
             db.update("INSERT INTO effects VALUES('stock-flow')");
             if (failStock) throw new IllegalStateException("stock worker failed after write");
@@ -189,6 +194,72 @@ class WxOrderMockPaymentTransactionTest {
     }
     @Test void successAndRepeatCommitStockOnceWithoutChangingPointsOrIdentity() {
         service.simulatePayWxOrderByMember(100L); service.simulatePayWxOrderByMember(100L); assertSuccess();
+    }
+    private void persistedPaymentForNotification() {
+        SecurityContextHolder.clearContext();
+        db.update("INSERT INTO pay_order VALUES(50,7,0,9,1,1,'WX100',1234,10,?, ?,0)",
+                PayChannelEnum.MOCK.getCode(), LocalDateTime.now());
+    }
+    @Test void notificationLateAndRepeatedNeverChangesProcessedOrder() {
+        service.simulatePayWxOrderByMember(100L);
+        SecurityContextHolder.clearContext();
+        for (int status : List.of(1,2,3,4,-1)) {
+            db.update("UPDATE ph_wx_order SET status=?", status);
+            service.notifyWxOrderPaid("WX100",50L);
+            service.notifyWxOrderPaid("WX100",50L);
+            assertEquals(status, db.queryForObject("SELECT status FROM ph_wx_order",Integer.class));
+        }
+        db.update("UPDATE ph_wx_order SET pay_status=2");
+        db.update("UPDATE pay_order SET status=20,refund_price=1234");
+        service.notifyWxOrderPaid("WX100",50L);
+        assertEquals(2, db.queryForObject("SELECT pay_status FROM ph_wx_order",Integer.class));
+        assertEquals(8, db.queryForObject("SELECT qty FROM stock",Integer.class));
+        assertEquals(3,count("effects")); verifyNoInteractions(points,employeeInventory);
+        verify(payments,times(1)).submitOrder(any(),anyString());
+    }
+    @Test void notificationConcurrentFirstDeliveryCompletesOnceWithoutLogin() throws Exception {
+        persistedPaymentForNotification();
+        var pool=Executors.newFixedThreadPool(2); var start=new CountDownLatch(1);
+        Callable<Void> notify=()->{ TenantContextHolder.setTenantId(7L);
+            try { start.await(); service.notifyWxOrderPaid("WX100",50L); }
+            finally { TenantContextHolder.clear(); SecurityContextHolder.clearContext(); } return null; };
+        try {
+            var first=pool.submit(notify); var second=pool.submit(notify); start.countDown();
+            first.get(10,TimeUnit.SECONDS); second.get(10,TimeUnit.SECONDS);
+        } finally { pool.shutdownNow(); }
+        assertEquals(1,db.queryForObject("SELECT pay_status FROM ph_wx_order",Integer.class));
+        assertEquals(8,db.queryForObject("SELECT qty FROM stock",Integer.class));
+        assertEquals(2,count("effects")); verifyNoInteractions(payments,points,employeeInventory);
+    }
+    @Test void notificationFailureRollsBackAndRetryCompletes() {
+        persistedPaymentForNotification(); failStock=true;
+        assertThrows(IllegalStateException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        assertEquals(0,db.queryForObject("SELECT pay_status FROM ph_wx_order",Integer.class));
+        assertEquals(10,db.queryForObject("SELECT qty FROM stock",Integer.class));
+        assertEquals(0,count("effects")); assertEquals(1,count("pay_order"));
+        failStock=false; service.notifyWxOrderPaid("WX100",50L); service.notifyWxOrderPaid("WX100",50L);
+        assertEquals(8,db.queryForObject("SELECT qty FROM stock",Integer.class));
+        assertEquals(2,count("effects")); verifyNoInteractions(payments,points,employeeInventory);
+    }
+    @Test void notificationRejectsForgedRecordsAndTenantEvenAfterCompletion() {
+        persistedPaymentForNotification();
+        for (String change : List.of("status=0", "price=1", "app_id=99", "user_id=2",
+                "user_type=2", "merchant_order_id='OTHER'", "tenant_id=8", "success_time=NULL")) {
+            db.update("UPDATE pay_order SET status=10,price=1234,app_id=9,user_id=1,user_type=1,merchant_order_id='WX100',tenant_id=7,success_time=CURRENT_TIMESTAMP");
+            db.update("UPDATE pay_order SET "+change);
+            assertThrows(RuntimeException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        }
+        TenantContextHolder.setTenantId(8L);
+        assertThrows(RuntimeException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        TenantContextHolder.clear();
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        TenantContextHolder.setTenantId(7L); TenantContextHolder.setIgnore(true);
+        assertThrows(org.springframework.security.access.AccessDeniedException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        TenantContextHolder.setIgnore(false);
+        db.update("UPDATE ph_wx_order SET pay_status=1,status=4,pay_no='51'");
+        db.update("UPDATE pay_order SET success_time=CURRENT_TIMESTAMP");
+        assertThrows(RuntimeException.class,()->service.notifyWxOrderPaid("WX100",50L));
+        verifyNoInteractions(worker,payments,points,employeeInventory);
     }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})

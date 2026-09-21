@@ -182,6 +182,9 @@ public interface WxOrderService {
     /** 默认关闭的开发模拟支付，复用支付成功记录和订单扣库事务。 */
     void simulatePayWxOrderByMember(Long id);
 
+    /** 支付业务通知：核实服务端支付记录，重复通知不重复执行订单副作用。 */
+    void notifyWxOrderPaid(String merchantOrderId, Long payOrderId);
+
     /** 本人已支付且完成拣货的配送订单确认收货；自提保留门店核销。 */
     void confirmReceiveWxOrderByMember(Long id);
 
