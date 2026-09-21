@@ -1,0 +1,152 @@
+# FirstSun Pharmacy — 低内存云端演示部署
+# 服务器要求：Ubuntu 22.04, 2核, ≥1.7Gi RAM, Docker + Compose V2
+# 所有服务仅绑定 127.0.0.1，通过 SSH 隧道访问
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: firstsun-pharmacy-mysql
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-firstsun_pharmacy}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=192M
+      - --innodb-log-file-size=48M
+      - --max-connections=50
+      - --table-open-cache=200
+      - --performance-schema=OFF
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ../backend/sql/mysql/ruoyi-vue-pro.sql:/docker-entrypoint-initdb.d/01-yudao.sql:ro
+      - ../sql/firstsun_pharmacy_init.sql:/docker-entrypoint-initdb.d/02-firstsun.sql:ro
+      - ../sql/migrations/20260908_a_pharmacy_module_init.sql:/docker-entrypoint-initdb.d/03-pharmacy-module.sql:ro
+      - ../sql/migrations/20260908_b_pharmacy_store_menu.sql:/docker-entrypoint-initdb.d/04-pharmacy-store-menu.sql:ro
+      - ../sql/migrations/20260908_c_pharmacy_employee_menu.sql:/docker-entrypoint-initdb.d/05-pharmacy-employee-menu.sql:ro
+      - ../sql/migrations/20260908_d_pharmacy_drug_menu.sql:/docker-entrypoint-initdb.d/06-pharmacy-drug-menu.sql:ro
+      - ../sql/migrations/20260908_e_pharmacy_barcode_menu.sql:/docker-entrypoint-initdb.d/07-pharmacy-barcode-menu.sql:ro
+      - ../sql/migrations/20260909_f_pharmacy_menu_path_fix.sql:/docker-entrypoint-initdb.d/08-pharmacy-menu-path-fix.sql:ro
+      - ../sql/migrations/20260909_g_pharmacy_role_menu_tenant_fix.sql:/docker-entrypoint-initdb.d/09-pharmacy-role-menu-fix.sql:ro
+      - ../sql/migrations/20260909_h_pharmacy_barcode_menu_icon_fix.sql:/docker-entrypoint-initdb.d/10-pharmacy-barcode-icon-fix.sql:ro
+      - ../sql/migrations/20260908_d_pos_menu.sql:/docker-entrypoint-initdb.d/11-pos-menu.sql:ro
+      - ../sql/migrations/20260908_d_pos_menu_bind_role.sql:/docker-entrypoint-initdb.d/12-pos-menu-role.sql:ro
+      - ../sql/migrations/20260909_d_pos_tables_fix.sql:/docker-entrypoint-initdb.d/13-pos-tables-fix.sql:ro
+      - ../sql/migrations/fix_pos_menu_name.sql:/docker-entrypoint-initdb.d/14-pos-menu-name-fix.sql:ro
+      - ../sql/migrations/20260912_b_purchase_supplier_menu.sql:/docker-entrypoint-initdb.d/15-purchase-supplier-menu.sql:ro
+      - ../sql/migrations/20260913_b_purchase_order_receipt_menu.sql:/docker-entrypoint-initdb.d/16-purchase-order-receipt-menu.sql:ro
+      - ../sql/migrations/20260917_b_purchase_order_reject.sql:/docker-entrypoint-initdb.d/17-purchase-order-reject.sql:ro
+      - ../sql/migrations/20260917_b_purchase_doc_seq.sql:/docker-entrypoint-initdb.d/18-purchase-doc-seq.sql:ro
+      - ../sql/migrations/20260914_k_pharmacy_inventory_menu.sql:/docker-entrypoint-initdb.d/19-pharmacy-inventory-menu.sql:ro
+      - ../sql/migrations/20260911_f_pharmacy_member_menu.sql:/docker-entrypoint-initdb.d/20-pharmacy-member-menu.sql:ro
+      - ../sql/migrations/20260910_i_firstsun_shared_account.sql:/docker-entrypoint-initdb.d/21-firstsun-shared-account.sql:ro
+      - ../sql/migrations/20260911_j_pos_menu_path_fix.sql:/docker-entrypoint-initdb.d/22-pos-menu-path-fix.sql:ro
+      - ../sql/migrations/20260914_l_pharmacy_demo_data.sql:/docker-entrypoint-initdb.d/23-pharmacy-demo-data.sql:ro
+      - ../sql/migrations/20260914_m_pharmacy_rx_pay_menu.sql:/docker-entrypoint-initdb.d/24-pharmacy-rx-pay-menu.sql:ro
+      - ../sql/migrations/20260914_n_pay_app_init.sql:/docker-entrypoint-initdb.d/25-pay-app-init.sql:ro
+      - ../sql/migrations/20260915_c_inventory_facade_flow_ref.sql:/docker-entrypoint-initdb.d/26-inventory-facade-flow-ref.sql:ro
+      - ../sql/migrations/20260916_f_wx_order_line_alloc.sql:/docker-entrypoint-initdb.d/27-pharmacy-wx-alloc.sql:ro
+      - ../sql/migrations/20260916_f_wx_order_alloc_frozen_stage.sql:/docker-entrypoint-initdb.d/28-pharmacy-wx-alloc-frozen.sql:ro
+      - ../sql/migrations/20260916_f_wx_order_alloc_out_ref.sql:/docker-entrypoint-initdb.d/29-pharmacy-wx-alloc-out-ref.sql:ro
+      - ../sql/migrations/20260917_f_member_address_update_menu.sql:/docker-entrypoint-initdb.d/30-pharmacy-member-address-update.sql:ro
+      - ../sql/migrations/20260918_f_member_sms_code.sql:/docker-entrypoint-initdb.d/31-pharmacy-member-sms-code.sql:ro
+      - ../sql/migrations/20260918_f_wx_order_points.sql:/docker-entrypoint-initdb.d/32-pharmacy-wx-order-points.sql:ro
+      - ../sql/migrations/20260917_c_inventory_shared_role_menu.sql:/docker-entrypoint-initdb.d/33-c-inventory-role-menu.sql:ro
+      - ../sql/migrations/20260918_c_inventory_flow_comment_utf8.sql:/docker-entrypoint-initdb.d/34-c-inventory-flow-comment.sql:ro
+      - ../sql/migrations/20260918_l_fix_demo_location_163032.sql:/docker-entrypoint-initdb.d/35-fix-demo-location-163032.sql:ro
+      - ../sql/migrations/20260917_o_pharmacy_ai_prototype.sql:/docker-entrypoint-initdb.d/36-pharmacy-ai-prototype.sql:ro
+      - ../sql/migrations/20260918_a_ai_menu_fix.sql:/docker-entrypoint-initdb.d/37-pharmacy-ai-menu-fix.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: firstsun-pharmacy-redis
+    restart: unless-stopped
+    mem_limit: 96m
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    image: firstsun-pharmacy-backend:latest
+    container_name: firstsun-pharmacy-backend
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      PHARMACY_AI_API_KEY: ${PHARMACY_AI_API_KEY:-}
+      PHARMACY_DEV_SMS_CODE: ${PHARMACY_DEV_SMS_CODE:-}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx256m -Djava.security.egd=file:/dev/./urandom}
+      ARGS: >-
+        --spring.profiles.active=local
+        --yudao.security.mock-enable=false
+        --yudao.pay.order-notify-url=http://127.0.0.1:${BACKEND_PORT:-48080}/admin-api/pay/notify/order
+        --yudao.pay.refund-notify-url=http://127.0.0.1:${BACKEND_PORT:-48080}/admin-api/pay/notify/refund
+        --yudao.pay.transfer-notify-url=http://127.0.0.1:${BACKEND_PORT:-48080}/admin-api/pay/notify/transfer
+        --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-firstsun_pharmacy}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+        --spring.datasource.dynamic.datasource.master.username=${MYSQL_USER}
+        --spring.datasource.dynamic.datasource.master.password=${MYSQL_PASSWORD}
+        --spring.datasource.dynamic.datasource.slave.url=jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-firstsun_pharmacy}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+        --spring.datasource.dynamic.datasource.slave.username=${MYSQL_USER}
+        --spring.datasource.dynamic.datasource.slave.password=${MYSQL_PASSWORD}
+        --spring.data.redis.host=redis
+        --spring.data.redis.port=6379
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-48080}:48080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:48080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  admin-ui:
+    image: firstsun-pharmacy-admin-ui:latest
+    container_name: firstsun-pharmacy-admin-ui
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-80}:80"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  mysql-data:

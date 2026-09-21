@@ -46,3 +46,10 @@ Thumbs.db
 
 # Local environment overrides
 **/.env.*.local
+
+# Deployment secrets
+/deploy/.env.prod
+
+# Deployment image archives
+/deploy/*.tar
+/deploy/*.tar.gz

@@ -6,7 +6,7 @@
 //   false = 接入真实后端 app-api（默认，课堂演示使用真实接口）
 // 开关只在这里配置，页面/组件不允许散落 Mock 判断（见 client.js 门面）。
 // =====================================================
-export const PHARMACY_DEMO = false;
+export const PHARMACY_DEMO = true;
 
 // 测试手机号登录使用的验证码。
 // 前端「获取测试码」按钮会填入该值；真实后端校验的是
