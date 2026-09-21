@@ -220,6 +220,7 @@ public interface ErrorCodeConstants {
     ErrorCode PRESC_STATUS_INVALID = new ErrorCode(1_032_001_004, "处方状态不允许该操作");
     ErrorCode PRESC_SOURCE_INVALID = new ErrorCode(1_032_001_005, "处方来源非法：只能为 0(纸质拍照)/1(电子处方平台)/2(复诊续方)");
     ErrorCode PRESC_IMAGES_EXCEED = new ErrorCode(1_032_001_006, "处方影像最多上传 5 张");
+    ErrorCode PRESC_NOT_OWNER = new ErrorCode(1_032_001_007, "无权查看他人处方");
 
     // ========== 审方 1-032-002-000（E 维护）==========
     ErrorCode PRESC_REVIEW_ALREADY = new ErrorCode(1_032_002_000, "处方已审核，不能重复审核");

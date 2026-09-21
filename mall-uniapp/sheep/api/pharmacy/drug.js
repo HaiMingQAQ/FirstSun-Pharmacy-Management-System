@@ -13,6 +13,7 @@ const DrugApi = {
       params,
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },
@@ -24,6 +25,9 @@ const DrugApi = {
       params: {
         id,
       },
+      custom: {
+        showError: false,
+      },
     });
   },
   // 获得启用的药品分类列表
@@ -33,6 +37,7 @@ const DrugApi = {
       method: 'GET',
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },

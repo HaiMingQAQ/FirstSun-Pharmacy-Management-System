@@ -56,6 +56,9 @@ public class AppWxOrderRespVO {
     @Schema(description = "订单状态 0待支付/1待拣货/2拣货中/3待自提/4完成/-1取消", requiredMode = Schema.RequiredMode.REQUIRED, example = "0")
     private Integer status;
 
+    @Schema(description = "关联处方案编号（含处方药订单才有）", example = "1024")
+    private Long prescId;
+
     @Schema(description = "取消原因", example = "用户主动取消")
     private String cancelReason;
 

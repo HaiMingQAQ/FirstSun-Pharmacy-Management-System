@@ -1,0 +1,4 @@
+*
+!mysql.Dockerfile
+!redis.Dockerfile
+!http-client.Dockerfile

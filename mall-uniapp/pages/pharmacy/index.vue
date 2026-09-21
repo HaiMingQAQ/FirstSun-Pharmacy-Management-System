@@ -15,10 +15,10 @@
         <view class="fs-grow">
           <view class="store-title">
             <uni-icons type="location" size="17" color="#176b5b" />
-            阳光店
+            {{ storeInfo.name }}
             <text class="fs-tag">演示门店</text>
           </view>
-          <view class="fs-muted">到店自提 / 门店配送 · {{ api.store.hours }}</view>
+          <view class="fs-muted">到店自提 / 门店配送 · {{ storeInfo.hours }}</view>
         </view>
         <uni-icons type="right" size="16" color="#758078" />
       </view>
@@ -29,7 +29,7 @@
     </view>
     <view class="shortcuts fs-white">
       <button
-        v-for="cat in api.categories.slice(1)"
+        v-for="cat in categories.slice(1)"
         :key="cat.id"
         @tap="go('category?category=' + cat.id)"
       >
@@ -82,11 +82,15 @@
   import api from '@/sheep/api/pharmacy/client';
   import { go, toast, requireLogin, useRequest, useAction } from './usePharmacy';
   const list = ref([]);
+  const storeInfo = ref(api.store);
+  const categories = ref(api.categories);
   const { loading, error, run } = useRequest();
   const { busy, act } = useAction();
   const load = () =>
     run(async () => {
       list.value = (await api.products()).slice(0, 5);
+      categories.value = api.categories;
+      storeInfo.value = api.store;
     });
   const add = (p) => {
     if (requireLogin())

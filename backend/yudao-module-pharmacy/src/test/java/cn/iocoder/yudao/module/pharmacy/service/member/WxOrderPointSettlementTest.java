@@ -100,6 +100,12 @@ class WxOrderPointSettlementTest {
 
     @BeforeEach
     void setUp() {
+        var login = new cn.iocoder.yudao.framework.security.core.LoginUser();
+        login.setId(MEMBER_ID); login.setTenantId(7L);
+        login.setUserType(cn.iocoder.yudao.framework.common.enums.UserTypeEnum.MEMBER.getValue());
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(7L);
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(login, null, List.of()));
         // 购物车：一件商品，单价 25.00 × 2 = 50.00
         when(wxCartService.getSelectedCartListByMemberId(MEMBER_ID)).thenReturn(List.of(buildCart()));
         when(drugApi.getDrugList(anyList())).thenReturn(List.of(buildDrug()));
@@ -111,6 +117,12 @@ class WxOrderPointSettlementTest {
             order.setId(ORDER_ID);
             return 1;
         }).when(wxOrderMapper).insert(any(WxOrderDO.class));
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void clearMemberContext() {
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     // ========== 下单：预扣抵扣积分 ==========
@@ -219,6 +231,7 @@ class WxOrderPointSettlementTest {
         DrugRespDTO drug = new DrugRespDTO();
         drug.setId(DRUG_ID);
         drug.setStatus(1);
+        drug.setSaleableOnline(1);
         drug.setApproveStatus(1);
         drug.setIsRx(0);
         drug.setRetailPrice(new BigDecimal("25.00"));

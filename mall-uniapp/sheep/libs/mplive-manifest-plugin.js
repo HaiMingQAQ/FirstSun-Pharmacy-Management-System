@@ -1,32 +1,19 @@
-const fs = require('fs');
-
-const manifestPath = process.env.UNI_INPUT_DIR + '/manifest.json';
-
-let Manifest = fs.readFileSync(manifestPath, {
-	encoding: 'utf-8'
-});
-
-function mpliveMainfestPlugin(isOpen) {
-	if (process.env.UNI_PLATFORM !== 'mp-weixin') return;
-
-	const manifestData = JSON.parse(Manifest)
-
-	if (isOpen === '0') {
-		delete manifestData['mp-weixin'].plugins['live-player-plugin'];
-	}
-
-	if (isOpen === '1') {
-		manifestData['mp-weixin'].plugins['live-player-plugin'] = {
-			"version": "1.3.5",
-			"provider": "wx2b03c6e691cd7370"
-		}
-	}
-
-	Manifest = JSON.stringify(manifestData, null, 2)
-
-	fs.writeFileSync(manifestPath, Manifest, {
-		"flag": "w"
-	})
+// Configure generated output without rewriting the checked-in manifest.
+export default function mpliveMainfestPlugin(isOpen) {
+  return {
+    name: 'firstsun-mplive-manifest',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      if (process.env.UNI_PLATFORM !== 'mp-weixin') return;
+      const asset = bundle['app.json'];
+      if (!asset || asset.type !== 'asset') return;
+      const app = JSON.parse(String(asset.source));
+      app.plugins = app.plugins || {};
+      if (isOpen === '0') delete app.plugins['live-player-plugin'];
+      if (isOpen === '1') app.plugins['live-player-plugin'] = {
+        version: '1.3.5', provider: 'wx2b03c6e691cd7370',
+      };
+      asset.source = JSON.stringify(app, null, 2);
+    },
+  };
 }
-
-export default mpliveMainfestPlugin

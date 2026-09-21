@@ -66,8 +66,8 @@
         <view class="fs-between fs-field">
           <view class="fs-grow">
             <view>积分抵扣</view>
-            <view class="fs-muted">可用 {{ data.points }} 积分 · 100 积分抵 ¥1</view>
-            <view class="fs-muted">每单最多抵 ¥5，配送费不参与</view>
+            <view class="fs-muted">可用 {{ data.points }} 积分 · {{ data.pointsRule }}</view>
+            <view class="fs-muted">{{ data.maxDeductNote }}，配送费不参与</view>
           </view>
           <switch
             :checked="usePoints"
@@ -134,10 +134,8 @@
   const subtotal = computed(
     () => data.value?.items.reduce((s, r) => s + r.product.price * r.qty, 0) || 0,
   );
-  const shipping = computed(() => (mode.value === 'delivery' ? 600 : 0));
-  const discount = computed(() =>
-    usePoints.value ? Math.min(data.value?.points || 0, subtotal.value, 500) : 0,
-  );
+  const shipping = computed(() => data.value?.shipping?.[mode.value] ?? 0);
+  const discount = computed(() => (usePoints.value ? data.value?.maxDeductFen || 0 : 0));
   const total = computed(() => subtotal.value + shipping.value - discount.value);
   const load = () =>
     run(async () => {

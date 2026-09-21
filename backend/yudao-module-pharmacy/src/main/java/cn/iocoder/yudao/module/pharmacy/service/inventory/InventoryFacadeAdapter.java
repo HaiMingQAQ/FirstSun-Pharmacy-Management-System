@@ -109,13 +109,16 @@ public class InventoryFacadeAdapter implements InventoryFacade {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DeductResult deduct(Long storeId, List<DeductItem> items) {
-        var scope = access.requireScope(storeId);
+        return deduct(access.requireScope(storeId), items, operator());
+    }
+
+    // Package-private: only the verified paid-order entry in this package may use a system actor.
+    DeductResult deduct(InventoryReadAccess.Scope scope, List<DeductItem> items, long operator) {
         validateDeduct(items);
         Map<Long, List<Flow>> existing = flows(scope, BIZ_SALE, items.get(0).getBizNo(), deductLineIds(items));
         if (!existing.isEmpty()) return existingDeduct(items, existing);
 
         drugApi.validateDrugList(items.stream().map(DeductItem::getDrugId).distinct().toList());
-        long operator = operator();
         List<DeductResult.Allocation> allocations = new ArrayList<>();
         for (DeductItem item : items.stream().sorted(Comparator.comparingLong(DeductItem::getBizLineId)).toList()) {
             if (item.getBatchId() != null || item.getLocationId() != null) {
@@ -191,11 +194,13 @@ public class InventoryFacadeAdapter implements InventoryFacade {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public DeductResult consumeReservation(Long storeId, List<ConsumeItem> items) {
-        var scope = access.requireScope(storeId);
+        return consumeReservation(access.requireScope(storeId), items, operator());
+    }
+
+    DeductResult consumeReservation(InventoryReadAccess.Scope scope, List<ConsumeItem> items, long operator) {
         validateConsume(items);
         Map<Long, List<Flow>> existing = flowsByType(scope, BIZ_ONLINE_ORDER, items.get(0).getBizNo(), consumeLineIds(items), FLOW_CONSUME);
         if (!existing.isEmpty()) return existingConsumed(items, existing);
-        long operator = operator();
         List<DeductResult.Allocation> allocations = new ArrayList<>();
         for (ConsumeItem item : items.stream().sorted(Comparator.comparingLong(ConsumeItem::getBizLineId)).toList()) {
             resolveReservation(scope, item.getOriginalBizNo(), item.getOriginalBizLineId(), item.getBatchId(), item.getLocationId(), item.getDrugId(), item.getQty(), operator, true, item.getBizNo(), item.getBizLineId());

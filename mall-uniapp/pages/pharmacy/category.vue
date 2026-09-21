@@ -31,7 +31,7 @@
     <view class="category-layout">
       <view class="category-nav">
         <button
-          v-for="cat in api.categories"
+          v-for="cat in categories"
           :key="cat.id"
           :class="{ active: category === cat.id }"
           @tap="select(cat.id)"
@@ -77,14 +77,16 @@
     category = ref('all'),
     list = ref([]),
     history = ref(api.history());
+  const categories = ref(api.categories);
   const { loading, error, run } = useRequest();
   const { busy, act } = useAction();
   const categoryName = computed(
-    () => api.categories.find((c) => c.id === category.value)?.name || '全部药品',
+    () => categories.value.find((c) => c.id === category.value)?.name || '全部药品',
   );
   const load = () =>
     run(async () => {
       list.value = await api.products({ keyword: keyword.value, category: category.value });
+      categories.value = api.categories;
     });
   function search() {
     if (loading.value) return;

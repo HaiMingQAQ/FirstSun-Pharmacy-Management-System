@@ -1,0 +1,237 @@
+{
+  "name": "firstsun-miniapp-http-acceptance",
+  "services": {
+    "mysql": {
+      "image": "firstsun-miniapp-http-mysql:acceptance",
+      "build": {
+        "context": ".",
+        "dockerfile": "mysql.Dockerfile",
+        "labels": {
+          "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+        }
+      },
+      "container_name": "firstsun-miniapp-http-mysql",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      },
+      "environment": {
+        "MYSQL_ROOT_PASSWORD": "${ACCEPT_ROOT_PASSWORD:?prepare first}",
+        "MYSQL_DATABASE": "${ACCEPT_DB:?prepare first}",
+        "MYSQL_USER": "${ACCEPT_DB_USER:?prepare first}",
+        "MYSQL_PASSWORD": "${ACCEPT_DB_PASSWORD:?prepare first}",
+        "TZ": "Asia/Shanghai"
+      },
+      "command": [
+        "--character-set-server=utf8mb4",
+        "--collation-server=utf8mb4_unicode_ci"
+      ],
+      "ports": [
+        "127.0.0.1:${ACCEPT_MYSQL_PORT:?prepare first}:3306"
+      ],
+      "volumes": [
+        {
+          "type": "volume",
+          "source": "mysql-data",
+          "target": "/var/lib/mysql"
+        },
+        {
+          "type": "bind",
+          "source": "./runtime/init",
+          "target": "/docker-entrypoint-initdb.d",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "acceptance"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql -h127.0.0.1 -u\"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" -Nse 'SELECT 1 FROM acceptance_marker' >/dev/null 2>&1"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 60,
+        "start_period": "30s"
+      }
+    },
+    "redis": {
+      "image": "firstsun-miniapp-http-redis:acceptance",
+      "build": {
+        "context": ".",
+        "dockerfile": "redis.Dockerfile",
+        "labels": {
+          "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+        }
+      },
+      "container_name": "firstsun-miniapp-http-redis",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      },
+      "environment": {
+        "REDIS_PASSWORD": "${ACCEPT_REDIS_PASSWORD:?prepare first}"
+      },
+      "command": [
+        "sh",
+        "-c",
+        "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""
+      ],
+      "ports": [
+        "127.0.0.1:${ACCEPT_REDIS_PORT:?prepare first}:6379"
+      ],
+      "volumes": [
+        "redis-data:/data"
+      ],
+      "networks": [
+        "acceptance"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -qx PONG"
+        ],
+        "interval": "5s",
+        "timeout": "5s",
+        "retries": 30
+      }
+    },
+    "backend": {
+      "image": "firstsun-miniapp-http-backend:acceptance",
+      "build": {
+        "context": "../../backend",
+        "dockerfile": "Dockerfile",
+        "labels": {
+          "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+        }
+      },
+      "container_name": "firstsun-miniapp-http-backend",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      },
+      "depends_on": {
+        "mysql": {
+          "condition": "service_healthy"
+        },
+        "redis": {
+          "condition": "service_healthy"
+        }
+      },
+      "environment": {
+        "TZ": "Asia/Shanghai",
+        "ACCEPT_RUN_ID": "${ACCEPT_RUN_ID:?prepare first}",
+        "JAVA_OPTS": "-Xms256m -Xmx768m -Djava.security.egd=file:/dev/./urandom",
+        "ARGS": "--spring.profiles.active=local --server.port=48080 --spring.datasource.dynamic.datasource.master.url=jdbc:mysql://mysql:3306/${ACCEPT_DB}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true --spring.datasource.dynamic.datasource.master.username=${ACCEPT_DB_USER} --spring.datasource.dynamic.datasource.master.password=${ACCEPT_DB_PASSWORD} --spring.datasource.dynamic.datasource.slave.url=jdbc:mysql://mysql:3306/${ACCEPT_DB}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true --spring.datasource.dynamic.datasource.slave.username=${ACCEPT_DB_USER} --spring.datasource.dynamic.datasource.slave.password=${ACCEPT_DB_PASSWORD} --spring.data.redis.host=redis --spring.data.redis.port=6379 --spring.data.redis.database=0 --spring.data.redis.password=${ACCEPT_REDIS_PASSWORD} --spring.datasource.druid.stat-view-servlet.enabled=false --spring.boot.admin.client.enabled=false --spring.quartz.auto-startup=false --yudao.security.mock-enable=false --yudao.tenant.enable=true --yudao.pharmacy.member-sms.login-enabled=true --yudao.pharmacy.member-sms.dev-code-enabled=true --yudao.pharmacy.member-sms.dev-code=${ACCEPT_SMS_CODE} --firstsun.miniapp.mock-payment-enabled=true --firstsun.miniapp.pay-app-key=firstsun-acceptance --yudao.pharmacy.member-point.earn-enabled=true --yudao.pharmacy.member-point.deduct-enabled=true --yudao.pharmacy.member-point.points-per-yuan=100 --yudao.pharmacy.member-point.max-deduct-percent=50 --yudao.pay.order-notify-url=http://backend:48080/admin-api/pay/notify/order --yudao.pay.refund-notify-url=http://backend:48080/admin-api/pay/notify/refund --yudao.pay.transfer-notify-url=http://backend:48080/admin-api/pay/notify/transfer --logging.file.name=/acceptance-logs/backend.log --logging.level.cn.iocoder.yudao.framework.apilog=OFF --logging.level.cn.iocoder.yudao.module.pharmacy=INFO --logging.level.cn.iocoder.yudao.module.pay=INFO"
+      },
+      "ports": [
+        "127.0.0.1:${ACCEPT_HTTP_PORT:?prepare first}:48080"
+      ],
+      "volumes": [
+        "backend-logs:/acceptance-logs"
+      ],
+      "networks": [
+        "acceptance"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "bash",
+          "-c",
+          "exec 3<>/dev/tcp/127.0.0.1/48080"
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 60,
+        "start_period": "60s"
+      }
+    },
+    "client": {
+      "image": "firstsun-miniapp-http-client:acceptance",
+      "build": {
+        "context": ".",
+        "dockerfile": "http-client.Dockerfile",
+        "labels": {
+          "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+        }
+      },
+      "container_name": "firstsun-miniapp-http-client",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      },
+      "depends_on": {
+        "backend": {
+          "condition": "service_healthy"
+        }
+      },
+      "command": [
+        "node",
+        "-e",
+        "setInterval(()=>{},3600000)"
+      ],
+      "read_only": true,
+      "cap_drop": [
+        "ALL"
+      ],
+      "security_opt": [
+        "no-new-privileges:true"
+      ],
+      "volumes": [
+        {
+          "type": "bind",
+          "source": "./http-client.cjs",
+          "target": "/client/http-client.cjs",
+          "read_only": true,
+          "bind": {
+            "create_host_path": false
+          }
+        }
+      ],
+      "networks": [
+        "acceptance"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "node",
+          "/client/http-client.cjs",
+          "--ready"
+        ],
+        "interval": "10s",
+        "timeout": "35s",
+        "retries": 12,
+        "start_period": "10s"
+      }
+    }
+  },
+  "networks": {
+    "acceptance": {
+      "name": "firstsun-miniapp-http-network",
+      "internal": true,
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      }
+    }
+  },
+  "volumes": {
+    "mysql-data": {
+      "name": "firstsun-miniapp-http-mysql-data",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      }
+    },
+    "redis-data": {
+      "name": "firstsun-miniapp-http-redis-data",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      }
+    },
+    "backend-logs": {
+      "name": "firstsun-miniapp-http-backend-logs",
+      "labels": {
+        "io.firstsun.acceptance": "${ACCEPT_RUN_ID:?prepare first}"
+      }
+    }
+  }
+}

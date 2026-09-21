@@ -57,4 +57,10 @@ public class AppDrugRespVO {
     @Schema(description = "药品说明")
     private String description;
 
+    @Schema(description = "批准文号", example = "国药准字H20000001")
+    private String approvalNo;
+
+    @Schema(description = "药品图片地址", example = "https://xxx/drug.jpg")
+    private String imageUrl;
+
 }

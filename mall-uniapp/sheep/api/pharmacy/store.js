@@ -11,6 +11,7 @@ const StoreApi = {
       method: 'GET',
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },

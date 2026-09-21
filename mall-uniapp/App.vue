@@ -1,7 +1,6 @@
 <script setup>
   import { onLaunch, onShow, onError } from '@dcloudio/uni-app';
   import { ShoproInit } from './sheep';
-  import { PHARMACY_DEMO } from './sheep/api/pharmacy/config';
 
   onLaunch((options) => {
     // 隐藏原生导航栏 使用自定义底部导航
@@ -10,9 +9,10 @@
     });
 
     // 加载Shopro底层依赖
-    // 药店本地演示不调用商城租户、装修或真实登录接口。
+    // 药店小程序不调用商城租户、装修或真实登录接口（商城模块不在后端构建内，调用必然 401）。
+    // 无论 Mock 还是真实模式，药店入口都跳过 ShoproInit，避免启动期无效请求。
     const pharmacyEntry = !options?.path || options.path.startsWith('pages/pharmacy/');
-    if (!(PHARMACY_DEMO && pharmacyEntry)) ShoproInit();
+    if (!pharmacyEntry) ShoproInit();
   });
 
   onShow(() => {

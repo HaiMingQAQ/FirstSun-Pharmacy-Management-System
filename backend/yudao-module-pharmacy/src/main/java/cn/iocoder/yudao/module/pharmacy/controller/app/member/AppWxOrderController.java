@@ -98,6 +98,28 @@ public class AppWxOrderController {
         return success(true);
     }
 
+    @PostMapping("/simulate-pay")
+    @Operation(summary = "模拟支付本人订单（幂等）：待支付 → 已支付 + 待拣货",
+            description = "默认关闭；仅开发测试环境可启用，使用服务端金额并经支付成功链完成扣库")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    public CommonResult<Boolean> simulatePay(@RequestParam("id") Long id) {
+        // 校验订单归属后模拟支付，避免越权操作他人订单
+        wxOrderService.validateWxOrderOwner(getLoginUserId(), id);
+        wxOrderService.simulatePayWxOrderByMember(id);
+        return success(true);
+    }
+
+    @PostMapping("/confirm-receive")
+    @Operation(summary = "确认本人配送订单收货（幂等）：配送准备完成 → 完成",
+            description = "仅已支付且完成拣货的配送订单；自提由门店员工按取货码核销")
+    @Parameter(name = "id", description = "订单编号", required = true, example = "1024")
+    public CommonResult<Boolean> confirmReceive(@RequestParam("id") Long id) {
+        // 校验订单归属后确认收货，避免越权操作他人订单
+        wxOrderService.validateWxOrderOwner(getLoginUserId(), id);
+        wxOrderService.confirmReceiveWxOrderByMember(id);
+        return success(true);
+    }
+
     // ========== 私有方法 ==========
 
     private List<AppWxOrderLineRespVO> getOrderLines(Long wxOrderId) {

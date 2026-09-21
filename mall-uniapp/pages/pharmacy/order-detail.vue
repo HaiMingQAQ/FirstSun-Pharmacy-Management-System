@@ -29,13 +29,13 @@
       <view class="fs-section">
         <view class="fs-between">
           <text class="fs-title">{{ order.mode === 'pickup' ? '到店自提' : '门店配送' }}</text>
-          <text class="fs-tag">{{ order.paid ? '已支付（模拟）' : '未支付' }}</text>
+          <text class="fs-tag">{{ order.paymentLabel || (order.paid ? '已支付（模拟）' : '未支付') }}</text>
         </view>
         <view class="fs-gap">
           {{
             order.mode === 'pickup'
               ? order.store.name
-              : order.address?.name + '  ' + order.address?.mobile
+              : [order.address?.name, order.address?.mobile].filter(Boolean).join(' ')
           }}
         </view>
         <view class="fs-muted fs-gap">
@@ -100,7 +100,7 @@
         </view>
         <view class="meta-row">
           <text>支付方式</text>
-          <text>模拟支付（不会扣款）</text>
+          <text>{{ order.paymentLabel ? '以门店支付记录为准' : '模拟支付（不会扣款）' }}</text>
         </view>
         <view class="meta-row">
           <text>订单备注</text>
@@ -123,12 +123,12 @@
   const statusDescription = computed(
     () =>
       ({
-        unpaid: '订单已提交，请完成模拟支付',
+        unpaid: order.value?.paymentLabel ? '订单尚未支付，请联系门店' : '订单已提交，请完成模拟支付',
         review: '处方已提交，请等待药师审核',
         ready:
           order.value?.mode === 'pickup'
-            ? '模拟支付成功，等待门店备货'
-            : '模拟支付成功，等待门店配送',
+            ? '订单已支付，等待门店备货'
+            : '订单已支付，等待门店配送',
         completed: '感谢您的信任，请按说明书使用药品',
         cancelled: '订单已取消，使用的测试积分已退回',
       }[order.value?.status]),

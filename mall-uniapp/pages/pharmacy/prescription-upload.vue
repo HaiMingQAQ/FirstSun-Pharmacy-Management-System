@@ -14,7 +14,7 @@
           {{ MAX_PRESCRIPTIONS }} 张，每张不超过 10MB。
         </view>
         <view class="fs-notice fs-gap">
-          隐私提示：本版只支持本地模拟上传，请使用测试图片，不要上传真实处方。图片不会发送至服务器，重新打开应用后可能需要重新选择。
+          隐私提示：处方图片将上传至服务器，仅用于药师审方，请使用测试图片，不要上传真实处方。
         </view>
         <view class="upload-grid fs-gap">
           <view v-for="(image, index) in images" :key="image" class="upload-item">
@@ -48,7 +48,7 @@
         <view class="review-step">2. 由药师核对处方信息</view>
         <view class="review-step">3. 审核通过后继续购买</view>
         <view class="fs-muted fs-gap">
-          需上传处方并经药师审核。此测试版本不进行真实审核，不承诺审核时效或结果，也不提供诊断建议。
+          需上传处方并经药师审核。审核结果以药师实际处理为准，本功能不提供诊断建议。
         </view>
       </view>
       <view class="fs-dock">

@@ -29,7 +29,7 @@
     />
     <view v-else v-for="order in filtered" :key="order.id" class="fs-section">
       <view class="fs-between">
-        <text class="fs-small">阳光店</text>
+        <text class="fs-small">{{ order.store?.name || api.store.name }}</text>
         <text class="order-status">{{ statusNames[order.status] }}</text>
       </view>
       <view class="fs-muted fs-gap">订单号 {{ order.id }}</view>

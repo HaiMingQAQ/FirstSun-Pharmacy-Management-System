@@ -18,7 +18,7 @@
       模拟支付
     </button>
     <button
-      v-if="order.status === 'ready'"
+      v-if="order.status === 'ready' && order.canReceive !== false"
       class="fs-primary"
       :disabled="busy"
       :loading="busy"

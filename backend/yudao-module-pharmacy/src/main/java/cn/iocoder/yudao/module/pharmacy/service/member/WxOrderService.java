@@ -179,4 +179,10 @@ public interface WxOrderService {
     Long createOrderFromCart(Long memberId, Long storeId, Integer orderType,
                              Long addressId, Long prescId, String remark, Integer usePoints);
 
+    /** 默认关闭的开发模拟支付，复用支付成功记录和订单扣库事务。 */
+    void simulatePayWxOrderByMember(Long id);
+
+    /** 本人已支付且完成拣货的配送订单确认收货；自提保留门店核销。 */
+    void confirmReceiveWxOrderByMember(Long id);
+
 }

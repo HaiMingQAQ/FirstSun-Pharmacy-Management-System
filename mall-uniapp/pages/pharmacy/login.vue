@@ -32,7 +32,7 @@
           />
           <button class="fs-secondary" :disabled="!validMobile" @tap="fillCode">获取测试码</button>
         </view>
-        <view class="fs-muted fs-gap">点击“获取测试码”自动填入，仅用于本地体验</view>
+        <view class="fs-muted fs-gap">点击“获取测试码”自动填入，验证码与后端测试环境一致</view>
       </view>
       <view class="agreement fs-gap">
         <button class="fs-check" aria-label="同意测试用户协议" @tap="agreed = !agreed">
@@ -67,13 +67,13 @@
   const validMobile = computed(() => /^1[3-9]\d{9}$/.test(mobile.value));
   const fillCode = () => {
     code.value = TEST_CODE;
-    toast('测试验证码已填入，不发送短信');
+    toast('测试验证码已填入');
   };
   const showTerms = () =>
     uni.showModal({
       title: '测试用户协议与隐私说明',
       content:
-        '本版本仅用于功能体验，不提供真实购药服务。测试手机号、地址和订单保存在当前设备，可通过清除应用数据删除。请勿上传真实处方或填写真实个人信息。处方图片仅在当前会话用于模拟审核，不上传服务器。正式服务协议将在上线前提供。',
+        '本版本仅用于功能体验，不提供真实购药服务。测试手机号与测试验证码由后端校验（验证码来自环境变量 PHARMACY_DEV_SMS_CODE）。请勿上传真实处方或填写真实个人信息；处方图片会上传至服务器用于药师审方。正式服务协议将在上线前提供。',
       showCancel: false,
       confirmColor: '#176b5b',
     });

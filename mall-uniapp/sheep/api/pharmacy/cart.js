@@ -12,6 +12,7 @@ const CartApi = {
       method: 'GET',
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },
@@ -26,15 +27,14 @@ const CartApi = {
       },
     });
   },
-  // 加购（同一门店同一商品累加数量）
+  // 加购（同一门店同一商品累加数量；成功/失败 toast 由页面负责）
   addCart: (data) => {
     return request({
       url: '/member/wx-cart/add',
       method: 'POST',
       data,
       custom: {
-        showSuccess: true,
-        successMsg: '已加入购物车',
+        showError: false,
       },
     });
   },
@@ -49,6 +49,7 @@ const CartApi = {
       },
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },
@@ -63,6 +64,7 @@ const CartApi = {
       },
       custom: {
         showLoading: false,
+        showError: false,
       },
     });
   },
@@ -73,6 +75,9 @@ const CartApi = {
       method: 'DELETE',
       params: {
         id,
+      },
+      custom: {
+        showError: false,
       },
     });
   },
