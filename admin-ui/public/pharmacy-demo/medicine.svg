@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">通用药品占位图</title><desc id="desc">项目原创的绿色药盒与药片图形</desc>
+  <rect width="240" height="240" rx="16" fill="#f3f8f5"/>
+  <rect x="42" y="58" width="156" height="124" rx="8" fill="#fff" stroke="#2f7d57" stroke-width="6"/>
+  <path d="M42 91h156" stroke="#2f7d57" stroke-width="6"/>
+  <path d="M70 125h45M70 145h70" stroke="#9bbcab" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="166" cy="142" r="21" fill="#e05b4e"/><path d="M151 142h30" stroke="#fff" stroke-width="7"/>
+</svg>

@@ -50,6 +50,7 @@ import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString
 public class ApiAccessLogFilter extends ApiRequestFilter {
 
     private static final String[] SANITIZE_KEYS = new String[]{"password", "token", "accessToken", "refreshToken"};
+    private static final String SANITIZE_FAILURE_PLACEHOLDER = "[请求参数已脱敏]";
 
     private final String applicationName;
 
@@ -198,13 +199,14 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             return null;
         }
         try {
-            JsonNode rootNode = JsonUtils.parseTree(jsonString);
+            // 直接使用已配置的 ObjectMapper，避免 JsonUtils.parseTree 在失败时记录原始 JSON。
+            JsonNode rootNode = JsonUtils.getObjectMapper().readTree(jsonString);
             sanitizeJson(rootNode, sanitizeKeys);
             return JsonUtils.toJsonString(rootNode);
         } catch (Exception e) {
-            // 脱敏失败的情况下，直接忽略异常，避免影响用户请求
-            log.error("[sanitizeJson][脱敏({}) 发生异常]", jsonString, e);
-            return jsonString;
+            // 脱敏失败时不记录异常详情或原文，避免通过日志消息、堆栈间接泄露敏感参数
+            log.warn("[sanitizeJson][JSON 脱敏失败，已使用占位内容]");
+            return SANITIZE_FAILURE_PLACEHOLDER;
         }
     }
 
@@ -218,9 +220,9 @@ public class ApiAccessLogFilter extends ApiRequestFilter {
             sanitizeJson(rootNode.get("data"), sanitizeKeys); // 只处理 data 字段，不处理 code、msg 字段，避免错误被脱敏掉
             return JsonUtils.toJsonString(rootNode);
         } catch (Exception e) {
-            // 脱敏失败的情况下，直接忽略异常，避免影响用户请求
-            log.error("[sanitizeJson][脱敏({}) 发生异常]", jsonString, e);
-            return jsonString;
+            // 脱敏失败时不记录异常详情或原文，避免通过日志消息、堆栈间接泄露敏感参数
+            log.warn("[sanitizeJson][JSON 脱敏失败，已使用占位内容]");
+            return SANITIZE_FAILURE_PLACEHOLDER;
         }
     }
 

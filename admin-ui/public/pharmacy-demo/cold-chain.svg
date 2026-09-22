@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">冷链商品占位图</title><desc id="desc">项目原创的冷藏箱与雪花图形</desc>
+  <rect width="240" height="240" rx="16" fill="#f0f7fb"/>
+  <rect x="45" y="70" width="150" height="112" rx="10" fill="#fff" stroke="#337fa8" stroke-width="6"/>
+  <path d="M85 70V55h70v15" stroke="#337fa8" stroke-width="6"/>
+  <path d="M120 95v62M93 111l54 30M147 111l-54 30M109 101l11 9 11-9M109 151l11-9 11 9" stroke="#60a9d0" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

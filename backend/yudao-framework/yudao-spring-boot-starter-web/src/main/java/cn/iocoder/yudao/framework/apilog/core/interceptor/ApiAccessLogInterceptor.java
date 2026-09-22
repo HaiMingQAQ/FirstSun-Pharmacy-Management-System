@@ -3,9 +3,14 @@ package cn.iocoder.yudao.framework.apilog.core.interceptor;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.resource.ResourceUtil;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ArrayUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.spring.SpringUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +19,8 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,11 +52,13 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
         if (!SpringUtils.isProd()) {
             Map<String, String> queryString = ServletUtils.getParamMap(request);
             String requestBody = ServletUtils.getBody(request);
+            Map<String, String> safeQueryString = sanitizeQueryString(queryString, handlerMethod);
             if (CollUtil.isEmpty(queryString) && StrUtil.isEmpty(requestBody)) {
                 log.info("[preHandle][开始请求 URL({}) 无参数]", request.getRequestURI());
             } else {
+                String safeRequestBody = sanitizeRequestBody(requestBody, handlerMethod);
                 log.info("[preHandle][开始请求 URL({}) 参数({})]", request.getRequestURI(),
-                        StrUtil.blankToDefault(requestBody, queryString.toString()));
+                        StrUtil.blankToDefault(safeRequestBody, safeQueryString.toString()));
             }
             // 计时
             StopWatch stopWatch = new StopWatch();
@@ -59,6 +68,61 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
             printHandlerMethodPosition(handlerMethod);
         }
         return true;
+    }
+
+    private Map<String, String> sanitizeQueryString(Map<String, String> queryString, HandlerMethod handlerMethod) {
+        if (CollUtil.isEmpty(queryString) || handlerMethod == null) {
+            return queryString;
+        }
+        ApiAccessLog accessLog = handlerMethod.getMethodAnnotation(ApiAccessLog.class);
+        if (accessLog == null || accessLog.sanitizeKeys().length == 0) {
+            return queryString;
+        }
+        Map<String, String> safeQueryString = new HashMap<>(queryString);
+        MapUtil.removeAny(safeQueryString, accessLog.sanitizeKeys());
+        return safeQueryString;
+    }
+
+    private String sanitizeRequestBody(String requestBody, HandlerMethod handlerMethod) {
+        if (StrUtil.isEmpty(requestBody) || handlerMethod == null) {
+            return requestBody;
+        }
+        ApiAccessLog accessLog = handlerMethod.getMethodAnnotation(ApiAccessLog.class);
+        if (accessLog == null || accessLog.sanitizeKeys().length == 0) {
+            return requestBody;
+        }
+        try {
+            JsonNode rootNode = JsonUtils.parseTree(requestBody);
+            sanitizeJson(rootNode, accessLog.sanitizeKeys());
+            return JsonUtils.toJsonString(rootNode);
+        } catch (Exception ignore) {
+            // 脱敏失败时不打印原始请求体，避免敏感参数泄露
+            return "[请求参数已脱敏]";
+        }
+    }
+
+    private void sanitizeJson(JsonNode node, String[] sanitizeKeys) {
+        if (node == null) {
+            return;
+        }
+        if (node.isArray()) {
+            for (JsonNode childNode : node) {
+                sanitizeJson(childNode, sanitizeKeys);
+            }
+            return;
+        }
+        if (!node.isObject()) {
+            return;
+        }
+        Iterator<Map.Entry<String, JsonNode>> iterator = node.properties().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, JsonNode> entry = iterator.next();
+            if (ArrayUtil.contains(sanitizeKeys, entry.getKey())) {
+                iterator.remove();
+                continue;
+            }
+            sanitizeJson(entry.getValue(), sanitizeKeys);
+        }
     }
 
     @Override
