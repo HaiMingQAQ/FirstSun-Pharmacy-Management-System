@@ -45,6 +45,13 @@ cp .env.prod.example .env.prod
 - `PHARMACY_DEV_SMS_CODE` — 演示测试验证码（仅 SSH 隧道下使用；留空则禁用）
 - `PHARMACY_AI_API_KEY` — AI 功能密钥
 
+微信小程序真实登录还必须配置以下变量（只填入受保护的 `.env.prod`，不要提交模板实际值）：
+- `PHARMACY_WECHAT_TENANT_ID` — 后端可信会员租户
+- `PHARMACY_WECHAT_APP_ID` — 后端可信小程序 AppID
+- `WX_MINIAPP_APPID` / `WX_MINIAPP_SECRET` — WxJava `wx.miniapp` SDK 的 AppID/密钥
+
+药店微信登录实际读取 `WxMaProperties`（配置前缀 `wx.miniapp`）创建的 `WxMaService`，不读取 `system_social_client`。后者仅供通用社交模块使用。
+
 > `.env.prod` 已在 `.gitignore` 排除范围，不应提交。
 
 ---
@@ -217,6 +224,14 @@ ssh -L 48080:127.0.0.1:48080 -L 8080:127.0.0.1:80 -N user@YOUR_SERVER_IP
 
 > 关于默认登录凭据：admin-ui 构建时嵌入了默认用户名/密码（admin/admin123），但由于服务仅通过 SSH 隧道访问，不暴露公网，风险受控。首次登录后建议立即修改密码。
 
+### 微信小程序受限联调
+
+1. 本地将 `mall-uniapp/sheep/api/pharmacy/config.js` 的 `PHARMACY_DEMO` 临时设为 `false`，执行 `npm run build:mp-weixin`。
+2. 微信开发者工具导入 `mall-uniapp/dist/build/mp-weixin`，使用与 `PHARMACY_WECHAT_APP_ID` 相同的 AppID。
+3. 开发者工具仅用于本机演示时开启“不校验合法域名、TLS 版本以及 HTTPS 证书”；真机不能使用电脑的 `localhost` SSH 隧道。
+4. 登录请求应为 `POST http://localhost:48080/app-api/member/auth/social-login`，请求体只含本次 `uni.login()` 返回的 `code`。
+5. 登录成功后应继续请求会员资料，再可执行退出；不要在日志、截图或工单中复制 code、token、session_key 或完整微信响应。
+
 ---
 
 ## 第 10 步：数据库备份
@@ -268,14 +283,13 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --force-rec
 
 ## 小程序前端（mall-uniapp）— 当前状态说明
 
-小程序前端不在本次服务器部署范围内。部署到微信需要：
+小程序前端不在本次服务器镜像部署范围内。通过 SSH 隧道进行电脑开发者工具受限演示需要：
 
-1. 将 `mall-uniapp/.env.production` 中的 `SHOPRO_BASE_URL` 改为公网可达地址
+1. `mall-uniapp/.env.production` 使用 `http://localhost:48080`，不要填写云服务器内网地址
 2. 执行 `pnpm build:mp-weixin` 编译
-3. 用微信开发者工具上传到微信后台
-4. 提交审核
+3. 在开发者工具导入 `dist/build/mp-weixin` 并保持 SSH 隧道
 
-当前无域名、服务仅 SSH 隧道可达，小程序无法直连后端。待配置域名 + HTTPS 后再处理此部分。
+当前无域名、服务仅 SSH 隧道可达；小程序真机和正式发布仍不可用，待配置合法域名与 HTTPS 后再处理。
 
 ---
 

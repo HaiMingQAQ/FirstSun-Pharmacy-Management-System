@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.pharmacy.service.member;
 
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginRespVO;
+import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberWechatLoginRespVO;
 
 /**
  * 会员认证 Service（小程序端）
@@ -25,6 +26,9 @@ public interface MemberAuthService {
      * @param code   手机验证码
      */
     AppMemberAuthLoginRespVO loginOrRegister(String mobile, String code);
+
+    /** 微信小程序 code 登录；首次登录创建无手机号会员。 */
+    AppMemberWechatLoginRespVO wechatLogin(String code);
 
     /**
      * 登出，删除访问令牌

@@ -65,6 +65,11 @@ public interface MemberUserService {
      */
     MemberUserDO getMemberUserByMobile(String mobile);
 
+    /**
+     * 按租户读取会员，供药店微信身份绑定使用。
+     */
+    MemberUserDO getMemberUserByIdAndTenantId(Long id, Long tenantId);
+
     // ========== 小程序端（app）相关 ==========
 
     /**
@@ -88,6 +93,11 @@ public interface MemberUserService {
      * @return 会员信息
      */
     MemberUserDO createMemberUserIfAbsent(String mobile, String ip);
+
+    /**
+     * 创建无手机号的微信会员。该方法只由微信身份绑定事务调用。
+     */
+    MemberUserDO createWechatMember(Long tenantId, String ip);
 
     /**
      * 更新会员个人资料（小程序个人中心）

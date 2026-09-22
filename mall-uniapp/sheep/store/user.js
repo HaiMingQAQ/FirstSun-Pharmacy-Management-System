@@ -80,7 +80,7 @@ const user = defineStore('user', {
     },
 
     // 设置 token
-    setToken(token = '', refreshToken = '') {
+    setToken(token = '', refreshToken = '', options = {}) {
       if (token === '') {
         this.isLogin = false;
         uni.removeStorageSync('token');
@@ -89,7 +89,7 @@ const user = defineStore('user', {
         this.isLogin = true;
         uni.setStorageSync('token', token);
         uni.setStorageSync('refresh-token', refreshToken);
-        this.loginAfter();
+        if (!options.skipLoginAfter) this.loginAfter();
       }
       return this.isLogin;
     },

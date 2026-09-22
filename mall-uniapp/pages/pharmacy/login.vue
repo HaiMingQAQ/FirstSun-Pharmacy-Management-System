@@ -5,7 +5,7 @@
       <view class="fs-heading fs-gap">欢迎来到 FirstSun 药店</view>
       <view class="fs-muted fs-gap">登录后选购药品、查看订单与会员积分</view>
     </view>
-    <view class="fs-section">
+    <view v-if="PHARMACY_DEMO" class="fs-section">
       <view class="fs-notice">
         当前为测试环境，不发送短信、不产生真实消费。请使用测试手机号，避免填写个人敏感信息。
       </view>
@@ -52,13 +52,43 @@
         {{ busy ? '登录中…' : '登录 / 注册测试账户' }}
       </button>
     </view>
-    <view class="fs-footer">无需微信授权 · 不接入真实短信服务</view>
+    <!-- #ifdef MP-WEIXIN -->
+    <view v-else class="fs-section">
+      <view class="fs-notice">
+        微信登录由服务端验证本次小程序登录凭证，不需要填写手机号，也不会读取或提交 openid。
+      </view>
+      <view class="agreement fs-gap">
+        <button class="fs-check" aria-label="同意用户协议" @tap="agreed = !agreed">
+          <uni-icons :type="agreed ? 'checkbox-filled' : 'circle'" size="22" color="#176b5b" />
+        </button>
+        <view class="fs-small">
+          我已阅读并同意
+          <text class="link" @tap="showTerms">《用户协议与隐私说明》</text>
+        </view>
+      </view>
+      <button
+        class="fs-primary fs-gap"
+        :disabled="busy || !agreed"
+        :loading="busy"
+        @tap="login"
+      >
+        {{ busy ? '登录中…' : '微信登录' }}
+      </button>
+    </view>
+    <!-- #endif -->
+    <!-- #ifndef MP-WEIXIN -->
+    <view v-if="!PHARMACY_DEMO" class="fs-section">
+      <view class="fs-notice">真实微信登录仅支持微信小程序，请在微信开发者工具中打开。</view>
+    </view>
+    <!-- #endif -->
+    <view v-if="PHARMACY_DEMO" class="fs-footer">无需微信授权 · 不接入真实短信服务</view>
+    <view v-else class="fs-footer">仅支持微信小程序登录 · 不接入手机号授权</view>
   </s-pharmacy-page>
 </template>
 <script setup>
   import { ref, computed } from 'vue';
   import api from '@/sheep/api/pharmacy/client';
-  import { TEST_CODE } from '@/sheep/api/pharmacy/config';
+  import { PHARMACY_DEMO, TEST_CODE } from '@/sheep/api/pharmacy/config';
   import { toast, useAction } from './usePharmacy';
   const mobile = ref(''),
     code = ref(''),
@@ -71,16 +101,18 @@
   };
   const showTerms = () =>
     uni.showModal({
-      title: '测试用户协议与隐私说明',
-      content:
-        '本版本仅用于功能体验，不提供真实购药服务。测试手机号与测试验证码由后端校验（验证码来自环境变量 PHARMACY_DEV_SMS_CODE）。请勿上传真实处方或填写真实个人信息；处方图片会上传至服务器用于药师审方。正式服务协议将在上线前提供。',
+      title: PHARMACY_DEMO ? '测试用户协议与隐私说明' : '用户协议与隐私说明',
+      content: PHARMACY_DEMO
+        ? '本版本仅用于功能体验，不提供真实购药服务。测试手机号与测试验证码由后端校验（验证码来自环境变量 PHARMACY_DEV_SMS_CODE）。请勿上传真实处方或填写真实个人信息；处方图片会上传至服务器用于药师审方。正式服务协议将在上线前提供。'
+        : '本版本仅用于受限演示。微信登录凭证由服务端实时校验；请勿上传真实处方或填写真实个人信息。正式服务协议将在上线前提供。',
       showCancel: false,
       confirmColor: '#176b5b',
     });
   const login = () =>
     act(async () => {
       if (!agreed.value) return;
-      await api.login(mobile.value, code.value);
+      if (PHARMACY_DEMO) await api.login(mobile.value, code.value);
+      else await api.wechatLogin();
       toast('登录成功');
       if (getCurrentPages().length > 1) uni.navigateBack();
       else uni.reLaunch({ url: '/pages/pharmacy/user' });

@@ -73,9 +73,10 @@
   import { go, requireLogin, confirm, useRequest } from './usePharmacy';
   const profile = ref(null);
   const { loading, error, run } = useRequest();
-  const maskedMobile = computed(() =>
-    profile.value?.mobile.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2'),
-  );
+  const maskedMobile = computed(() => {
+    const mobile = profile.value?.mobile;
+    return mobile ? mobile.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : '微信会员';
+  });
   const shortcuts = [
     { status: 'unpaid', name: '待支付', icon: 'wallet' },
     { status: 'review', name: '待审核', icon: 'help' },
@@ -84,7 +85,12 @@
   ];
   const load = () =>
     run(async () => {
-      profile.value = await api.profile();
+      try {
+        profile.value = await api.profile();
+      } catch (e) {
+        if (!api.session()) profile.value = null;
+        throw e;
+      }
     });
   const open = (path) => {
     if (requireLogin()) go(path);
@@ -101,14 +107,17 @@
   };
   const logout = async () => {
     if (await confirm('退出登录', '确定退出当前测试账户？')) {
-      api.logout();
+      await api.logout();
       profile.value = null;
       error.value = '';
     }
   };
   onShow(() => {
-    if (api.session()) load();
-    else profile.value = null;
+    const session = api.session();
+    if (session) {
+      profile.value = session;
+      load();
+    } else profile.value = null;
   });
 </script>
 <style scoped>

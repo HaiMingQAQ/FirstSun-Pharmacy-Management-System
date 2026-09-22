@@ -1,5 +1,8 @@
 package cn.iocoder.yudao.module.pharmacy.controller.app.member;
 
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberWechatLoginReqVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -42,6 +45,21 @@ class AppMemberAuthControllerContractTest {
                 "验证码不允许作为 query 参数，否则会被 ApiAccessLogInterceptor 打印到日志");
         assertTrue(findAnnotation(codeAnnotations, RequestBody.class) == null,
                 "验证码不允许作为请求体，否则会被 ApiAccessLogInterceptor 打印到日志");
+    }
+
+    @Test
+    void testWechatLogin_acceptsCodeBodyButMarksSensitiveFieldsForSanitization()
+            throws NoSuchMethodException {
+        Method method = AppMemberAuthController.class.getMethod("socialLogin",
+                AppMemberWechatLoginReqVO.class);
+        assertNotNull(findAnnotation(method.getParameterAnnotations()[0], RequestBody.class));
+
+        ApiAccessLog accessLog = method.getAnnotation(ApiAccessLog.class);
+        assertNotNull(accessLog);
+        assertTrue(Arrays.asList(accessLog.sanitizeKeys()).contains("code"));
+        assertTrue(Arrays.asList(accessLog.sanitizeKeys()).contains("state"));
+        assertNotNull(method.getAnnotation(TenantIgnore.class),
+                "微信登录入口必须由后端可信租户配置接管，不能要求客户端伪造 tenant-id");
     }
 
     private static <T extends Annotation> T findAnnotation(Annotation[] annotations, Class<T> type) {

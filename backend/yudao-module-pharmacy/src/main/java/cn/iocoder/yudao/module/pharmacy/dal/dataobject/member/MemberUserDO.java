@@ -30,6 +30,11 @@ public class MemberUserDO extends BaseDO {
     @TableId
     private Long id;
     /**
+     * 租户编号。药店会员表历史上未由 DO 映射该列，微信首次注册时必须显式写入，
+     * 避免新会员落到默认租户。
+     */
+    private Long tenantId;
+    /**
      * 手机号
      */
     private String mobile;

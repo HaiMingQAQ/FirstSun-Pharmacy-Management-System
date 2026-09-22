@@ -91,10 +91,10 @@ services:
         max-file: "3"
 
   backend:
-    image: firstsun-pharmacy-backend:latest
+    image: firstsun-pharmacy-backend:20260922-wechat-prep
     container_name: firstsun-pharmacy-backend
     restart: unless-stopped
-    mem_limit: 384m
+    mem_limit: 768m
     depends_on:
       mysql:
         condition: service_healthy
@@ -104,7 +104,11 @@ services:
       TZ: Asia/Shanghai
       PHARMACY_AI_API_KEY: ${PHARMACY_AI_API_KEY:-}
       PHARMACY_DEV_SMS_CODE: ${PHARMACY_DEV_SMS_CODE:-}
-      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx256m -Djava.security.egd=file:/dev/./urandom}
+      PHARMACY_WECHAT_TENANT_ID: ${PHARMACY_WECHAT_TENANT_ID:-}
+      PHARMACY_WECHAT_APP_ID: ${PHARMACY_WECHAT_APP_ID:-}
+      WX_MINIAPP_APPID: ${WX_MINIAPP_APPID:-}
+      WX_MINIAPP_SECRET: ${WX_MINIAPP_SECRET:-}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms128m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
       ARGS: >-
         --spring.profiles.active=local
         --yudao.security.mock-enable=false
@@ -134,7 +138,7 @@ services:
         max-file: "3"
 
   admin-ui:
-    image: firstsun-pharmacy-admin-ui:latest
+    image: firstsun-pharmacy-admin-ui:20260921-2355
     container_name: firstsun-pharmacy-admin-ui
     restart: unless-stopped
     mem_limit: 64m

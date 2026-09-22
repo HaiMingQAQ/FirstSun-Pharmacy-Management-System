@@ -266,7 +266,24 @@ async function load(file) {
   await mod.link((name, parent) => {
     if (name === '@/sheep/request') return loadStubRequest();
     if (name === '@/sheep/config') return loadStubConfig();
+    if (name === './config' && ['client.js', 'server.js', 'demo.js'].includes(path.basename(parent.identifier))) {
+      return loadStubPharmacyConfig();
+    }
     return load(resolveId(name, parent.identifier));
+  });
+  return mod;
+}
+
+async function loadStubPharmacyConfig() {
+  const file = path.join(MALL_ROOT, '.test-stubs', 'pharmacy-config.js');
+  if (modules.has(file)) return modules.get(file);
+  const mod = new vm.SourceTextModule(
+    "export const PHARMACY_DEMO = false;\nexport const TEST_CODE = '123456';\nexport const MAX_PRESCRIPTIONS = 3;\nexport const DEFAULT_AREA_ID = 350203;",
+    { context, identifier: file },
+  );
+  modules.set(file, mod);
+  await mod.link(() => {
+    throw new Error('pharmacy config stub 无依赖');
   });
   return mod;
 }
@@ -274,7 +291,8 @@ async function loadStubRequest() {
   const file = path.join(MALL_ROOT, '.test-stubs', 'request.js');
   const mod = new vm.SourceTextModule(
     "export default (config) => Promise.resolve().then(() => __backend(config));" +
-      "export const getAccessToken = () => uni.getStorageSync('token') || '';",
+      "export const getAccessToken = () => uni.getStorageSync('token') || '';" +
+      "export const clearLoginState = () => { uni.removeStorageSync('token'); uni.removeStorageSync('refresh-token'); };",
     { context, identifier: file },
   );
   modules.set(file, mod);

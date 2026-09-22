@@ -98,7 +98,9 @@ http.interceptors.request.use(
     config.header['terminal'] = getTerminal();
 
     config.header['Accept'] = '*/*';
-    config.header['tenant-id'] = getTenantId();
+    if (!config.custom.skipTenant) {
+      config.header['tenant-id'] = getTenantId();
+    }
     return config;
   },
   (error) => {
@@ -113,7 +115,11 @@ http.interceptors.response.use(
   (response) => {
     // 约定：如果是 /auth/ 下的 URL 地址，并且返回了 accessToken 说明是登录相关的接口，则自动设置登陆令牌
     if (response.config.url.indexOf('/member/auth/') >= 0 && response.data?.data?.accessToken) {
-      $store('user').setToken(response.data.data.accessToken, response.data.data.refreshToken);
+      $store('user').setToken(
+        response.data.data.accessToken,
+        response.data.data.refreshToken,
+        { skipLoginAfter: response.config.custom.skipUserInit === true },
+      );
     }
 
     // 自定处理【loading 加载中】：如果需要显示 loading，则关闭 loading
@@ -122,7 +128,7 @@ http.interceptors.response.use(
     // 自定义处理【error 错误提示】：如果需要显示错误提示，则显示错误提示
     if (response.data.code !== 0) {
       // 特殊：如果 401 错误码，则跳转到登录页 or 刷新令牌
-      if (response.data.code === 401) {
+      if (response.data.code === 401 && !response.config.custom.skipRefresh) {
         return refreshToken(response.config);
       }
       // 特殊：处理分销用户绑定失败的提示
@@ -197,9 +203,10 @@ http.interceptors.response.use(
           errorMessage = 'HTTP 版本不受支持';
           break;
       }
-      if (error.errMsg.includes('timeout')) errorMessage = '请求超时';
+      const errMsg = error.errMsg || '';
+      if (errMsg.includes('timeout')) errorMessage = '请求超时';
       // #ifdef H5
-      if (error.errMsg.includes('Network'))
+      if (errMsg.includes('Network'))
         errorMessage = window.navigator.onLine ? '服务器异常' : '请检查您的网络连接';
       // #endif
     }
@@ -213,6 +220,11 @@ http.interceptors.response.use(
         });
       }
       error.config.custom.showLoading && closeLoading();
+      if (error.config.custom.rejectOnError) {
+        const requestError = new Error(error.data?.msg || errorMessage);
+        requestError.code = error.data?.code ?? error.statusCode;
+        return Promise.reject(requestError);
+      }
     }
 
     return false;
@@ -227,20 +239,27 @@ const refreshToken = async (config) => {
   if (config.url.indexOf('/member/auth/refresh-token') >= 0) {
     return Promise.reject('error');
   }
+  if (config.custom.refreshAttempted) {
+    return handleAuthorized(config);
+  }
+  config.custom.refreshAttempted = true;
 
   // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
   if (!isRefreshToken) {
     // 1. 如果获取不到刷新令牌，则只能执行登出操作
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
-      return handleAuthorized();
+      return handleAuthorized(config);
     }
     // 只有真正发起刷新时才标记刷新中，避免无刷新令牌时状态一直卡住，后续 401 不再弹登录框
     // https://github.com/yudaocode/yudao-mall-uniapp/issues/38
     isRefreshToken = true;
     // 2. 进行刷新访问令牌
     try {
-      const refreshTokenResult = await AuthUtil.refreshToken(refreshToken);
+      const refreshTokenResult = await AuthUtil.refreshToken(
+        refreshToken,
+        config.custom.skipUserInit === true,
+      );
       if (refreshTokenResult.code !== 0) {
         // 如果刷新不成功，直接抛出 e 触发 2.2 的逻辑
         // noinspection ExceptionCaughtLocallyJS
@@ -260,7 +279,7 @@ const refreshToken = async (config) => {
         cb();
       });
       // 提示是否要登出。即不回放当前请求！不然会形成递归
-      return handleAuthorized();
+      return handleAuthorized(config);
     } finally {
       requestList = [];
       isRefreshToken = false;
@@ -279,14 +298,14 @@ const refreshToken = async (config) => {
 /**
  * 处理 401 未登录的错误
  */
-const handleAuthorized = () => {
+const handleAuthorized = (config = {}) => {
   const userStore = $store('user');
   userStore.logout(true);
-  showAuthModal();
+  if (!config.custom?.skipUserInit) showAuthModal();
   // 登录超时
   return Promise.reject({
     code: 401,
-    msg: userStore.isLogin ? '您的登陆已过期' : '请先登录',
+    msg: '登录已失效，请重新登录',
   });
 };
 
@@ -303,6 +322,11 @@ export const getRefreshToken = () => {
 /** 获得租户编号 */
 export const getTenantId = () => {
   return uni.getStorageSync('tenant-id') || tenantId;
+};
+
+/** 清除登录令牌及共享用户登录态。 */
+export const clearLoginState = () => {
+  $store('user').setToken();
 };
 
 const request = (config) => {

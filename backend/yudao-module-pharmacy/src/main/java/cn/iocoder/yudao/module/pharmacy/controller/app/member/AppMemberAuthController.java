@@ -1,13 +1,18 @@
 package cn.iocoder.yudao.module.pharmacy.controller.app.member;
 
 import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.security.config.SecurityProperties;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginReqVO;
 import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberAuthLoginRespVO;
+import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberWechatLoginReqVO;
+import cn.iocoder.yudao.module.pharmacy.controller.app.member.vo.auth.AppMemberWechatLoginRespVO;
 import cn.iocoder.yudao.module.pharmacy.service.member.MemberAuthService;
 import cn.iocoder.yudao.module.pharmacy.service.member.MemberSmsCodeService;
+import cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -21,6 +26,8 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.pharmacy.enums.ErrorCodeConstants.PHARMACY_WECHAT_LOGIN_TYPE_INVALID;
 
 /**
  * 用户 APP - 会员认证
@@ -71,6 +78,20 @@ public class AppMemberAuthController {
             @RequestParam("mobile") String mobile,
             @RequestHeader(value = SMS_CODE_HEADER, required = false) String code) {
         return success(memberAuthService.loginOrRegister(mobile, code));
+    }
+
+    @PostMapping("/social-login")
+    @Operation(summary = "微信小程序登录")
+    @ApiAccessLog(sanitizeKeys = {"code", "state"})
+    @TenantIgnore
+    @PermitAll
+    public CommonResult<AppMemberWechatLoginRespVO> socialLogin(
+            @RequestBody @Valid AppMemberWechatLoginReqVO reqVO) {
+        if (reqVO.getType() != null
+                && !SocialTypeEnum.WECHAT_MINI_PROGRAM.getType().equals(reqVO.getType())) {
+            throw exception(PHARMACY_WECHAT_LOGIN_TYPE_INVALID);
+        }
+        return success(memberAuthService.wechatLogin(reqVO.getCode()));
     }
 
     @PostMapping("/send-sms-code")

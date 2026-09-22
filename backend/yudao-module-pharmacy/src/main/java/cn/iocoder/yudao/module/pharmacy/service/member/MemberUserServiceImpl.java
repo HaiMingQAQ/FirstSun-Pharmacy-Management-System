@@ -122,6 +122,11 @@ public class MemberUserServiceImpl implements MemberUserService {
         return memberUserMapper.selectByMobile(mobile);
     }
 
+    @Override
+    public MemberUserDO getMemberUserByIdAndTenantId(Long id, Long tenantId) {
+        return memberUserMapper.selectByIdAndTenantId(id, tenantId);
+    }
+
     private void validateMobileUnique(Long id, String mobile) {
         MemberUserDO memberUser = memberUserMapper.selectByMobile(mobile);
         if (memberUser == null) {
@@ -172,6 +177,25 @@ public class MemberUserServiceImpl implements MemberUserService {
         memberUser.setStatus(STATUS_ENABLE);
         memberUser.setRegisterIp(resolveRegisterIp(ip));
         memberUser.setNickname("会员" + mobile.substring(mobile.length() - 4));
+        memberUser.setAvatar("");
+        memberUser.setPoint(0);
+        memberUser.setExperience(0);
+        memberUserMapper.insert(memberUser);
+        return memberUser;
+    }
+
+    @Override
+    public MemberUserDO createWechatMember(Long tenantId, String ip) {
+        if (tenantId == null) {
+            throw exception(PHARMACY_MEMBER_USER_NOT_EXISTS);
+        }
+        MemberUserDO memberUser = new MemberUserDO();
+        memberUser.setTenantId(tenantId);
+        memberUser.setMobile(null);
+        memberUser.setPassword("");
+        memberUser.setStatus(STATUS_ENABLE);
+        memberUser.setRegisterIp(resolveRegisterIp(ip));
+        memberUser.setNickname("微信会员");
         memberUser.setAvatar("");
         memberUser.setPoint(0);
         memberUser.setExperience(0);

@@ -12,17 +12,9 @@
     <el-row class="mx-[-10px]">
       <el-col :span="24" class="px-10px">
         <el-form-item>
-          <LoginFormTitle class="w-full" />
-        </el-form-item>
-      </el-col>
-      <el-col :span="24" class="px-10px">
-        <el-form-item v-if="loginData.tenantEnable === 'true'" prop="tenantName">
-          <el-input
-            v-model="loginData.loginForm.tenantName"
-            :placeholder="t('login.tenantNamePlaceholder')"
-            :prefix-icon="iconHouse"
-            link
-            type="primary"
+          <LoginFormTitle
+            class="w-full"
+            :title="isPlatformLogin ? '芋道平台租户登录' : 'FirstSun 药店管理系统'"
           />
         </el-form-item>
       </el-col>
@@ -55,15 +47,6 @@
                 {{ t('login.remember') }}
               </el-checkbox>
             </el-col>
-            <el-col :offset="6" :span="12">
-              <el-link
-                class="float-right"
-                type="primary"
-                @click="setLoginState(LoginStateEnum.RESET_PASSWORD)"
-              >
-                {{ t('login.forgetPassword') }}
-              </el-link>
-            </el-col>
           </el-row>
         </el-form-item>
       </el-col>
@@ -84,54 +67,9 @@
       />
       <el-col :span="24" class="px-10px">
         <el-form-item>
-          <el-row :gutter="5" justify="space-between" style="width: 100%">
-            <el-col :span="8">
-              <el-button class="w-full" @click="setLoginState(LoginStateEnum.MOBILE)">
-                {{ t('login.btnMobile') }}
-              </el-button>
-            </el-col>
-            <el-col :span="8">
-              <el-button class="w-full" @click="setLoginState(LoginStateEnum.QR_CODE)">
-                {{ t('login.btnQRCode') }}
-              </el-button>
-            </el-col>
-            <el-col :span="8">
-              <el-button class="w-full" @click="setLoginState(LoginStateEnum.REGISTER)">
-                {{ t('login.btnRegister') }}
-              </el-button>
-            </el-col>
-          </el-row>
-        </el-form-item>
-      </el-col>
-      <el-divider content-position="center">{{ t('login.otherLogin') }}</el-divider>
-      <el-col :span="24" class="px-10px">
-        <el-form-item>
-          <div class="w-full flex justify-between">
-            <Icon
-              v-for="(item, key) in socialList"
-              :key="key"
-              :icon="item.icon"
-              :size="30"
-              class="anticon cursor-pointer"
-              color="#999"
-              @click="doSocialLogin(item.type)"
-            />
-          </div>
-        </el-form-item>
-      </el-col>
-      <el-divider content-position="center">萌新必读</el-divider>
-      <el-col :span="24" class="px-10px">
-        <el-form-item>
-          <div class="w-full flex justify-between">
-            <el-link href="https://doc.iocoder.cn/" target="_blank">📚开发指南</el-link>
-            <el-link href="https://doc.iocoder.cn/video/" target="_blank">🔥视频教程</el-link>
-            <el-link href="https://www.iocoder.cn/Interview/good-collection/" target="_blank">
-              ⚡面试手册
-            </el-link>
-            <el-link href="http://static.yudao.iocoder.cn/mp/Aix9975.jpeg" target="_blank">
-              🤝外包咨询
-            </el-link>
-          </div>
+          <el-link class="w-full" type="primary" @click="switchLoginMode">
+            {{ isPlatformLogin ? '返回药店登录' : '平台管理员登录' }}
+          </el-link>
         </el-form-item>
       </el-col>
     </el-row>
@@ -147,18 +85,17 @@ import { useIcon } from '@/hooks/web/useIcon'
 import * as authUtil from '@/utils/auth'
 import { usePermissionStore } from '@/store/modules/permission'
 import * as LoginApi from '@/api/login'
-import { LoginStateEnum, useFormValid, useLoginState } from './useLogin'
+import { LoginModeEnum, LoginStateEnum, useFormValid, useLoginState } from './useLogin'
 
 defineOptions({ name: 'LoginForm' })
 
 const { t } = useI18n()
 const message = useMessage()
-const iconHouse = useIcon({ icon: 'ep:house' })
 const iconAvatar = useIcon({ icon: 'ep:avatar' })
 const iconLock = useIcon({ icon: 'ep:lock' })
 const formLogin = ref()
 const { validForm } = useFormValid(formLogin)
-const { setLoginState, getLoginState } = useLoginState()
+const { getLoginMode, setLoginMode, getLoginState } = useLoginState()
 const { currentRoute, push } = useRouter()
 const permissionStore = usePermissionStore()
 const redirect = ref<string>('')
@@ -168,30 +105,37 @@ const captchaType = ref('blockPuzzle') // blockPuzzle 滑块 clickWord 点击文
 
 const getShow = computed(() => unref(getLoginState) === LoginStateEnum.LOGIN)
 
-const LoginRules = {
-  tenantName: [required],
-  username: [required],
-  password: [required]
-}
+const LoginRules = { username: [required], password: [required] }
+const pharmacyTenantName = import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || 'FirstSun'
+const platformTenantName = '芋道源码'
+const isPlatformLogin = computed(() => getLoginMode.value === LoginModeEnum.PLATFORM)
+const getTenantName = () => (isPlatformLogin.value ? platformTenantName : pharmacyTenantName)
 const loginData = reactive({
   isShowPassword: false,
   captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE,
   tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE,
   loginForm: {
-    tenantName: import.meta.env.VITE_APP_DEFAULT_LOGIN_TENANT || '',
-    username: import.meta.env.VITE_APP_DEFAULT_LOGIN_USERNAME || '',
-    password: import.meta.env.VITE_APP_DEFAULT_LOGIN_PASSWORD || '',
+    tenantName: getTenantName(),
+    username: '',
+    password: '',
     captchaVerification: '',
     rememberMe: true // 默认记录我。如果不需要，可手动修改
   }
 })
 
-const socialList = [
-  { icon: 'ant-design:wechat-filled', type: 30 },
-  { icon: 'ant-design:dingtalk-circle-filled', type: 20 },
-  { icon: 'ant-design:github-filled', type: 0 },
-  { icon: 'ant-design:alipay-circle-filled', type: 0 }
-]
+const switchLoginMode = () => {
+  const mode = isPlatformLogin.value ? LoginModeEnum.PHARMACY : LoginModeEnum.PLATFORM
+  authUtil.removeToken()
+  authUtil.removeTenantContext()
+  authUtil.removeLoginForm()
+  loginData.loginForm.password = ''
+  loginData.loginForm.captchaVerification = ''
+  loginData.loginForm.tenantName = mode === LoginModeEnum.PLATFORM ? platformTenantName : pharmacyTenantName
+  loginData.loginForm.username = ''
+  loginData.loginForm.rememberMe = true
+  formLogin.value?.clearValidate()
+  setLoginMode(mode)
+}
 
 // 获取验证码
 const getCode = async () => {
@@ -206,33 +150,31 @@ const getCode = async () => {
 }
 // 获取租户 ID
 const getTenantId = async () => {
-  if (loginData.tenantEnable === 'true') {
-    const res = await LoginApi.getTenantIdByName(loginData.loginForm.tenantName)
+  if (loginData.tenantEnable !== 'true') return true
+  try {
+    const res = await LoginApi.getTenantIdByName(getTenantName())
+    if (!res) throw new Error('未找到对应租户，请联系管理员')
     authUtil.setTenantId(res)
+    return true
+  } catch (error) {
+    authUtil.removeTenantContext()
+    message.error(error instanceof Error ? error.message : '租户解析失败，请稍后重试')
+    return false
   }
 }
 // 记住我
 const getLoginFormCache = () => {
   const loginForm = authUtil.getLoginForm()
-  if (loginForm) {
+  if (loginForm?.loginMode === getLoginMode.value) {
     loginData.loginForm = {
       ...loginData.loginForm,
       username: loginForm.username ? loginForm.username : loginData.loginForm.username,
       password: loginForm.password ? loginForm.password : loginData.loginForm.password,
       rememberMe: loginForm.rememberMe,
-      tenantName: loginForm.tenantName ? loginForm.tenantName : loginData.loginForm.tenantName
+      tenantName: getTenantName()
     }
-  }
-}
-// 根据域名，获得租户信息
-const getTenantByWebsite = async () => {
-  if (loginData.tenantEnable === 'true') {
-    const website = location.host
-    const res = await LoginApi.getTenantByWebsite(website)
-    if (res) {
-      loginData.loginForm.tenantName = res.name
-      authUtil.setTenantId(res.id)
-    }
+  } else if (loginForm) {
+    authUtil.removeLoginForm()
   }
 }
 const loading = ref() // ElLoading.service 返回的实例
@@ -240,7 +182,7 @@ const loading = ref() // ElLoading.service 返回的实例
 const handleLogin = async (params: any) => {
   loginLoading.value = true
   try {
-    await getTenantId()
+    if (!(await getTenantId())) return
     const data = await validForm()
     if (!data) {
       return
@@ -257,7 +199,7 @@ const handleLogin = async (params: any) => {
       background: 'rgba(0, 0, 0, 0.7)'
     })
     if (loginDataLoginForm.rememberMe) {
-      authUtil.setLoginForm(loginDataLoginForm)
+      authUtil.setLoginForm({ ...loginDataLoginForm, loginMode: getLoginMode.value })
     } else {
       authUtil.removeLoginForm()
     }
@@ -273,45 +215,10 @@ const handleLogin = async (params: any) => {
     }
   } finally {
     loginLoading.value = false
-    loading.value.close()
+    loading.value?.close()
   }
 }
 
-// 社交登录
-const doSocialLogin = async (type: number) => {
-  if (type === 0) {
-    message.error('此方式未配置')
-  } else {
-    loginLoading.value = true
-    if (loginData.tenantEnable === 'true') {
-      // 尝试先通过 tenantName 获取租户
-      await getTenantId()
-      // 如果获取不到，则需要弹出提示，进行处理
-      if (!authUtil.getTenantId()) {
-        try {
-          const data = await message.prompt('请输入租户名称', t('common.reminder'))
-          if (data?.action !== 'confirm') throw 'cancel'
-          const res = await LoginApi.getTenantIdByName(data.value)
-          authUtil.setTenantId(res)
-        } catch (error) {
-          if (error === 'cancel') return
-        } finally {
-          loginLoading.value = false
-        }
-      }
-    }
-    // 计算 redirectUri
-    // 注意: type、redirect 需要先 encode 一次，否则钉钉回调会丢失。
-    // 配合 social-login.vue#getUrlValue() 使用
-    const redirectUri =
-      location.origin +
-      '/social-login?' +
-      encodeURIComponent(`type=${type}&redirect=${redirect.value || '/'}`)
-
-    // 进行跳转
-    window.location.href = await LoginApi.socialAuthRedirect(type, encodeURIComponent(redirectUri))
-  }
-}
 watch(
   () => currentRoute.value,
   (route: RouteLocationNormalizedLoaded) => {
@@ -322,8 +229,9 @@ watch(
   }
 )
 onMounted(() => {
+  setLoginMode(LoginModeEnum.PHARMACY)
+  loginData.loginForm.tenantName = pharmacyTenantName
   getLoginFormCache()
-  getTenantByWebsite()
 })
 </script>
 

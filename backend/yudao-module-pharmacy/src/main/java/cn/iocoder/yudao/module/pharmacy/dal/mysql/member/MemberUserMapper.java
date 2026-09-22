@@ -28,6 +28,12 @@ public interface MemberUserMapper extends BaseMapperX<MemberUserDO> {
         return selectOne(MemberUserDO::getMobile, mobile);
     }
 
+    default MemberUserDO selectByIdAndTenantId(Long id, Long tenantId) {
+        return selectOne(new LambdaQueryWrapperX<MemberUserDO>()
+                .eq(MemberUserDO::getId, id)
+                .eq(MemberUserDO::getTenantId, tenantId));
+    }
+
     /**
      * 原子增减会员积分（正数增加、负数扣减），避免并发下的覆盖写
      *

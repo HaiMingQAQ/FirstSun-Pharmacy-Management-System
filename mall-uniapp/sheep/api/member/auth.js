@@ -70,7 +70,7 @@ const AuthUtil = {
     });
   },
   // 刷新令牌
-  refreshToken: (refreshToken) => {
+  refreshToken: (refreshToken, skipUserInit = false) => {
     return request({
       url: '/member/auth/refresh-token',
       method: 'POST',
@@ -80,6 +80,7 @@ const AuthUtil = {
       custom: {
         showLoading: false, // 不用加载中
         showError: false, // 不展示错误提示
+        skipUserInit,
       },
     });
   },

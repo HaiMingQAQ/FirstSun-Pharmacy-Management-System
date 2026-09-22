@@ -4,7 +4,7 @@
 // 实现 client.js 门面暴露的同一契约；页面不感知 Mock / 真实切换。
 // 所有金额统一为「分」，状态统一为客户端状态机，后端原始结构只在本文件内出现。
 // =====================================================
-import request from '@/sheep/request';
+import request, { clearLoginState } from '@/sheep/request';
 import DrugApi from './drug';
 import StoreApi from './store';
 import CartApi from './cart';
@@ -20,6 +20,45 @@ const CHECKOUT_KEY = 'firstsun-checkout';
 const ADDRESS_KEY = 'firstsun-address-id';
 const HISTORY_KEY = 'firstsun-history';
 const STORE_KEY = 'firstsun-store';
+
+const clearAuthSession = () => {
+  clearLoginState();
+  uni.removeStorageSync(SESSION_KEY);
+};
+const authErrorCode = (error) =>
+  error?.code ?? error?.statusCode ?? error?.errCode ?? 'UNKNOWN';
+async function authStep(stage, task) {
+  const startedAt = Date.now();
+  try {
+    const result = await task();
+    console.info('[FirstSun 微信登录]', {
+      stage,
+      status: 'success',
+      durationMs: Date.now() - startedAt,
+      code: 0,
+    });
+    return result;
+  } catch (error) {
+    console.info('[FirstSun 微信登录]', {
+      stage,
+      status: 'failed',
+      durationMs: Date.now() - startedAt,
+      code: authErrorCode(error),
+    });
+    throw error;
+  }
+}
+const normalizeAuthError = (error, stage) => {
+  if (error instanceof Error && error.message) return error;
+  if (error?.msg) {
+    const normalized = new Error(error.msg);
+    normalized.code = authErrorCode(error);
+    return normalized;
+  }
+  if (stage === 'wechat-sdk') return new Error('微信登录凭证获取失败，请重试');
+  if (stage === 'member-profile') return new Error('会员资料加载失败，请重新登录');
+  return new Error('微信登录服务暂时不可用，请重试');
+};
 
 const getDraft = () => {
   const draft = uni.getStorageSync(CHECKOUT_KEY);
@@ -39,6 +78,8 @@ async function call(config) {
       showLoading: false,
       showError: false, // 错误由本层抛出，避免重复 toast
       isToken: true,
+      skipUserInit: true,
+      rejectOnError: true,
       ...(config.custom || {}),
     },
   });
@@ -184,11 +225,46 @@ const api = {
       method: 'POST',
       params: { mobile },
       header: { 'X-Sms-Code': code },
+      custom: { skipUserInit: true },
     });
     // 拦截器已按 /member/auth/ 响应自动写入 token；此处补拉会员资料缓存
     const p = await api.profile();
     uni.setStorageSync(SESSION_KEY, p);
     return p;
+  },
+  async wechatLogin() {
+    // #ifdef MP-WEIXIN
+    // 微信登录由后端可信配置确定租户/AppID；不要沿用可能过期的租户缓存。
+    clearAuthSession();
+    uni.removeStorageSync('tenant-id');
+    let stage = 'wechat-sdk';
+    try {
+      const loginResult = await authStep(stage, async () => {
+        const result = await uni.login();
+        if (!result || result.errMsg !== 'login:ok' || !result.code) {
+          throw new Error('微信登录凭证获取失败，请重试');
+        }
+        return result;
+      });
+      stage = 'social-login';
+      await authStep(stage, () =>
+        call({
+          url: '/member/auth/social-login',
+          method: 'POST',
+          data: { code: loginResult.code },
+          custom: { isToken: false, skipTenant: true, skipUserInit: true },
+        }),
+      );
+      stage = 'member-profile';
+      const p = await authStep(stage, () => api.profile({ skipRefresh: true }));
+      uni.setStorageSync(SESSION_KEY, p);
+      return p;
+    } catch (error) {
+      clearAuthSession();
+      throw normalizeAuthError(error, stage);
+    }
+    // #endif
+    throw new Error('微信登录仅支持微信小程序');
   },
   async logout() {
     try {
@@ -202,8 +278,12 @@ const api = {
     uni.removeStorageSync(CHECKOUT_KEY);
     uni.removeStorageSync(ADDRESS_KEY);
   },
-  async profile() {
-    const raw = await call({ url: '/member/user/get', method: 'GET' });
+  async profile(options = {}) {
+    const raw = await call({
+      url: '/member/user/get',
+      method: 'GET',
+      custom: { skipRefresh: options.skipRefresh === true },
+    });
     const profile = {
       userId: raw.id,
       name: raw.nickname || 'FirstSun 会员',

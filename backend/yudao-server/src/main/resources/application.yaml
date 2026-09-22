@@ -350,6 +350,9 @@ yudao:
     begin-code: 9999 # 这里配置 9999 的原因是，测试方便。
     end-code: 9999 # 这里配置 9999 的原因是，测试方便。
   pharmacy: # F 会员模块配置
+    wechat-login: # 药店微信登录；未配置可信租户/AppID 时拒绝登录
+      tenant-id: ${PHARMACY_WECHAT_TENANT_ID:0}
+      app-id: ${PHARMACY_WECHAT_APP_ID:}
     member-sms: # 手机号 + 验证码快捷登录
       # 基础配置默认关闭：prod 环境没有 local/dev 覆盖，会落到这里 => 手机号快捷登录整体禁用，
       # 开发验证码在 prod 不可能生效（对应 F-1 要求 3、4）

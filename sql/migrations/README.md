@@ -14,6 +14,8 @@
 
 采购驳回迁移以信息_schema 检查列和约束后再变更，采购单号序列表使用单号中的业务日期回填，并以 `GREATEST` 保证重复执行只增不减。演示货位迁移只更新仍处于错误仓库且未删除的目标货位，重复执行无副作用。已有持久化数据库不会自动重跑 init 目录脚本，应按上述顺序手工执行尚未落地的幂等迁移。
 
+`20260922_f_pharmacy_wechat_identity.sql` 只创建药店微信身份绑定表，不写入身份数据。启用后端微信登录前，需在后端受保护配置中提供 `PHARMACY_WECHAT_TENANT_ID` 和 `PHARMACY_WECHAT_APP_ID`，并保证后者与现有 `wx.miniapp.appid` 一致；缺任一配置时接口拒绝登录。本文件尚未在本轮执行。
+
 > 所有脚本均使用 `ON DUPLICATE KEY UPDATE` 或先删后插，**幂等可重复执行**。
 > 字典 type 已与后端 `DictTypeConstants.java`、前端 `utils/dict.ts` 保持一致。
 > 菜单 ID 段 22000+，字典类型 ID 300+，字典数据 ID 1500+，避免与 system 已有数据冲突。
@@ -52,12 +54,13 @@
 | 28 | `20260917_f_member_address_update_menu.sql` | F：会员地址更新菜单与权限 |
 | 29 | `20260918_f_member_sms_code.sql` | F：会员短信验证码表 |
 | 30 | `20260918_f_wx_order_points.sql` | F：小程序订单积分字段与约束 |
-| 31 | `20260917_c_inventory_shared_role_menu.sql` | C-1：共享租户套餐、角色167与上架移位权限 |
-| 32 | `20260918_c_inventory_flow_comment_utf8.sql` | C-3：纠正库存流水原出库引用列中文注释 |
-| 33 | `20260918_l_fix_demo_location_163032.sql` | E：修复演示数据货位关联 |
-| 34 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
-| 35 | `20260917_o_pharmacy_ai_prototype.sql` | AI 助手原型表、权限与角色授权 |
-| 36 | `20260918_a_ai_menu_fix.sql` | A：恢复采购管理目录并迁移 AI 权限 |
+| 31 | `20260922_f_pharmacy_wechat_identity.sql` | F：药店微信身份绑定表；执行前备份，应用启动前按需手工执行 |
+| 32 | `20260917_c_inventory_shared_role_menu.sql` | C-1：共享租户套餐、角色167与上架移位权限 |
+| 33 | `20260918_c_inventory_flow_comment_utf8.sql` | C-3：纠正库存流水原出库引用列中文注释 |
+| 34 | `20260918_l_fix_demo_location_163032.sql` | E：修复演示数据货位关联 |
+| 35 | `20260916_c_inventory_movement_menu.sql` | C/P1 同仓货位移位权限 |
+| 36 | `20260917_o_pharmacy_ai_prototype.sql` | AI 助手原型表、权限与角色授权 |
+| 37 | `20260918_a_ai_menu_fix.sql` | A：恢复采购管理目录并迁移 AI 权限 |
 
 ## 统一执行方法
 
@@ -99,6 +102,7 @@ $scripts = @(
   "20260917_f_member_address_update_menu.sql",
   "20260918_f_member_sms_code.sql",
   "20260918_f_wx_order_points.sql",
+  "20260922_f_pharmacy_wechat_identity.sql",
   "20260918_l_fix_demo_location_163032.sql",
   "20260917_o_pharmacy_ai_prototype.sql",
   "20260918_a_ai_menu_fix.sql"

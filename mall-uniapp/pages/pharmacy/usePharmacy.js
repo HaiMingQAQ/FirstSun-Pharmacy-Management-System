@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import api from '@/sheep/api/pharmacy/client';
 export const go = (path) => uni.navigateTo({ url: `/pages/pharmacy/${path}` });
 export const toast = (title) => uni.showToast({ title, icon: 'none' });
+const errorText = (error, fallback) => error?.message || error?.msg || fallback;
 export const confirm = (title, content) =>
   new Promise((resolve) =>
     uni.showModal({
@@ -27,7 +28,7 @@ export function useRequest() {
     try {
       return await fn();
     } catch (e) {
-      error.value = e.message || '服务暂时不可用，请重试';
+      error.value = errorText(e, '服务暂时不可用，请重试');
     } finally {
       loading.value = false;
     }
@@ -42,7 +43,7 @@ export function useAction() {
     try {
       return await fn();
     } catch (e) {
-      toast(e.message || '操作失败，请重试');
+      toast(errorText(e, '操作失败，请重试'));
     } finally {
       busy.value = false;
     }
