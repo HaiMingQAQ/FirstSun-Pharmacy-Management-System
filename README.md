@@ -1,40 +1,100 @@
-# FirstSun Pharmacy Management System
+# FirstSun 药店管理系统
 
-医药门店管理系统，基于 Yudao / RuoYi-Vue-Pro 二次开发。本仓库采用单仓库管理，包含后端、管理后台、会员小程序和数据库初始化脚本。
+面向连锁药店日常经营的课程实践项目，覆盖基础档案、采购、库存、POS、处方与会员等管理场景，并提供可独立复现的 Docker 交付环境。
 
-> 数据库文件本身不上传 GitHub，通过 Docker 初始化脚本让每位成员获得一致的开发环境。
+> 当前 `codex/admin-delivery` 交付范围是 **Web 管理后台**。PR #48 不包含 `mall-uniapp`、微信登录或小程序端功能。
 
-## 统一技术版本
+## 项目截图
 
-| 组件 | 版本 |
+![FirstSun 采购订单列表](docs/images/purchase-orders.png)
+
+截图来自仓库内的独立演示环境，展示采购订单、门店、供应商、金额和状态等关联数据。
+
+## 核心能力
+
+| 能力 | 当前交付内容 |
 | --- | --- |
-| Java | 17 |
-| Spring Boot | 3.5.15 |
-| Maven | 3.9.x |
-| Node.js | 22 |
-| pnpm | 11.22.0 |
-| MySQL | 8.0 |
-| Redis | 7 |
+| 双入口登录 | 默认进入 FirstSun 药店登录，可切换到芋道平台租户登录 |
+| A-F 业务模块 | 基础资料、采购收货、库存库房、POS、处方支付、会员管理 |
+| 关联演示数据 | 为 FirstSun 租户（`tenant_id=163`）准备 20 个药品及采购、库存、销售、处方、会员等关联数据 |
+| 药品图片 | 使用仓库内原创分类占位图，同源访问，不依赖随机外链或真实包装图 |
+| 安全日志 | API 日志对密码、Token、AppSecret、手机号等敏感字段做脱敏处理 |
+| 独立部署 | 固定镜像标签、独立 Compose 项目名；支持通过 SSH 隧道访问 |
+| 服务隔离 | 交付 Compose 不向宿主机或公网暴露 MySQL、Redis 端口 |
 
-后端基于 RuoYi-Vue-Pro 官方 `master-jdk17` 分支。成员本机的 JDK 安装路径可以不同，但 `java -version` 和 `mvn -version` 必须显示 Java 17 或更高版本；也可以完全使用 Docker 构建运行。
+## A-F 模块
 
-## 团队开发环境同步
+| 模块 | 页面与业务范围 | 演示数据覆盖 |
+| --- | --- | --- |
+| A · 基础资料 | 门店、员工、药品分类、药品档案、药品条码、公共平台能力 | 门店、仓库、库位、员工、20 个药品及条码；药品列表显示本地分类图片 |
+| B · 采购收货 | 供应商、证照、采购订单、采购明细、收货入库 | 供应商、不同状态采购单及关联收货记录 |
+| C · 库存库房 | 仓库、库位、批次、库存、流水、盘点、调拨、报损与效期预警 | 批次、有效期、门店可售量、库存流水及盘点/调拨记录 |
+| D · POS 销售 | 收银、销售单、退货、班次与经营统计 | 会员销售订单、明细、支付状态和班次数据 |
+| E · 处方与支付 | 处方登记、明细、药师审核、支付与退款记录查询 | 处方及审核状态、支付应用和关联记录；不接真实支付渠道 |
+| F · 会员管理 | 会员档案、等级、积分、地址和订单数据 | 合成会员、等级、积分流水、地址及订单关联数据 |
 
-拉取最新代码后执行：
+模块以真实菜单、表结构和已验证页面为准。旧验收报告中记录的未闭环项不因演示数据补齐而自动视为已完成。
 
-```powershell
-git pull
-docker compose up -d --build
+## 技术架构
+
+```mermaid
+flowchart LR
+    U[浏览器] -->|HTTP / SSH 隧道| N[Nginx · admin-ui]
+    N -->|REST API| B[Spring Boot 3 · backend]
+    N -->|同源静态资源| I[原创药品分类图片]
+    B --> M[(MySQL 8)]
+    B --> R[(Redis 7)]
+    B --> P[药店 A-F 业务模块]
+    B -. 可选 .-> AI[AI 模型 API]
+
+    subgraph delivery["Docker 独立交付环境"]
+      N
+      B
+      M
+      R
+      I
+    end
 ```
-如果本次更新包含数据库初始化脚本，并且本地测试数据不需要保留：
-```powershell
-docker compose down -v
-docker compose up -d --build
+
+| 层级 | 主要技术 |
+| --- | --- |
+| 管理后台 | Vue 3、TypeScript、Vite、Element Plus、pnpm |
+| 后端 | Java 17、Spring Boot 3、MyBatis Plus、Maven |
+| 数据与缓存 | MySQL 8、Redis 7 |
+| 交付 | Docker、Docker Compose、Nginx、SSH 隧道 |
+
+## 目录结构
+
+```text
+FirstSun-Pharmacy-Management-System/
+├─ admin-ui/                       # Web 管理后台
+│  └─ public/pharmacy-demo/        # 原创药品分类占位图与许可说明
+├─ backend/                        # Spring Boot 后端
+├─ deploy/                         # 独立交付 Compose 与部署说明
+├─ docs/                           # 协作规范、验收报告与截图
+├─ sql/                            # 基础 SQL 与幂等迁移
+│  └─ migrations/                  # 含第 38 份交付演示数据迁移
+├─ mall-uniapp/                    # 仓库既有目录，不属于当前 PR 交付范围
+├─ docker-compose.yml              # 团队本地开发环境
+└─ README.md
 ```
 
-## 本地开发测试账号
+## 快速启动
 
-完成数据库初始化后，可使用以下账号登录：
+交付环境需要 Docker、Docker Compose 和约 2 GiB 可用内存。先从样例创建本地配置，并按部署指南构建两个固定标签镜像：
+
+```bash
+cp deploy/.env.prod.example deploy/.env.prod
+# 按本机环境填写 deploy/.env.prod；该文件已被 Git 忽略
+
+docker buildx build --platform linux/amd64 -t firstsun-admin-delivery-backend:codex-20260922 -f backend/Dockerfile --load backend/
+docker buildx build --platform linux/amd64 -t firstsun-admin-delivery-admin-ui:codex-20260923-demo-data -f admin-ui/Dockerfile --build-arg VITE_BASE_URL=http://localhost:48080 --load admin-ui/
+docker compose -p firstsun-admin-delivery -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d
+```
+
+首次创建数据卷时，MySQL 按 `01` 至 `38` 的顺序初始化。端口、健康检查、SSH 隧道、升级和回滚步骤见 [交付部署指南](deploy/README-deploy.md)。
+
+## 演示账号
 
 | 项目 | 内容 |
 | --- | --- |
@@ -42,229 +102,73 @@ docker compose up -d --build
 | 用户名 | `0407` |
 | 密码 | `123456` |
 
-> 该账号仅用于本地 Docker 开发和团队联调，请勿用于生产环境。
+该账号仅用于本地演示和团队联调。首次用于受控部署后应立即改密；仓库不提供生产凭据，也不展示 `deploy/.env.prod` 的内容。
 
-网址：
+## Docker 部署入口
 
-   ```text
-   http://localhost/
-   ```
+[deploy/README-deploy.md](deploy/README-deploy.md) 是交付部署的唯一完整指南，包含：
 
-后端接口地址：
+- 固定镜像标签与构建命令；
+- 独立 Compose 项目、数据卷和初始化顺序；
+- SSH 隧道访问方式；
+- 健康检查、日志、升级、回滚和精确清理命令；
+- 2 GiB 主机的内存预算与风险说明。
 
-```text
-http://localhost:48080
-```
+生产式演示环境只将管理后台和后端绑定到回环地址；MySQL、Redis 只在 Compose 网络内通信，不映射公网端口。
 
-数据库连接串：
+## 测试与验证
 
-```text
-jdbc:mysql://localhost:3307/firstsun_pharmacy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-```
+<details>
+<summary>本交付分支已留存的验证结果</summary>
 
-
-
-## 项目结构
-
-```text
-backend/            基于 RuoYi-Vue-Pro 的 Java 后端
-admin-ui/           基于 yudao-ui-admin-vue3 的管理后台
-mall-uniapp/        基于 yudao-mall-uniapp 的会员小程序
-sql/                FirstSun 药店业务初始化 SQL
-docs/               团队分工、开发规范、UI 标准和交互演示
-docker-compose.yml  团队统一 Docker 开发环境
-```
-
-## 当前开发进度
-
-项目正在按照 A～F 六人模块分工并行开发。
-
-当前已经完成并合入 `main`：
-
-- A 模块：药品分类、药品档案、药品条码、门店管理和员工管理。
-- 药店管理端 V1 公共 UI 基线。
-- FirstSun 品牌主题、统一业务页面头部、数据概览条和动态菜单样式。
-- 前端 UI 规范、页面迁移清单、AI 执行提示词和交互演示。
-- Java 17 与 Spring Boot 3 开发环境迁移。
-
-当前 UI 版本为团队开发基线，并非最终视觉版本。A 将继续完善公共组件、详情面板、表单视觉和响应式验收；B～F 基于公共 UI 开发各自业务模块。
-
-## 开发文档
-
-所有成员开始开发前，应按以下顺序阅读：
-
-1. [团队开发须知](./docs/团队开发须知.md)：环境启动、Git 分支、提交、数据库迁移和冲突处理。
-2. [六人全栈开发方案](./docs/六人全栈开发方案.md)：A～F 的模块、页面、数据表及跨模块接口分工。
-3. [开发规范与 AI 协作规则](./docs/开发规范与AI协作规则.md)：成员和 AI 工具必须遵守的修改范围及交付要求。
-4. [前端 UI 开发资料](./docs/frontend-ui/README.md)：新版 UI 规范、演示、迁移流程和验收要求。
-5. [V2 现代化 UI 风格规范](./docs/frontend-ui/V2现代化UI风格规范-初版.md)：颜色、布局、图标、组件和动效规范。
-6. [页面迁移与验收清单](./docs/frontend-ui/页面迁移与验收清单.md)：页面开发完成后的统一检查项。
-7. [前端 UI 交互演示](./docs/frontend-ui/demos/pharmacy-modern-ui-v2-motion-demo.html)：目标布局和交互方向参考。
-
-完整文档索引见 [docs/README.md](./docs/README.md)。
-
-每位成员必须从最新 `main` 同步公共 UI 基线，只修改本人负责的业务模块。公共样式、公共 Pharmacy 组件和系统外壳由 A 统一维护；其他成员需要扩展公共组件时，应先与 A 沟通。
-
-## 前端 UI 协作方式
-
-其他成员开始页面适配前，先保存自己的修改，然后同步最新主分支：
-
-```powershell
-git status
-git add .
-git commit -m "wip: 保存当前开发进度"
-
-git fetch origin
-git merge origin/main
-```
-
-如果工作区没有未提交修改，可以省略 `git add` 和 `git commit`。
-
-页面开发统一遵守以下要求：
-
-- 正式页面继续使用 Vue 3、Element Plus、真实 API、动态菜单、权限和字典。
-- 不得复制演示页面中的固定数据或写死菜单。
-- 页面根容器使用统一的药店页面样式。
-- 标题和数据概览优先使用公共 `Pharmacy` 组件。
-- 菜单和按钮使用项目统一的 SVG/Iconify 图标，不使用单字或 Emoji 充当图标。
-- 高频查询条件默认展示，低频条件放入“更多筛选”。
-- 简单 CRUD 页面参考药品分类。
-- 复杂业务列表和表单参考药品档案。
-- 简单表单使用 Dialog，复杂表单使用 Drawer 和连续分区。
-- 每位成员先完成一个代表页面并提交截图评审，通过后再迁移同模块其他页面。
-- 公共样式或公共组件存在问题时统一反馈给 A，不在个人分支中自行覆盖。
-
-## 一键启动开发环境
-
-### 前提
-
-安装并启动 Docker Desktop。本机直接编译后端时还需要 JDK 17+ 和 Maven 3.9.x。
-
-首次构建后端镜像会下载 Maven 依赖，耗时可能较长；后续构建会复用 Docker 缓存。
-
-### 首次启动
-
-1. 复制环境变量文件。`.env` 已被 Git 忽略，不会上传：
-
-   ```powershell
-   Copy-Item .env.example .env
-   ```
-
-2. 构建并启动全部服务：
-
-   ```powershell
-   docker compose up -d --build
-   ```
-
-3. 查看服务状态：
-
-   ```powershell
-   docker compose ps
-   ```
-
-正常情况下会看到 4 个容器：
-
-| 服务 | 容器 | 端口 |
-| --- | --- | --- |
-| MySQL | `firstsun-pharmacy-mysql` | `3307 -> 3306` |
-| Redis | `firstsun-pharmacy-redis` | `6379 -> 6379` |
-| 后端 | `firstsun-pharmacy-backend` | `48080 -> 48080` |
-| 管理后台 | `firstsun-pharmacy-admin-ui` | `80 -> 80` |
-
-
-## 日常命令
-
-| 操作 | 命令 |
+| 检查项 | 结果 |
 | --- | --- |
-| 启动全部服务 | `docker compose up -d` |
-| 构建并启动全部服务 | `docker compose up -d --build` |
-| 停止全部服务并保留数据 | `docker compose down` |
-| 查看全部日志 | `docker compose logs -f` |
-| 查看后端日志 | `docker compose logs -f backend` |
-| 查看前端日志 | `docker compose logs -f admin-ui` |
-| 进入 MySQL | `docker exec -it firstsun-pharmacy-mysql mysql -uroot -p` |
+| 第 38 份 SQL 在保留数据卷执行 | 通过 |
+| 同一 SQL 再次执行的幂等性 | 通过，未产生重复业务行 |
+| 全新数据卷按 01-38 初始化 | 通过 |
+| FirstSun 登录与管理后台健康检查 | 通过 |
+| 药品档案图片、采购订单等页面检查 | 通过 |
+| 前端生产构建 | 通过，包含药品图片列表功能与 5 张原创 SVG |
+| API 日志脱敏定向测试 | 通过（2/2） |
+| `docker compose config` 与 `git diff --check` | 通过 |
 
-日常前端开发优先使用本地 Vite 开发服务器，从而获得热更新，不需要每次修改代码后重新构建 Docker：
+验证结果针对当前交付范围，不等同于真实支付、外部 AI 服务或全部历史业务缺陷均已完成验收。
 
-```powershell
-cd admin-ui
-pnpm dev
-```
+</details>
 
-默认访问地址以终端输出为准，通常为：
+详细历史证据位于 [验收报告目录](docs/acceptance/reports/)。报告反映其生成时的代码状态，阅读时请结合当前分支和“已知限制”。
 
-```text
-http://localhost:5173/
-```
+## 安全设计
 
+- 登录日志与 API 访问日志对常见秘密和个人信息字段脱敏，不记录明文密码、Token 或 AppSecret。
+- 租户数据按 `tenant_id` 隔离；交付演示业务数据统一属于 FirstSun 租户 `163`。
+- `deploy/.env.prod` 被 Git 忽略，仓库只提供不含真实密钥的配置样例。
+- 药品图片随仓库交付，由 Nginx 同源提供，避免外链可用性和授权风险。
+- MySQL、Redis 不暴露宿主机端口；远程访问管理后台使用 SSH 隧道。
+- 真实支付默认关闭，演示环境不得配置真实支付密钥。
 
+## 已知限制
 
-> `-v` 会删除 Docker 数据卷，数据库里的所有本地数据都会清空。执行前必须确认没有需要保留的数据。
+- 当前 PR 不包含 `mall-uniapp`、微信登录或小程序功能。
+- 真实支付默认关闭；演示数据中的支付状态不代表真实支付渠道已接通。
+- AI 助手需要使用者自行配置 `PHARMACY_AI_API_KEY`；未配置时只有 AI 能力不可用，不应伪造成功结果。
+- 云服务器 2 GiB 内存余量偏紧，建议配置 Swap 或提高内存，并监控 MySQL 与 JVM 占用。
+- 阴凉库近效期弹窗仍有已知显示问题；相关列表数据可展示，但该弹窗不应作为完整验收通过项。
+- 芋道平台入口、外部 AI 模型真实调用和长期稳定性仍需按目标环境单独验证。
 
-普通前端样式和 Vue 页面修改不需要删除数据库卷，也不需要执行 `docker compose down -v`。
+## 团队协作与贡献
 
-## 团队同步规则
+开始开发前请先阅读：
 
-- 所有成员从最新 `main` 同步公共代码，不直接相互合并个人功能分支。
-- 数据库结构以 `backend/sql/mysql/ruoyi-vue-pro.sql` 和 `sql/firstsun_pharmacy_init.sql` 为准。
-- `.env` 只保存本机配置，禁止提交。
-- 后端统一使用 `48080`。
-- 管理后台 Docker 版本统一使用 `80`。
-- MySQL 统一使用 `3307`。
-- Redis 统一使用 `6379`。
-- 前端包管理统一使用 pnpm，不要提交 `package-lock.json`。
-- 修改数据库脚本后，必须在本机重建数据库并验证服务能够启动，再提交 Pull Request。
-- 每个 Pull Request 必须说明修改范围、真实接口验证结果和已知限制。
-- 提交前检查是否包含测试账号、密码、临时截图、本地启动脚本或构建产物。
+- [团队开发须知](docs/团队开发须知.md)
+- [六人全栈开发方案](docs/六人全栈开发方案.md)
+- [开发规范与 AI 协作规则](docs/开发规范与AI协作规则.md)
+- [前端界面统一规范](docs/前端界面统一规范.md)
 
-管理后台 Docker 容器使用 `admin-ui/.env.docker`，不要把个人 `admin-ui/.env.local` 提交到仓库。
+建议按“独立分支 → 定向测试 → Pull Request → 人工审查”的流程协作。提交不得包含真实凭据、运行日志、构建产物、数据库数据卷或个人环境文件。
 
-## 环境变量说明
+## License 与用途
 
-除 `docker-compose.yml` 中带默认值的变量外，以下变量需要按需填写到本机 `.env`（`.env` 已被 Git 忽略）：
+本项目基于 Yudao / RuoYi-Vue-Pro 进行课程实践和二次开发；后端与管理后台的授权分别见 [backend/LICENSE](backend/LICENSE) 和 [admin-ui/LICENSE](admin-ui/LICENSE)，并请同时遵守对应上游项目许可。
 
-| 变量名 | 是否必填 | 用途 | 说明 |
-| --- | --- | --- | --- |
-| `PHARMACY_DEV_SMS_CODE` | 使用小程序手机号登录时必填 | 会员手机号快捷登录的**开发测试验证码**（F 模块） | 只写在本地 `.env`，禁止写入代码/前端/SQL/Dockerfile，也禁止提交到 Git；仅 `local`/`dev` profile 生效 |
-
-### 手机号快捷登录（小程序）
-
-会员手机号快捷登录需要「手机号 + 验证码」，验证码由后端校验：
-
-```text
-POST /app-api/member/auth/send-sms-code?mobile=13800138000     # 获取验证码（不返回验证码内容）
-POST /app-api/member/auth/login-or-register?mobile=13800138000 # 登录（不存在则自动注册）
-     Header: X-Sms-Code: <验证码>
-```
-
-> 验证码走请求头 `X-Sms-Code` 而不是 query 参数或 JSON body：yudao 框架的访问日志拦截器在非 prod 环境会把请求参数与 body 原样打印，走请求头可以确保验证码不会出现在后端日志里。
-
-- 本地开发自行在 `.env` 里设置 `PHARMACY_DEV_SMS_CODE`（任意 4-8 位数字/字母即可，团队各人可不同），然后 `docker compose up -d backend` 让变量生效；调用发码接口后，用 `.env` 里配置的这个值登录。
-- 验证码与「手机号 + 登录用途」绑定，10 分钟内有效，且**一次性使用**：用过一次、过期、错误或不匹配当前手机号都会被拒绝。
-- 生产环境（无 `local`/`dev` 覆盖）默认**关闭**手机号快捷登录，接口返回「当前环境未启用短信登录」，开发测试验证码在 prod 无效。手机号 + 密码登录不受影响。
-
-### 会员积分规则（F 模块）
-
-积分赠送、抵扣、退货回退与取消返还**全部由后端**按配置 + 会员等级计算，前端传入的积分值只表示「希望使用多少抵扣积分」，实际可用值由后端校验后确定。规则配置在 `backend/yudao-server/src/main/resources/application.yaml` 的 `yudao.pharmacy.member-point` 下：
-
-| 配置项 | 默认值 | 含义 |
-| --- | --- | --- |
-| `earn-enabled` | true | 是否启用积分赠送 |
-| `earn-per-yuan` | 1 | 每消费 1 元获得的基础积分 |
-| `level-multiplier` | 1→1.0 / 2→1.2 / 3→1.5 / 4→2.0 | 按 `member_level.level` 的赠送倍率，未配置的等级按 1.0 |
-| `deduct-enabled` | true | 是否启用积分抵扣 |
-| `points-per-yuan` | 100 | 多少积分抵扣 1 元 |
-| `max-deduct-percent` | 50 | 单笔订单最高抵扣比例（占应付金额的百分比） |
-| `min-deduct-points` / `max-deduct-points` | 1 / 0 | 单笔最少使用积分 / 单笔上限（0 表示不额外限制） |
-
-计算口径：`赠送积分 = ⌊实付金额 × earn-per-yuan × 等级倍率⌋`，`可用抵扣积分 = min(会员余额, 订单金额 × max-deduct-percent, 单笔上限)`，退货按「实际退货金额 ÷ 原单金额」比例回退，整单全退时结清剩余。
-
-积分入口（小程序端，会员编号取自登录令牌）：
-
-```text
-GET  /app-api/member/point/summary                      # 积分余额 + 当前生效规则
-POST /app-api/member/point/deduct-preview               # 抵扣试算（不传 usePoints 时返回本单最多可用积分）
-POST /app-api/member/wx-order/create                    # 下单，请求体可带 usePoints 使用积分抵扣
-```
-
-所有积分变动都带业务幂等键（会员 + 业务类型 + 业务编码，对应唯一键 `uk_point_event`），重复支付回调、重复核销、重复退货、重复取消都不会重复变动积分；`member_point_record` 只允许由 F 的积分服务写入，D（POS）、E（支付）通过 `MemberPointFacade` 调用。
+本仓库用于教学、课程答辩、团队协作和功能演示，不构成医疗建议，也不应未经安全、合规和真实业务验收直接用于生产药店系统。
