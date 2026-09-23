@@ -9,13 +9,24 @@ export enum LoginStateEnum {
   SSO
 }
 
+export enum LoginModeEnum {
+  PHARMACY = 'pharmacy',
+  PLATFORM = 'platform'
+}
+
 const currentState = ref(LoginStateEnum.LOGIN)
+const currentLoginMode = ref(LoginModeEnum.PHARMACY)
 
 export function useLoginState() {
   function setLoginState(state: LoginStateEnum) {
     currentState.value = state
   }
   const getLoginState = computed(() => currentState.value)
+  const getLoginMode = computed(() => currentLoginMode.value)
+
+  function setLoginMode(mode: LoginModeEnum) {
+    currentLoginMode.value = mode
+  }
 
   function handleBackLogin() {
     setLoginState(LoginStateEnum.LOGIN)
@@ -24,6 +35,8 @@ export function useLoginState() {
   return {
     setLoginState,
     getLoginState,
+    setLoginMode,
+    getLoginMode,
     handleBackLogin
   }
 }

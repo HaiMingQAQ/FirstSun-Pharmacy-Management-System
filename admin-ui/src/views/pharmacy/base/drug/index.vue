@@ -127,6 +127,19 @@
       </el-button>
 
       <el-table v-loading="loading" :data="list" :show-overflow-tooltip="true" class="mt-10px">
+        <el-table-column label="图片" align="center" width="76">
+          <template #default="scope">
+            <el-image
+              v-if="scope.row.imageUrl"
+              :src="scope.row.imageUrl"
+              :preview-src-list="[scope.row.imageUrl]"
+              preview-teleported
+              fit="contain"
+              class="h-44px w-44px rounded-4px bg-#f5f7fa"
+            />
+            <span v-else class="text-12px text-#909399">暂无</span>
+          </template>
+        </el-table-column>
         <el-table-column label="药品编码" align="left" prop="drugCode" width="120" />
         <el-table-column label="通用名" align="left" prop="genericName" min-width="140" />
         <el-table-column label="商品名" align="left" prop="tradeName" min-width="120" />

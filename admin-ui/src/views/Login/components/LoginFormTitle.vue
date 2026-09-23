@@ -8,11 +8,14 @@ import { LoginStateEnum, useLoginState } from './useLogin'
 
 defineOptions({ name: 'LoginFormTitle' })
 
+const props = defineProps<{ title?: string }>()
+
 const { t } = useI18n()
 
 const { getLoginState } = useLoginState()
 
 const getFormTitle = computed(() => {
+  if (props.title) return props.title
   const titleObj = {
     [LoginStateEnum.RESET_PASSWORD]: t('sys.login.forgetFormTitle'),
     [LoginStateEnum.LOGIN]: t('sys.login.signInFormTitle'),

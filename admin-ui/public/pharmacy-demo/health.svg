@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">保健品占位图</title><desc id="desc">项目原创的橙色营养瓶图形</desc>
+  <rect width="240" height="240" rx="16" fill="#fff8ef"/>
+  <rect x="73" y="67" width="94" height="121" rx="18" fill="#fff" stroke="#dd8b31" stroke-width="6"/>
+  <rect x="86" y="45" width="68" height="25" rx="5" fill="#dd8b31"/>
+  <circle cx="120" cy="130" r="31" fill="#f6c36c"/>
+  <path d="M120 108v44M98 130h44" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+</svg>

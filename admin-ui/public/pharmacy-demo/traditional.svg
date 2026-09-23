@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+  <title id="title">中成药占位图</title><desc id="desc">项目原创的棕色药瓶与叶片图形</desc>
+  <rect width="240" height="240" rx="16" fill="#faf7f0"/>
+  <rect x="76" y="62" width="88" height="126" rx="12" fill="#fff" stroke="#9a6a3a" stroke-width="6"/>
+  <path d="M92 62V45h56v17M91 110h58" stroke="#9a6a3a" stroke-width="6"/>
+  <path d="M119 154c-24-2-30-24-26-36 20 1 31 12 26 36zm2 0c24-2 30-24 26-36-20 1-31 12-26 36z" fill="#4c8c58"/>
+</svg>

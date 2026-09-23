@@ -48,6 +48,7 @@ export type LoginFormType = {
   username: string
   password: string
   rememberMe: boolean
+  loginMode?: string
 }
 
 export const getLoginForm = () => {
@@ -75,6 +76,11 @@ export const getTenantId = () => {
 
 export const setTenantId = (tenantId: number) => {
   wsCache.set(CACHE_KEY.TenantId, tenantId)
+}
+
+export const removeTenantContext = () => {
+  wsCache.delete(CACHE_KEY.TenantId)
+  wsCache.delete(CACHE_KEY.VisitTenantId)
 }
 
 export const getVisitTenantId = () => {
