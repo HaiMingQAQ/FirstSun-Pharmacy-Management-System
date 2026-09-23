@@ -152,8 +152,20 @@ docker compose -p firstsun-admin-delivery -f docker-compose.prod.yml logs -f bac
 
 首次创建空数据卷时，MySQL 会按 `01` 至 `38` 的顺序执行初始化脚本。第 38 份脚本
 `20260922_p_admin_delivery_demo_data.sql` 为 FirstSun 租户（`tenant_id=163`）补充管理后台
-A-F 板块的关联演示数据。推荐仅在首次初始化的空数据卷中执行。固定 ID 或业务唯一键若已被其他记录占用，脚本会报错并回滚，不会改写其他租户或继续引用冲突记录。仅当同一批演示记录已存在且尚未产生真实业务流水时，才可重跑核验；重跑不会重置已有库存、订单状态或会员状态。业务运行后的库存与状态以实际流水为准，不要把此脚本当作恢复数据的工具。
-脚本不使用 `DROP`、`TRUNCATE`，也不删除既有数据。
+A-F 板块的关联演示数据，推荐仅在首次初始化的空数据卷中执行。
+
+**前置数据依赖（重要）**：第 38 份脚本不自行创建门店、分类、仓库、货位、供应商、员工、
+班次及会员等基础记录，而是引用此前迁移已写入的固定 ID 演示记录——主要来自第 23 份
+`20260914_l_pharmacy_demo_data.sql`，门店 `407` 来自第 9 份共享账号脚本。脚本开头用
+`NOT EXISTS` 逐项校验这些前置记录，**任一前置记录缺失时，会在写入任何数据前明确失败并整体
+回滚**，不会插入指向空记录的孤儿数据。因此该脚本只能在完整执行过 `01`–`37`、且演示基线
+未被删除的库上运行；**不要在无演示数据的生产库、仅部分初始化或手动清理过演示记录的库中
+执行**。
+
+固定 ID 或业务唯一键若已被其他记录占用，脚本同样会报错并回滚，不会改写其他租户或继续
+引用冲突记录。仅当同一批演示记录已存在且尚未产生真实业务流水时，才可重跑核验；重跑不会
+重置已有库存、订单状态或会员状态。业务运行后的库存与状态以实际流水为准，不要把此脚本当作
+恢复数据的工具。脚本不使用 `DROP`、`TRUNCATE`，也不删除既有数据。
 
 演示药品图片位于 `admin-ui/public/pharmacy-demo/`，由管理后台 Nginx 同源提供
 `/pharmacy-demo/*.svg`。这些图片是项目内原创的通用分类占位图，不含真实药品包装或外链资源。
@@ -262,6 +274,14 @@ docker exec firstsun-admin-delivery-mysql \
    docker compose -p firstsun-admin-delivery -f docker-compose.prod.yml restart backend
    ```
 
+> **关于第 38 份脚本（`20260922_p_admin_delivery_demo_data.sql`）**：
+> - 新数据库会在首次初始化时随 `01`–`38` 自动执行，无需手动操作。
+> - **已有数据库升级时，只有在该库已完整包含第 23 份等前置演示记录时才可手动补跑第 38
+>   份**；脚本开头的前置检查会在缺失时直接失败回滚。
+> - 该脚本仅用于演示/验收环境。**没有演示数据基线的生产库不要执行**——它不会补建基础
+>   数据，前置检查失败即终止。
+> - **升级不得通过删除数据卷重建来完成**，否则会丢失既有业务数据。
+
 ### 回滚到上一次备份
 
 ```bash
@@ -317,7 +337,7 @@ deploy/
 ### 已验证（本地构建）
 - [x] 前端 `vite build --mode docker` 构建成功（1m 1s，0 错误）
 - [x] 后端 `mvn compile -pl yudao-server -am` 编译成功
-- [x] `ApiAccessLogFilterSanitizeTest` 2 个测试全部通过（0 失败，0 错误）
+- [x] `ApiAccessLogFilterSanitizeTest` 9 个测试全部通过（0 失败，0 错误），含改密请求链路明文不落日志、AI token 数量字段不被误伤
 - [x] Docker 镜像 `firstsun-admin-delivery-backend:codex-20260922` linux/amd64 构建成功
 - [x] Docker 镜像 `firstsun-admin-delivery-admin-ui:codex-20260923-demo-data` linux/amd64 构建成功，包含药品图片列表功能与仓库内占位图
 - [x] `docker compose config` 语法校验通过
@@ -330,6 +350,12 @@ deploy/
 - [x] backend、MySQL、Redis 健康，admin-ui 可登录 FirstSun 租户
 - [x] A-F 页面显示药品、采购、库存、销售、处方和会员关联数据；药品分类占位图可访问并实际显示
 - [x] 验收使用的临时 Compose 项目、网络和数据卷在完成后删除；保留卷 `firstsun-admin-delivery_mysql-data` 未删除
+
+### 冲突 / 前置缺失测试（2026-09-23，一次性 MySQL）
+- [x] 一次性 `mysql:8.0` 容器（无宿主端口、无命名卷，768MiB）实际运行 `Test-AdminDeliveryDemoData.ps1`，退出码 0
+- [x] 全新迁移、不重置状态重跑均保持 20 药品且库存数量不被重置（幂等）
+- [x] 错误引用、跨租户主键冲突、业务唯一键冲突均安全失败回滚，冲突行保留且无新数据
+- [x] 删除前置供应商后迁移在写入前失败，无守卫行、无孤儿药品（详见 `sql/tests/AdminDeliveryDemoData-result.md`）
 
 ### 未验证（需独立环境复现）
 - [ ] 服务器实际内存是否足够启动全部 4 个容器

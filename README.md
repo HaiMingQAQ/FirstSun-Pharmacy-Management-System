@@ -129,7 +129,8 @@ docker compose -p firstsun-admin-delivery -f deploy/docker-compose.prod.yml --en
 | FirstSun 登录与管理后台健康检查 | 通过 |
 | 药品档案图片、采购订单等页面检查 | 通过 |
 | 前端生产构建 | 通过，包含药品图片列表功能与 5 张原创 SVG |
-| API 日志脱敏定向测试 | 通过（7/7）；独立容器真实 HTTP 登录、异常响应与 Docker 日志复验通过 |
+| API 日志脱敏定向测试 | 通过（9/9）；改密请求 oldPassword/newPassword 明文不落控制台与访问日志，AI token 数量字段不被误伤；独立容器真实 HTTP 登录、异常响应与 Docker 日志复验通过 |
+| 第 38 份 SQL 前置缺失/冲突测试 | 通过；一次性 MySQL 实测前置记录缺失、跨租户主键及业务唯一键冲突均安全失败回滚，无孤儿数据 |
 | `docker compose config` 与 `git diff --check` | 通过 |
 
 验证结果针对当前交付范围，不等同于真实支付、外部 AI 服务或全部历史业务缺陷均已完成验收。

@@ -4,6 +4,35 @@ SET time_zone = '+08:00';
 SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'STRICT_ALL_TABLES');
 START TRANSACTION;
 
+-- 前置依赖检查：本迁移强依赖第 23 个迁移（20260914_l_pharmacy_demo_data.sql）等前置脚本
+-- 已创建的 FirstSun(tenant_id=163) 门店、分类、仓库、货位、供应商、员工、班次、会员记录。
+-- 全库无物理外键，若前置记录缺失仍继续，会写入指向空记录的孤儿数据；
+-- 因此先统计“期望存在但实际缺失”的记录数，缺失时由下方守卫语句在严格模式触发 NOT NULL 错误并回滚。
+SELECT
+  (SELECT COUNT(*) FROM (SELECT 407 AS id) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_store t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163001 AS id UNION ALL SELECT 163003 UNION ALL SELECT 163005) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_category t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163021 AS id UNION ALL SELECT 163022) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_warehouse t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163031 AS id UNION ALL SELECT 163032 UNION ALL SELECT 163033 UNION ALL SELECT 163034) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_location t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163301 AS id) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_supplier t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163011 AS id UNION ALL SELECT 163012 UNION ALL SELECT 163013 UNION ALL SELECT 163014) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_employee t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163703 AS id) e
+    WHERE NOT EXISTS (SELECT 1 FROM ph_pos_shift t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0')) +
+  (SELECT COUNT(*) FROM (SELECT 163611 AS id UNION ALL SELECT 163612) e
+    WHERE NOT EXISTS (SELECT 1 FROM member_user t WHERE t.id=e.id AND t.tenant_id=163 AND t.deleted=b'0'))
+  INTO @pr48_missing;
+
+-- 守卫：前置齐全（@pr48_missing=0）时 WHERE 不成立、不写入任何行，保持幂等；
+-- 前置缺失时尝试写入 tenant_id=NULL，严格模式下违反 NOT NULL，事务失败回滚，杜绝孤儿数据。
+INSERT INTO ph_category (id, cat_code, cat_name, tenant_id)
+SELECT 163999, 'PR48-GUARD', 'prerequisite guard', NULL
+ WHERE @pr48_missing > 0;
+
 -- FirstSun 管理后台交付演示数据（tenant_id=163）。
 -- 仅在演示数据未发生业务变更时重跑；重复行保持原样，不重置库存、状态或流水。
 -- 固定 ID 或业务唯一键属于别的记录/租户时，NOT NULL 约束令事务失败，禁止静默改写。

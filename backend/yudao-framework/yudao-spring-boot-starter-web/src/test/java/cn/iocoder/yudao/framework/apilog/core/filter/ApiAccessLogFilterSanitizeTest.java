@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import cn.iocoder.yudao.framework.apilog.core.ApiAccessLogSanitizer;
 import cn.iocoder.yudao.framework.apilog.core.interceptor.ApiAccessLogInterceptor;
 import cn.iocoder.yudao.framework.common.biz.infra.logger.ApiAccessLogCommonApi;
 import cn.iocoder.yudao.framework.common.biz.infra.logger.ApiErrorLogCommonApi;
@@ -55,6 +56,67 @@ class ApiAccessLogFilterSanitizeTest {
     @Test
     void accessLogPersistenceFailureDoesNotExposeExceptionMessage() throws Exception {
         runRequest("{\"password\":\"" + PASSWORD + "\"}", false, false, true, true);
+    }
+
+    @Test
+    void profilePasswordUpdateDoesNotLeakConsoleOrPersistedLog() throws Exception {
+        // 合成密码，仅用于断言明文不进入控制台 / 访问日志
+        String oldPassword = "synthetic-old-pwd-7421";
+        String newPassword = "synthetic-new-pwd-7421";
+        String body = "{\"oldPassword\":\"" + oldPassword + "\",\"newPassword\":\"" + newPassword + "\"}";
+
+        ApiAccessLogCommonApi logApi = mock(ApiAccessLogCommonApi.class);
+        ApiAccessLogFilter filter = new ApiAccessLogFilter(new WebProperties(), "test", logApi);
+        ApiAccessLogInterceptor interceptor = new ApiAccessLogInterceptor();
+        MockHttpServletRequest raw = new MockHttpServletRequest("PUT",
+                "/admin-api/system/user/profile/update-password");
+        raw.setContentType("application/json");
+        raw.setContent(body.getBytes(StandardCharsets.UTF_8));
+        HttpServletRequest request = new CacheRequestBodyWrapper(raw);
+        WebFrameworkUtils.setLoginUserType(request, 2); // 改密为已登录管理员；避免测试中静态 properties 未初始化
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        HandlerMethod handler = new HandlerMethod(new LoginHandler(), LoginHandler.class.getMethod("login"));
+
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        Logger consoleLogger = (Logger) LoggerFactory.getLogger(ApiAccessLogInterceptor.class);
+        Logger filterLogger = (Logger) LoggerFactory.getLogger(ApiAccessLogFilter.class);
+        consoleLogger.addAppender(appender);
+        filterLogger.addAppender(appender);
+        try {
+            filter.doFilter(request, response, (req, res) -> interceptor.preHandle(request, response, handler));
+
+            ArgumentCaptor<ApiAccessLogCreateReqDTO> captor =
+                    ArgumentCaptor.forClass(ApiAccessLogCreateReqDTO.class);
+            verify(logApi).createApiAccessLogAsync(captor.capture());
+            ApiAccessLogCreateReqDTO saved = captor.getValue();
+            // 落库访问日志不含明文新旧密码
+            String persisted = saved.getRequestParams() + saved.getResultMsg() + saved.getResponseBody();
+            assertFalse(persisted.contains(oldPassword));
+            assertFalse(persisted.contains(newPassword));
+            // 控制台日志不含明文新旧密码，且不附带异常堆栈代理
+            for (ILoggingEvent event : appender.list) {
+                String message = event.getFormattedMessage();
+                assertFalse(message.contains(oldPassword));
+                assertFalse(message.contains(newPassword));
+                assertNull(event.getThrowableProxy());
+            }
+        } finally {
+            consoleLogger.detachAppender(appender);
+            filterLogger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
+    void aiTokenCountFieldsAreNotOverRedacted() {
+        // tokens / maxTokens / segmentMaxTokens 是 AI 模块的数量字段，不应被当作凭据令牌误伤
+        String body = "{\"tokens\":123,\"maxTokens\":2048,\"segmentMaxTokens\":512}";
+        String safe = ApiAccessLogSanitizer.json(body, null);
+        assertNotNull(safe);
+        assertTrue(safe.contains("\"tokens\":123"));
+        assertTrue(safe.contains("\"maxTokens\":2048"));
+        assertTrue(safe.contains("\"segmentMaxTokens\":512"));
     }
 
     @Test

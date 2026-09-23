@@ -198,6 +198,7 @@ logging:
     cn.iocoder.yudao.module.iot.service.rule: debug
     cn.iocoder.yudao.module.ai.dal.mysql: INFO
     cn.iocoder.yudao.module.im.dal.mysql: INFO
+    cn.iocoder.yudao.module.pharmacy.dal.mysql: INFO # 显式关闭 MyBatis 参数级 DEBUG，避免药品业务凭据进入日志
     org.springframework.context.support.PostProcessorRegistrationDelegate: ERROR # TODO 芋艿：先禁用，Spring Boot 3.X 存在部分错误的 WARN 提示
 
 debug: false
