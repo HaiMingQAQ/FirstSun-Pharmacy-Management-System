@@ -129,7 +129,7 @@ docker compose -p firstsun-admin-delivery -f deploy/docker-compose.prod.yml --en
 | FirstSun 登录与管理后台健康检查 | 通过 |
 | 药品档案图片、采购订单等页面检查 | 通过 |
 | 前端生产构建 | 通过，包含药品图片列表功能与 5 张原创 SVG |
-| API 日志脱敏定向测试 | 通过（2/2） |
+| API 日志脱敏定向测试 | 通过（7/7）；独立容器真实 HTTP 登录、异常响应与 Docker 日志复验通过 |
 | `docker compose config` 与 `git diff --check` | 通过 |
 
 验证结果针对当前交付范围，不等同于真实支付、外部 AI 服务或全部历史业务缺陷均已完成验收。
@@ -140,7 +140,7 @@ docker compose -p firstsun-admin-delivery -f deploy/docker-compose.prod.yml --en
 
 ## 安全设计
 
-- 登录日志与 API 访问日志对常见秘密和个人信息字段脱敏，不记录明文密码、Token 或 AppSecret。
+- `local` profile 下的认证请求参数整体遮盖，其他 API 请求移除常见敏感字段；异常消息和响应体不写入访问日志，MyBatis Mapper 不输出参数级 DEBUG 日志。此策略针对应用自身的 API 日志，不能替代网关及其他第三方日志的独立检查。
 - 租户数据按 `tenant_id` 隔离；交付演示业务数据统一属于 FirstSun 租户 `163`。
 - `deploy/.env.prod` 被 Git 忽略，仓库只提供不含真实密钥的配置样例。
 - 药品图片随仓库交付，由 Nginx 同源提供，避免外链可用性和授权风险。

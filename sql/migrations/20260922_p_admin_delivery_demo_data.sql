@@ -1,9 +1,12 @@
 SET NAMES utf8mb4;
 SET time_zone = '+08:00';
+-- 冲突哨兵依赖 NOT NULL 报错；显式开启严格模式，避免旧库宽松 SQL 模式把 NULL 转成默认值。
+SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'STRICT_ALL_TABLES');
 START TRANSACTION;
 
 -- FirstSun 管理后台交付演示数据（tenant_id=163）。
--- 固定 ID、业务编号和唯一键使本脚本可重复执行；不删除、不清空既有数据。
+-- 仅在演示数据未发生业务变更时重跑；重复行保持原样，不重置库存、状态或流水。
+-- 固定 ID 或业务唯一键属于别的记录/租户时，NOT NULL 约束令事务失败，禁止静默改写。
 -- 药品图片均为仓库内原创通用占位图，由 admin-ui 同源静态服务提供。
 
 -- A 基础档案：补充中成药、处方药、保健品、器械和冷链分类及冷藏库位。
@@ -15,30 +18,31 @@ VALUES
   (163008, 'FS-CAT-HEALTH', '营养保健品', 0, 1, 21, 1, 'delivery-demo', 'delivery-demo', b'0', 163),
   (163009, 'FS-CAT-CONSUM', '医用耗材', 163005, 2, 31, 1, 'delivery-demo', 'delivery-demo', b'0', 163),
   (163010, 'FS-CAT-COLDCHAIN', '冷链及特殊储存', 0, 0, 40, 1, 'delivery-demo', 'delivery-demo', b'0', 163)
-ON DUPLICATE KEY UPDATE cat_name=VALUES(cat_name), parent_id=VALUES(parent_id), cat_type=VALUES(cat_type),
-  sort=VALUES(sort), status=1, deleted=b'0', tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND cat_code=VALUES(cat_code) AND parent_id=VALUES(parent_id) AND cat_type=VALUES(cat_type),tenant_id,NULL);
 
 INSERT INTO ph_warehouse
   (id, store_id, wh_code, wh_name, temp_zone, is_default, status, creator, updater, deleted, tenant_id)
 VALUES
   (163023, 407, 'FS-WH-COLD', '中心店冷藏库', 2, 0, 1, 'delivery-demo', 'delivery-demo', b'0', 163)
-ON DUPLICATE KEY UPDATE wh_name=VALUES(wh_name), temp_zone=2, status=1, deleted=b'0', tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND store_id=VALUES(store_id)
+  AND wh_code=VALUES(wh_code),tenant_id,NULL);
 
 INSERT INTO ph_location
   (id, warehouse_id, location_code, location_type, max_capacity, status, last_use_at,
    creator, updater, deleted, tenant_id)
 VALUES
   (163035, 163023, 'C-02-01', 0, 120, 1, NOW(), 'delivery-demo', 'delivery-demo', b'0', 163)
-ON DUPLICATE KEY UPDATE warehouse_id=VALUES(warehouse_id), max_capacity=VALUES(max_capacity),
-  status=1, last_use_at=NOW(), deleted=b'0', tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND warehouse_id=VALUES(warehouse_id)
+  AND location_code=VALUES(location_code),tenant_id,NULL);
 
 -- 既有 5 个药品也补齐仓库内图片。
 UPDATE ph_drug SET image_url='/pharmacy-demo/medicine.svg', images=JSON_ARRAY('/pharmacy-demo/medicine.svg'), updater='delivery-demo'
- WHERE tenant_id=163 AND id IN (163101,163102,163103) AND deleted=b'0';
+ WHERE tenant_id=163 AND id IN (163101,163102,163103) AND deleted=b'0' AND (image_url IS NULL OR image_url='');
 UPDATE ph_drug SET image_url='/pharmacy-demo/health.svg', images=JSON_ARRAY('/pharmacy-demo/health.svg'), updater='delivery-demo'
- WHERE tenant_id=163 AND id=163104 AND deleted=b'0';
+ WHERE tenant_id=163 AND id=163104 AND deleted=b'0' AND (image_url IS NULL OR image_url='');
 UPDATE ph_drug SET image_url='/pharmacy-demo/device.svg', images=JSON_ARRAY('/pharmacy-demo/device.svg'), updater='delivery-demo'
- WHERE tenant_id=163 AND id=163105 AND deleted=b'0';
+ WHERE tenant_id=163 AND id=163105 AND deleted=b'0' AND (image_url IS NULL OR image_url='');
 
 INSERT INTO ph_drug
   (id, drug_code, category_id, generic_name, trade_name, spell_code, specification,
@@ -64,14 +68,8 @@ VALUES
   (163118,'FS-DRUG-018',163005,'血糖仪','FirstCare Home','xty','套装/盒','医疗器械','鹏城演示医疗科技有限公司','粤械注准DEMO20260118',6,0,0,0,0,'盒',1,139.00,125.00,78.00,108.00,13.00,0,5,50,0,0,163033,1,1,'医疗器械演示商品','/pharmacy-demo/device.svg',JSON_ARRAY('/pharmacy-demo/device.svg'),'器械分类演示数据，不代表真实备案产品。',1,163012,NOW(),'delivery-demo','delivery-demo',b'0',163),
   (163119,'FS-DRUG-019',163010,'重组人胰岛素注射液','冷链一号','zrryds','3ml:300单位/支','注射剂','北辰演示生物制药有限公司','国药准字S-DEMO-0019',0,1,0,0,1,'支',1,56.00,52.00,38.00,45.00,13.00,2,8,80,2,1,163035,0,1,'2-8℃冷链处方药演示商品','/pharmacy-demo/cold-chain.svg',JSON_ARRAY('/pharmacy-demo/cold-chain.svg'),'冷链处方药演示数据，须经药师审核。',1,163012,NOW(),'delivery-demo','delivery-demo',b'0',163),
   (163120,'FS-DRUG-020',163010,'益生菌冻干粉','活力菌','ysj','2g*12袋/盒','粉剂','晨露演示健康科技有限公司','食健备G-DEMO-0020',5,0,0,0,1,'盒',12,68.00,62.00,28.00,50.00,13.00,0,8,90,2,1,163035,1,1,'冷藏保健品演示商品','/pharmacy-demo/cold-chain.svg',JSON_ARRAY('/pharmacy-demo/cold-chain.svg'),'冷链保健品分类演示数据，不代表真实品牌或功效。',1,163012,NOW(),'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE category_id=VALUES(category_id), generic_name=VALUES(generic_name), trade_name=VALUES(trade_name),
-  specification=VALUES(specification), dosage_form=VALUES(dosage_form), manufacturer=VALUES(manufacturer),
-  approval_no=VALUES(approval_no), drug_type=VALUES(drug_type), is_rx=VALUES(is_rx),
-  is_cold_chain=VALUES(is_cold_chain), retail_price=VALUES(retail_price), member_price=VALUES(member_price),
-  cost_price=VALUES(cost_price), min_stock=VALUES(min_stock), max_stock=VALUES(max_stock),
-  storage_cond=VALUES(storage_cond), default_location_id=VALUES(default_location_id),
-  saleable_online=VALUES(saleable_online), status=1, image_url=VALUES(image_url), images=VALUES(images),
-  description=VALUES(description), approve_status=1, deleted=b'0', tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND drug_code=VALUES(drug_code) AND category_id=VALUES(category_id) AND is_rx=VALUES(is_rx),tenant_id,NULL);
 
 INSERT INTO ph_drug_barcode
   (id, drug_id, barcode, barcode_type, is_default, creator, updater, deleted, tenant_id)
@@ -91,7 +89,8 @@ VALUES
   (163218,163118,'6900000163118',0,1,'delivery-demo','delivery-demo',b'0',163),
   (163219,163119,'6900000163119',0,1,'delivery-demo','delivery-demo',b'0',163),
   (163220,163120,'6900000163120',0,1,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE drug_id=VALUES(drug_id), barcode_type=0, is_default=1, deleted=b'0', tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND barcode=VALUES(barcode)
+  AND drug_id=VALUES(drug_id),tenant_id,NULL);
 
 -- B 采购：完整采购单、收货单及 15 条明细。
 INSERT INTO ph_po_order
@@ -108,9 +107,9 @@ VALUES
   (163406,'PO-FS-DELIVERY-003',407,163022,163301,CURRENT_DATE-INTERVAL 15 DAY,CURRENT_DATE-INTERVAL 12 DAY,
    140,1920.00,0.00,1920.00,5,0,'交付版阴凉品种采购演示',163011,NOW()-INTERVAL 14 DAY,
    'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE total_qty=VALUES(total_qty),total_amount=VALUES(total_amount),
-  payable_amount=VALUES(payable_amount),warehouse_id=VALUES(warehouse_id),status=5,
-  deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND order_no=VALUES(order_no) AND store_id=VALUES(store_id)
+  AND warehouse_id=VALUES(warehouse_id) AND supplier_id=VALUES(supplier_id),tenant_id,NULL);
 
 INSERT INTO ph_po_order_line
   (id,order_id,line_no,drug_id,order_qty,received_qty,unit_price,discount_rate,line_amount,remark,creator,updater,deleted,tenant_id)
@@ -130,9 +129,8 @@ VALUES
   (163427,163404,9,163118,10,10,78.00,1.00,780.00,NULL,'delivery-demo','delivery-demo',b'0',163),
   (163428,163405,1,163119,20,20,38.00,1.00,760.00,'冷链运输','delivery-demo','delivery-demo',b'0',163),
   (163429,163405,2,163120,20,20,28.00,1.00,560.00,'冷链运输','delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE order_id=VALUES(order_id),line_no=VALUES(line_no),drug_id=VALUES(drug_id),
-  order_qty=VALUES(order_qty),received_qty=VALUES(received_qty),
-  unit_price=VALUES(unit_price),line_amount=VALUES(line_amount),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND order_id=VALUES(order_id)
+  AND line_no=VALUES(line_no) AND drug_id=VALUES(drug_id),tenant_id,NULL);
 
 INSERT INTO ph_po_receipt
   (id,receipt_no,order_id,store_id,warehouse_id,receive_by,receive_date,total_qty,total_amount,
@@ -144,9 +142,9 @@ VALUES
    0,0,2,1,NOW()-INTERVAL 12 DAY,'delivery-demo','delivery-demo',b'0',163),
   (163425,'GR-FS-DELIVERY-003',163406,407,163022,163014,NOW()-INTERVAL 12 DAY,140,1920.00,
    0,0,2,1,NOW()-INTERVAL 12 DAY,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE total_qty=VALUES(total_qty),total_amount=VALUES(total_amount),
-  warehouse_id=VALUES(warehouse_id),status=2,quality_status=1,
-  posted_at=VALUES(posted_at),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND receipt_no=VALUES(receipt_no)
+  AND order_id=VALUES(order_id) AND store_id=VALUES(store_id)
+  AND warehouse_id=VALUES(warehouse_id),tenant_id,NULL);
 
 -- C 库存：每个新增品种一个批次及货位库存，冷链品种进入冷藏库。
 INSERT INTO ph_inv_batch
@@ -169,10 +167,9 @@ VALUES
   (163518,407,163021,163118,'FSDEL-018',CURRENT_DATE-INTERVAL 30 DAY,CURRENT_DATE+INTERVAL 850 DAY,163301,0,'GR-FS-DELIVERY-001',10,10,0,0,0,0,NULL,'器械批次',78.0000,1,'delivery-demo','delivery-demo',b'0',163),
   (163519,407,163023,163119,'FSDEL-019',CURRENT_DATE-INTERVAL 60 DAY,CURRENT_DATE+INTERVAL 40 DAY,163301,0,'GR-FS-DELIVERY-002',19,19,0,1,0,1,NOW()-INTERVAL 1 DAY,'2-8℃冷链近效期批次',38.0000,2,'delivery-demo','delivery-demo',b'0',163),
   (163520,407,163023,163120,'FSDEL-020',CURRENT_DATE-INTERVAL 45 DAY,CURRENT_DATE+INTERVAL 85 DAY,163301,0,'GR-FS-DELIVERY-002',20,20,0,0,0,1,NULL,'2-8℃冷链近效期批次',28.0000,1,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE warehouse_id=VALUES(warehouse_id),supplier_id=VALUES(supplier_id),
-  source_type=VALUES(source_type),source_no=VALUES(source_no),qty_total=VALUES(qty_total),qty_avail=VALUES(qty_avail),
-  qty_frozen=VALUES(qty_frozen),qty_sold=VALUES(qty_sold),expiry_date=VALUES(expiry_date),
-  expiry_status=VALUES(expiry_status),cost_price=VALUES(cost_price),version=VALUES(version),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND warehouse_id=VALUES(warehouse_id)
+  AND store_id=VALUES(store_id) AND drug_id=VALUES(drug_id)
+  AND batch_no=VALUES(batch_no),tenant_id,NULL);
 
 INSERT INTO ph_inv_location_stock
   (id,batch_id,location_id,drug_id,qty,qty_frozen,creator,updater,deleted,tenant_id)
@@ -192,8 +189,8 @@ VALUES
   (163528,163518,163033,163118,10,0,'delivery-demo','delivery-demo',b'0',163),
   (163529,163519,163035,163119,19,0,'delivery-demo','delivery-demo',b'0',163),
   (163530,163520,163035,163120,20,0,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE location_id=VALUES(location_id),drug_id=VALUES(drug_id),qty=VALUES(qty),
-  qty_frozen=VALUES(qty_frozen),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND batch_id=VALUES(batch_id)
+  AND location_id=VALUES(location_id) AND drug_id=VALUES(drug_id),tenant_id,NULL);
 
 INSERT INTO ph_inv_flow
   (id,store_id,batch_id,drug_id,batch_no,flow_type,in_qty,out_qty,balance_qty,biz_type,biz_no,flow_time,
@@ -217,9 +214,10 @@ VALUES
   (163816,407,163506,163106,'FSDEL-006',20,0,2,78,2,'SO-FS-DELIVERY-001',NOW()-INTERVAL 1 DAY,163013,'销售出库',163031,163728,0,5.8000,'delivery-demo','delivery-demo',b'0',163),
   (163817,407,163509,163109,'FSDEL-009',20,0,2,38,2,'SO-FS-DELIVERY-002',NOW()-INTERVAL 1 DAY,163013,'处方销售出库',163032,163729,0,12.0000,'delivery-demo','delivery-demo',b'0',163),
   (163818,407,163519,163119,'FSDEL-019',20,0,1,19,2,'SO-FS-DELIVERY-002',NOW()-INTERVAL 1 DAY,163013,'冷链处方销售出库',163035,163730,0,38.0000,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE biz_no=VALUES(biz_no),location_id=VALUES(location_id),biz_line_id=VALUES(biz_line_id),
-  in_qty=VALUES(in_qty),out_qty=VALUES(out_qty),balance_qty=VALUES(balance_qty),
-  flow_time=VALUES(flow_time),unit_cost=VALUES(unit_cost),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND biz_type=VALUES(biz_type)
+  AND biz_no=VALUES(biz_no) AND biz_line_id=VALUES(biz_line_id) AND batch_id=VALUES(batch_id)
+  AND location_id=VALUES(location_id) AND drug_id=VALUES(drug_id)
+  AND flow_type=VALUES(flow_type),tenant_id,NULL);
 
 INSERT INTO ph_inv_expiry_alert
   (id,store_id,batch_id,drug_id,alert_level,expire_days,handle_type,handle_by,handle_at,alert_date,creator,updater,deleted,tenant_id)
@@ -227,8 +225,9 @@ VALUES
   (163553,407,163512,163112,2,50,0,NULL,NULL,CURRENT_DATE,'delivery-demo','delivery-demo',b'0',163),
   (163554,407,163519,163119,3,40,1,163011,NOW(),CURRENT_DATE,'delivery-demo','delivery-demo',b'0',163),
   (163555,407,163520,163120,2,85,0,NULL,NULL,CURRENT_DATE,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE alert_level=VALUES(alert_level),expire_days=VALUES(expire_days),
-  handle_type=VALUES(handle_type),handle_by=VALUES(handle_by),handle_at=VALUES(handle_at),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND batch_id=VALUES(batch_id) AND drug_id=VALUES(drug_id)
+  AND store_id=VALUES(store_id) AND alert_date=VALUES(alert_date),tenant_id,NULL);
 
 -- 收货明细放在批次之后写入，create_batch_id 均指向上面的真实批次。
 INSERT INTO ph_po_receipt_line
@@ -250,10 +249,9 @@ VALUES
   (163446,163423,9,163427,163118,'FSDEL-018',CURRENT_DATE-INTERVAL 30 DAY,CURRENT_DATE+INTERVAL 850 DAY,10,78.00,780.00,1,'验收合格',NULL,163518,163033,'delivery-demo','delivery-demo',b'0',163),
   (163447,163424,1,163428,163119,'FSDEL-019',CURRENT_DATE-INTERVAL 60 DAY,CURRENT_DATE+INTERVAL 40 DAY,20,38.00,760.00,1,'冷链验收合格',5.20,163519,163035,'delivery-demo','delivery-demo',b'0',163),
   (163448,163424,2,163429,163120,'FSDEL-020',CURRENT_DATE-INTERVAL 45 DAY,CURRENT_DATE+INTERVAL 85 DAY,20,28.00,560.00,1,'冷链验收合格',4.80,163520,163035,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE receipt_id=VALUES(receipt_id),line_no=VALUES(line_no),order_line_id=VALUES(order_line_id),
-  drug_id=VALUES(drug_id),qty=VALUES(qty),unit_price=VALUES(unit_price),amount=VALUES(amount),
-  quality_flag=VALUES(quality_flag),cold_chain_temp=VALUES(cold_chain_temp),create_batch_id=VALUES(create_batch_id),
-  location_id=VALUES(location_id),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND receipt_id=VALUES(receipt_id)
+  AND line_no=VALUES(line_no) AND order_line_id=VALUES(order_line_id) AND drug_id=VALUES(drug_id)
+  AND create_batch_id=VALUES(create_batch_id) AND location_id=VALUES(location_id),tenant_id,NULL);
 
 -- E 处方：当前模型没有处方明细表，页面按 prescribed_items JSON 展示真实药品关联。
 INSERT INTO ph_presc_record
@@ -264,9 +262,8 @@ VALUES
   (163761,'PX-FS-DELIVERY-001',407,0,'演示社区健康中心','演示医师甲','演示患者甲',45,NULL,'演示处方记录','遵医嘱使用',CURRENT_DATE-INTERVAL 2 DAY,NULL,0,NULL,NULL,NULL,NULL,0,NULL,0,0,NULL,JSON_ARRAY(),JSON_ARRAY(JSON_OBJECT('drugId',163110,'drugName','缬沙坦胶囊','specification','80mg*14粒/盒','quantity',1,'usage','遵医嘱')),'delivery-demo','delivery-demo',b'0',163),
   (163762,'PX-FS-DELIVERY-002',407,1,'演示综合门诊','演示医师乙','演示患者乙',51,NULL,'演示已审核处方','遵医嘱使用',CURRENT_DATE-INTERVAL 1 DAY,NULL,1,163012,NOW()-INTERVAL 1 DAY,'用药信息完整，演示审核通过','演示药师电子签名',0,NULL,0,1,NULL,JSON_ARRAY(),JSON_ARRAY(JSON_OBJECT('drugId',163109,'drugName','阿莫西林胶囊','specification','0.25g*24粒/盒','quantity',2,'usage','遵医嘱'),JSON_OBJECT('drugId',163119,'drugName','重组人胰岛素注射液','specification','3ml:300单位/支','quantity',1,'usage','遵医嘱')),'delivery-demo','delivery-demo',b'0',163),
   (163763,'PX-FS-DELIVERY-003',407,0,'演示社区健康中心','演示医师丙','演示患者丙',38,NULL,'演示驳回处方','信息待补充',CURRENT_DATE,NULL,2,163012,NOW(),'演示数据：用法信息不完整','演示药师电子签名',0,NULL,0,0,NULL,JSON_ARRAY(),JSON_ARRAY(JSON_OBJECT('drugId',163111,'drugName','盐酸二甲双胍片','specification','0.5g*30片/盒','quantity',1,'usage','待补充')),'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE review_status=VALUES(review_status),pharmacist_id=VALUES(pharmacist_id),
-  review_at=VALUES(review_at),review_opinion=VALUES(review_opinion),status=VALUES(status),
-  prescribed_items=VALUES(prescribed_items),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND presc_no=VALUES(presc_no) AND store_id=VALUES(store_id),tenant_id,NULL);
 
 -- D/F 销售与会员关联：一笔 OTC 会员销售，一笔关联已审核处方的冷链处方销售。
 INSERT INTO ph_sale_order
@@ -276,9 +273,9 @@ INSERT INTO ph_sale_order
 VALUES
   (163717,'SO-FS-DELIVERY-001',407,'POS-01',163703,163013,NULL,163611,NULL,0,0,0,2,25.60,0,0,0,25.60,25.60,0,11.60,26,1,0,'交付版OTC会员销售',NOW()-INTERVAL 1 DAY,'delivery-demo','delivery-demo',b'0',163),
   (163718,'SO-FS-DELIVERY-002',407,'POS-01',163703,163013,163012,163612,NULL,0,0,0,3,107.60,0,0,0,107.60,107.60,0,62.00,108,1,0,'交付版处方及冷链销售',NOW()-INTERVAL 1 DAY,'delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE member_id=VALUES(member_id),total_qty=VALUES(total_qty),payable_amount=VALUES(payable_amount),
-  paid_amount=VALUES(paid_amount),cost_amount=VALUES(cost_amount),points_earned=VALUES(points_earned),
-  status=1,sale_time=VALUES(sale_time),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator)
+  AND order_no=VALUES(order_no) AND store_id=VALUES(store_id)
+  AND member_id=VALUES(member_id),tenant_id,NULL);
 
 INSERT INTO ph_sale_order_line
   (id,order_id,line_no,drug_id,batch_id,batch_no,expiry_date,qty,price,normal_price,discount,line_amount,
@@ -287,25 +284,21 @@ VALUES
   (163728,163717,1,163106,163506,'FSDEL-006',CURRENT_DATE+INTERVAL 540 DAY,2,12.80,12.80,0,25.60,5.80,0,NULL,0,0,163031,'对乙酰氨基酚片','0.5g*20片/盒','盒','delivery-demo','delivery-demo',b'0',163),
   (163729,163718,1,163109,163509,'FSDEL-009',CURRENT_DATE+INTERVAL 360 DAY,2,25.80,25.80,0,51.60,12.00,1,163762,0,0,163032,'阿莫西林胶囊','0.25g*24粒/盒','盒','delivery-demo','delivery-demo',b'0',163),
   (163730,163718,2,163119,163519,'FSDEL-019',CURRENT_DATE+INTERVAL 40 DAY,1,56.00,56.00,0,56.00,38.00,1,163762,0,0,163035,'重组人胰岛素注射液','3ml:300单位/支','支','delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE drug_id=VALUES(drug_id),batch_id=VALUES(batch_id),qty=VALUES(qty),price=VALUES(price),
-  line_amount=VALUES(line_amount),presc_id=VALUES(presc_id),location_id=VALUES(location_id),
-  drug_name=VALUES(drug_name),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND order_id=VALUES(order_id)
+  AND line_no=VALUES(line_no) AND drug_id=VALUES(drug_id)
+  AND batch_id=VALUES(batch_id) AND location_id=VALUES(location_id)
+  AND presc_id <=> VALUES(presc_id),tenant_id,NULL);
 
 INSERT INTO ph_sale_payment
   (id,order_id,pay_no,pay_method,pay_amount,channel,status,paid_at,payment_no,creator,updater,deleted,tenant_id)
 VALUES
   (163737,163717,'CASH-DELIVERY-001',1,25.60,'cash',1,NOW()-INTERVAL 1 DAY,'PAY-FS-DELIVERY-001','delivery-demo','delivery-demo',b'0',163),
   (163738,163718,'CARD-DELIVERY-002',4,107.60,'bank',1,NOW()-INTERVAL 1 DAY,'PAY-FS-DELIVERY-002','delivery-demo','delivery-demo',b'0',163)
-ON DUPLICATE KEY UPDATE order_id=VALUES(order_id),pay_amount=VALUES(pay_amount),status=1,
-  paid_at=VALUES(paid_at),deleted=b'0',tenant_id=163;
+ON DUPLICATE KEY UPDATE tenant_id=IF(id=VALUES(id) AND tenant_id=163 AND creator=VALUES(creator) AND order_id=VALUES(order_id)
+  AND payment_no=VALUES(payment_no) AND channel=VALUES(channel) AND pay_no=VALUES(pay_no)
+  AND pay_amount=VALUES(pay_amount),tenant_id,NULL);
 
--- F 会员：member_level 与 member_user 均沿用框架状态口径（0=启用、1=禁用）。
-UPDATE member_level
-SET status=0,updater='delivery-demo',deleted=b'0'
-WHERE tenant_id=163 AND id IN (163601,163602,163603);
-
-UPDATE member_user
-SET status=0,updater='delivery-demo',deleted=b'0'
-WHERE tenant_id=163 AND id IN (163611,163612,163613,163614);
+-- F 会员：前序初始化已以 status=0 创建会员和等级（框架口径：0=启用）。
+-- 不重置已有会员状态，避免重跑时重新启用已被管理员停用的账号。
 
 COMMIT;

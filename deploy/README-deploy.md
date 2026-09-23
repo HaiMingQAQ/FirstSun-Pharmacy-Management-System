@@ -152,8 +152,8 @@ docker compose -p firstsun-admin-delivery -f docker-compose.prod.yml logs -f bac
 
 首次创建空数据卷时，MySQL 会按 `01` 至 `38` 的顺序执行初始化脚本。第 38 份脚本
 `20260922_p_admin_delivery_demo_data.sql` 为 FirstSun 租户（`tenant_id=163`）补充管理后台
-A-F 板块的关联演示数据。脚本使用固定 ID 与唯一业务编号，可在已有数据库中重复执行；
-不使用 `DROP`、`TRUNCATE`，也不删除既有数据。
+A-F 板块的关联演示数据。推荐仅在首次初始化的空数据卷中执行。固定 ID 或业务唯一键若已被其他记录占用，脚本会报错并回滚，不会改写其他租户或继续引用冲突记录。仅当同一批演示记录已存在且尚未产生真实业务流水时，才可重跑核验；重跑不会重置已有库存、订单状态或会员状态。业务运行后的库存与状态以实际流水为准，不要把此脚本当作恢复数据的工具。
+脚本不使用 `DROP`、`TRUNCATE`，也不删除既有数据。
 
 演示药品图片位于 `admin-ui/public/pharmacy-demo/`，由管理后台 Nginx 同源提供
 `/pharmacy-demo/*.svg`。这些图片是项目内原创的通用分类占位图，不含真实药品包装或外链资源。
